@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0f1c">
+  <title>Streaming Systems Interactive Notes</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <button class="menu-toggle" id="menuToggle" aria-label="Open chapters menu" title="Chapters">&#9776;</button>
+
+    <div class="brand">
+      <div class="logo">S</div>
+      Streaming Systems Notes
+      <span class="brand-sub">Interactive interview prep</span>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="progress-pill" title="Overall progress across all chapters">
+      <span id="overallProgressText">0%</span>
+      <div class="progress-pill-bar"><div class="progress-pill-fill" id="overallProgressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="search-wrap">
+      <input type="text" class="search-box" id="searchBox" placeholder="Search concepts, labs, questions... (press /)" />
+      <div class="search-results" id="searchResults"></div>
+    </div>
+
+    <button class="iconbtn" id="exportBtn" title="Export your progress to a file">&#11015; Export</button>
+    <button class="iconbtn" id="importBtn" title="Import progress from a file">&#11014; Import</button>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none" />
+    <button class="iconbtn" id="themeToggle" title="Toggle theme">Light</button>
+    <button class="iconbtn" id="resetBtn" title="Reset all progress">Reset</button>
+
+    <div class="more-wrap">
+      <button class="more-toggle" id="moreToggle" aria-label="More actions" title="More">&#8943;</button>
+      <div class="more-menu" id="moreMenu">
+        <button class="iconbtn" data-action="export">&#11015; Export progress</button>
+        <button class="iconbtn" data-action="import">&#11014; Import progress</button>
+        <button class="iconbtn" data-action="theme">&#9728; Toggle theme</button>
+        <button class="iconbtn" data-action="reset">&#10227; Reset progress</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="backdrop" id="backdrop"></div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main" id="main"></main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="data.js"></script>
+  <script src="data-part2.js"></script>
+  <script src="demos.js"></script>
+  <script src="demos-part2.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
