@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0f1c">
+  <meta name="description" content="Library of the books behind the low-level design notes, readable in the browser.">
+  <title>Library · Low-Level Design</title>
+  <style>
+    :root {
+      --bg: #0a0f1c;
+      --bg-2: #10172a;
+      --bg-3: #18213a;
+      --border: #24304f;
+      --text: #e6ebf5;
+      --muted: #94a3b8;
+      --faint: #64748b;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.35);
+      color-scheme: dark;
+    }
+    :root[data-theme="light"] {
+      --bg: #f4f6fb;
+      --bg-2: #ffffff;
+      --bg-3: #eef2f7;
+      --border: #dde3ec;
+      --text: #0f172a;
+      --muted: #475569;
+      --faint: #64748b;
+      --shadow: 0 1px 2px rgba(15,23,42,.05), 0 10px 28px rgba(15,23,42,.08);
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    [hidden] { display: none !important; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+      background: var(--bg-3); border: 1px solid var(--border); color: var(--text);
+      border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer;
+    }
+    .btn:hover { border-color: var(--muted); }
+    .btn.primary { background: #14b8a6; border-color: #14b8a6; color: #04201d; font-weight: 600; }
+    .btn.primary:hover { filter: brightness(1.08); }
+
+    .topbar {
+      display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+      background: var(--bg-2); border-bottom: 1px solid var(--border);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; white-space: nowrap; }
+    .brand-mark {
+      width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none;
+      background: linear-gradient(135deg, #00add8, #14b8a6 50%, #a78bfa); color: #0a0f1c; font-size: 10px; font-weight: 800;
+    }
+    .spacer { flex: 1; }
+    .reader-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 14px; }
+    .reader-title b { color: var(--text); }
+    select.btn { padding-right: 8px; max-width: 240px; }
+
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .hero { padding: 36px 0 8px; }
+    .eyebrow { color: #14b8a6; font-size: 12px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; }
+    h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 8px 0 10px; letter-spacing: -.4px; }
+    .lede { color: var(--muted); font-size: 16px; max-width: 700px; margin: 0; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 28px 0 48px; }
+    .book {
+      --accent: #14b8a6;
+      position: relative; display: flex; flex-direction: column; gap: 12px;
+      background: var(--bg-2); border: 1px solid var(--border); border-radius: 14px;
+      padding: 20px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .book::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--accent); }
+    .book-head { display: flex; align-items: center; gap: 12px; }
+    .mono {
+      flex: none; width: 40px; height: 52px; border-radius: 4px 8px 8px 4px; display: grid; place-items: center;
+      font-weight: 800; font-size: 14px; color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+      border-left: 4px solid var(--accent);
+    }
+    .book h3 { margin: 0; font-size: 17px; line-height: 1.25; }
+    .by { color: var(--faint); font-size: 13px; }
+    .book p { margin: 0; color: var(--muted); font-size: 14px; flex: 1; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    body.reading { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+    .viewer { flex: 1; min-height: 0; position: relative; background: #525659; }
+    .viewer iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .fallback {
+      position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; background: var(--bg);
+    }
+    .fallback-box {
+      max-width: 420px; text-align: center; background: var(--bg-2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 24px; box-shadow: var(--shadow);
+    }
+    .fallback-box p { color: var(--muted); margin: 8px 0 16px; }
+    .fallback-box .actions { justify-content: center; }
+
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+      .hide-sm { display: none !important; }
+      .reader-title { display: none; }
+      select.btn { max-width: none; flex: 1; min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="btn" href="../index.html" title="All books (home)" aria-label="Home">&#8962;<span class="hide-sm"> Home</span></a>
+    <a class="brand" href="#" id="libraryLink" title="Library"><div class="brand-mark">LLD</div><span class="hide-sm">Library</span></a>
+    <span class="reader-title" id="readerTitle" hidden></span>
+    <div class="spacer"></div>
+    <select class="btn" id="bookSelect" aria-label="Choose a book" hidden></select>
+    <a class="btn" id="notesBtn" hidden>Notes</a>
+    <a class="btn hide-sm" id="openBtn" target="_blank" rel="noopener" hidden>Open in new tab &nearr;</a>
+    <a class="btn" id="downloadBtn" download hidden>&#11015;<span class="hide-sm"> Download</span></a>
+    <button class="btn" id="themeToggle" title="Toggle theme">Light</button>
+  </header>
+
+  <main id="library" class="wrap">
+    <section class="hero">
+      <div class="eyebrow">Library</div>
+      <h1>The books behind the notes</h1>
+      <p class="lede">Read any of the source books right here in the browser, jump to the interactive notes that go with it, or download the PDF.</p>
+    </section>
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <section class="viewer" id="viewer" hidden>
+    <iframe id="pdfFrame" title="Book"></iframe>
+    <div class="fallback" id="fallback" hidden>
+      <div class="fallback-box">
+        <strong>This browser can't show PDFs inline</strong>
+        <p>Open the book in your device's PDF reader, or download it.</p>
+        <div class="actions">
+          <a class="btn primary" id="fbOpen" target="_blank" rel="noopener">Open PDF</a>
+          <a class="btn" id="fbDownload" download>Download</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      const BOOKS = [
+        { id: "mastering-go", mono: "Go", accent: "#00add8", title: "Mastering Go, 4th edition", by: "Mihalis Tsoukalos",
+          file: "mastering-go.pdf",
+          notes: "../notes/mastering-go/index.html",
+          blurb: "Go from the basics to production: data types, slices and maps, generics, reflection and interfaces, packages, systems programming, concurrency, web services, REST, testing, profiling, fuzzing, performance and the garbage collector." }
+      ];
+      const $ = id => document.getElementById(id);
+      const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      const pdfUrl = b => encodeURI(b.file).replace(/'/g, "%27");
+      const fileName = b => b.file.split("/").pop();
+
+      const THEME_KEY = "system_design_hub_theme";
+      const root = document.documentElement, themeBtn = $("themeToggle");
+      const applyTheme = t => { root.dataset.theme = t; themeBtn.textContent = t === "dark" ? "Light" : "Dark"; };
+      let theme = localStorage.getItem(THEME_KEY) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      applyTheme(theme);
+      themeBtn.addEventListener("click", () => { theme = theme === "dark" ? "light" : "dark"; localStorage.setItem(THEME_KEY, theme); applyTheme(theme); });
+
+      $("grid").innerHTML = BOOKS.map(b => `
+        <article class="book" style="--accent:${b.accent}">
+          <div class="book-head">
+            <div class="mono">${esc(b.mono)}</div>
+            <div><h3>${esc(b.title)}</h3><div class="by">${esc(b.by)}</div></div>
+          </div>
+          <p>${esc(b.blurb)}</p>
+          <div class="actions">
+            <a class="btn primary" href="#${b.id}">Read</a>
+            <a class="btn" href="${esc(b.notes)}">${esc(b.notesLabel || "Notes")}</a>
+            <a class="btn" href="${esc(pdfUrl(b))}" download="${esc(fileName(b))}">&#11015; PDF</a>
+          </div>
+        </article>`).join("");
+      $("bookSelect").innerHTML = BOOKS.map(b => `<option value="${b.id}">${esc(b.title)}</option>`).join("");
+      $("bookSelect").addEventListener("change", e => { location.hash = e.target.value; });
+
+      const inlinePdf = navigator.pdfViewerEnabled !== false;
+      const readerEls = ["readerTitle", "bookSelect", "notesBtn", "openBtn", "downloadBtn"];
+      let shown = null;
+
+      function route() {
+        const book = BOOKS.find(b => b.id === location.hash.slice(1));
+        document.body.classList.toggle("reading", !!book);
+        $("library").hidden = !!book;
+        $("viewer").hidden = !book;
+        readerEls.forEach(id => { $(id).hidden = !book; });
+        if (!book) {
+          document.title = "Library · Low-Level Design";
+          return;
+        }
+        document.title = `${book.title} · Library`;
+        $("readerTitle").innerHTML = `<b>${esc(book.title)}</b> &middot; ${esc(book.by)}`;
+        $("bookSelect").value = book.id;
+        $("notesBtn").href = book.notes;
+        $("notesBtn").textContent = book.notesLabel || "Notes";
+        const url = pdfUrl(book);
+        [$("openBtn"), $("fbOpen")].forEach(a => { a.href = url; });
+        [$("downloadBtn"), $("fbDownload")].forEach(a => { a.href = url; a.download = fileName(book); });
+        $("fallback").hidden = inlinePdf;
+        if (inlinePdf && shown !== book.id) $("pdfFrame").src = url + "#view=FitH";
+        shown = book.id;
+      }
+      $("libraryLink").addEventListener("click", e => { e.preventDefault(); history.pushState(null, "", location.pathname); route(); });
+      window.addEventListener("hashchange", route);
+      window.addEventListener("popstate", route);
+      route();
+    })();
+  </script>
+</body>
+</html>

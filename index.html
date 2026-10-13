@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1c">
-  <meta name="description" content="Interactive system design notes: Designing Data-Intensive Applications, Streaming Systems, AI Engineering, Essential GraphRAG, Database Internals and a field guide to databases.">
-  <title>System Design · Interactive Notes</title>
+  <meta name="description" content="Interactive system design notes in two tracks: high-level design (distributed systems, data and AI books, core concepts) and low-level design (Mastering Go and the building blocks of well-designed programs).">
+  <title>System Design · High-Level and Low-Level Design</title>
   <style>
     :root {
       --bg: #0a0f1c;
@@ -53,71 +53,46 @@
     }
     .btn:hover { border-color: var(--muted); }
 
-    .hero { padding: 40px 0 28px; }
+    .hero { padding: 48px 0 32px; }
     .eyebrow { color: #14b8a6; font-size: 12px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; }
     h1 { font-size: clamp(32px, 5vw, 48px); line-height: 1.1; margin: 10px 0 14px; letter-spacing: -.5px; }
     .lede { color: var(--muted); font-size: 17px; max-width: 720px; margin: 0; }
-    .totals { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
-    .total {
-      background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px;
-      padding: 10px 14px; min-width: 112px;
-    }
-    .total b { display: block; font-size: 22px; line-height: 1.2; }
-    .total span { color: var(--faint); font-size: 12px; text-transform: uppercase; letter-spacing: .6px; }
 
-    h2 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.4px; margin: 36px 0 14px; }
-    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-
+    .tracks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
     .card {
       --accent: #14b8a6;
-      position: relative; display: flex; flex-direction: column; gap: 12px;
-      background: var(--bg-2); border: 1px solid var(--border); border-radius: 14px;
-      padding: 20px; box-shadow: var(--shadow); overflow: hidden;
+      position: relative; display: flex; flex-direction: column; gap: 14px;
+      background: var(--bg-2); border: 1px solid var(--border); border-radius: 16px;
+      padding: 26px; box-shadow: var(--shadow); overflow: hidden;
       transition: transform .15s ease, border-color .15s ease;
     }
-    .card::before {
-      content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--accent);
-    }
+    .card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--accent); }
     .card:hover, .card:focus-visible { transform: translateY(-2px); border-color: var(--accent); outline: none; }
-    .card-head { display: flex; align-items: center; gap: 12px; }
+    .card-head { display: flex; align-items: center; gap: 14px; }
     .mono {
-      flex: none; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
-      font-weight: 800; font-size: 15px; color: var(--accent);
+      flex: none; width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center;
+      font-weight: 800; font-size: 17px; color: var(--accent);
       background: color-mix(in srgb, var(--accent) 16%, transparent);
       border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
     }
-    .card h3 { margin: 0; font-size: 18px; line-height: 1.25; }
+    .card h2 { margin: 0; font-size: 22px; line-height: 1.2; }
     .by { color: var(--faint); font-size: 13px; }
-    .card p { margin: 0; color: var(--muted); font-size: 14px; }
+    .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .chip {
       font-size: 12px; padding: 2px 9px; border-radius: 999px; color: var(--accent);
       background: color-mix(in srgb, var(--accent) 12%, transparent);
     }
-    .meta { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); font-size: 13px; margin-top: auto; padding-top: 4px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: 13px; margin-top: auto; padding-top: 4px; }
     .meta b { color: var(--text); }
-    .prog { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--faint); }
-    .bar { flex: 1; height: 6px; border-radius: 999px; background: var(--bg-3); overflow: hidden; }
-    .fill { height: 100%; width: 0; background: var(--accent); border-radius: inherit; }
     .open { font-size: 14px; font-weight: 600; color: var(--accent); }
-
-    .card.wide { flex-direction: row; align-items: stretch; gap: 24px; }
-    .card.wide .body { display: flex; flex-direction: column; gap: 12px; flex: 1; }
-    .card.wide .side {
-      flex: none; width: 260px; display: flex; flex-direction: column; justify-content: center; gap: 6px;
-      border-left: 1px solid var(--border); padding-left: 24px; color: var(--muted); font-size: 13px;
-    }
-    .card.wide .side ol { margin: 0; padding-left: 18px; }
 
     footer { color: var(--faint); font-size: 13px; padding: 40px 0 48px; display: flex; flex-wrap: wrap; gap: 8px 20px; }
     footer a { color: var(--muted); border-bottom: 1px dotted var(--faint); }
 
-    @media (max-width: 960px) { .grid { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 720px) {
-      .grid { grid-template-columns: 1fr; }
-      .card.wide { flex-direction: column; }
-      .card.wide .side { width: auto; border-left: 0; border-top: 1px solid var(--border); padding: 14px 0 0; }
-      .hero { padding-top: 20px; }
+    @media (max-width: 760px) {
+      .tracks { grid-template-columns: 1fr; }
+      .hero { padding-top: 24px; }
     }
   </style>
 </head>
@@ -126,208 +101,41 @@
     <header class="topbar">
       <div class="brand"><div class="brand-mark">SD</div>System Design</div>
       <div class="spacer"></div>
-      <a class="btn" href="books/index.html" title="Read the books as PDFs">Library</a>
       <button class="btn" id="themeToggle" title="Toggle theme">Light</button>
     </header>
 
     <section class="hero">
       <div class="eyebrow">Interactive notes</div>
-      <h1>System design, one book at a time</h1>
-      <p class="lede">Chapter-wise notes with hands-on labs, cheatsheets, interview Q&amp;A and flashcards for the system design core concepts, the advanced topics and the books behind modern data and AI systems, plus a visual guide to how databases differ.</p>
-      <div class="totals">
-        <div class="total"><b>5</b><span>books</span></div>
-        <div class="total"><b>81</b><span>chapters</span></div>
-        <div class="total"><b>142</b><span>interactive labs</span></div>
-        <div class="total"><b>580</b><span>interview Q&amp;A</span></div>
-        <div class="total"><b>20</b><span>slides</span></div>
-      </div>
+      <h1>System design, in two tracks</h1>
+      <p class="lede">High-level design is about the boxes and arrows: how data moves between services, stores and regions. Low-level design is about what goes inside one box: the language, its types and interfaces, concurrency, and code that stays easy to test and change. Pick a track.</p>
     </section>
 
-    <h2>Core concepts</h2>
-    <a class="card wide" href="notes/core-concepts/index.html" style="--accent:#f87171" data-key="core_concepts_notes_v1" data-total="339">
-      <div class="body">
+    <div class="tracks">
+      <a class="card" href="high-level-design/index.html" style="--accent:#38bdf8">
         <div class="card-head">
-          <div class="mono">CC</div>
-          <div><h3>System Design Core Concepts</h3><div class="by">Based on Hello Interview's core concepts &middot; one long book</div></div>
+          <div class="mono">HLD</div>
+          <div><h2>High-Level Design</h2><div class="by">Distributed systems, data and AI</div></div>
         </div>
-        <p>The ideas that come up in almost every system design interview, from how a request crosses the network to sizing a system with back-of-the-envelope math. Labs cover retry storms, rate limiters, cache stampedes, hash rings, quorums, geohash lookups and more.</p>
-        <div class="chips"><span class="chip">Networking</span><span class="chip">API design</span><span class="chip">Caching</span><span class="chip">Sharding</span><span class="chip">CAP</span></div>
-        <div class="meta"><span><b>18</b> chapters</span><span><b>224</b> concepts</span><span><b>31</b> labs</span><span><b>115</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
-      </div>
-      <div class="side">
-        <strong style="color:var(--text)">Nine parts</strong>
-        <ol>
-          <li>Networking essentials</li>
-          <li>API design</li>
-          <li>Data modeling</li>
-          <li>Database indexing</li>
-          <li>Caching</li>
-          <li>Sharding</li>
-          <li>Consistent hashing</li>
-          <li>CAP theorem</li>
-          <li>Numbers to know</li>
-        </ol>
-      </div>
-    </a>
-
-    <h2>Advanced topics</h2>
-    <a class="card wide" href="notes/advanced-topics/index.html" style="--accent:#fb923c" data-key="advanced_topics_notes_v1" data-total="179">
-      <div class="body">
-        <div class="card-head">
-          <div class="mono">AT</div>
-          <div><h3>System Design Advanced Topics</h3><div class="by">Based on Hello Interview's advanced topics and Arpit Bhayani's Morris counter essay</div></div>
-        </div>
-        <p>The deep dives that come up once the core concepts are solid: proximity search, probabilistic data structures for big data (Bloom filters, Count-Min Sketch, HyperLogLog and the Morris counter), vector databases, time series databases and change data capture. Labs cover quadtrees, geohash cells, HyperLogLog registers, Morris counters, HNSW graph search, Gorilla compression, CDC ordering and more.</p>
-        <div class="chips"><span class="chip">Geospatial</span><span class="chip">Sketches</span><span class="chip">Morris counter</span><span class="chip">Vectors</span><span class="chip">Time series</span><span class="chip">CDC</span></div>
-        <div class="meta"><span><b>10</b> chapters</span><span><b>125</b> concepts</span><span><b>20</b> labs</span><span><b>54</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
-      </div>
-      <div class="side">
-        <strong style="color:var(--text)">Five parts</strong>
-        <ol>
-          <li>Proximity search</li>
-          <li>Data structures for big data</li>
-          <li>Vector databases</li>
-          <li>Time series databases</li>
-          <li>Change data capture</li>
-        </ol>
-      </div>
-    </a>
-
-    <h2>Problem breakdowns</h2>
-    <a class="card wide" href="notes/problem-breakdowns/index.html" style="--accent:#a3e635" data-key="problem_breakdowns_notes_v1" data-total="76">
-      <div class="body">
-        <div class="card-head">
-          <div class="mono">PB</div>
-          <div><h3>System Design Problem Breakdowns</h3><div class="by">Classic interview problems worked end to end &middot; inspired by Hello Interview's breakdowns</div></div>
-        </div>
-        <p>One interview problem per part, from requirements and back-of-the-envelope numbers to a first working design and the deep dives that make it scale. Starts with YouTube Top K: tumbling vs sliding windows, serving from a precomputed cache, partitioning counters, pre-aggregating in the stream, per-window totals and a Count-Min sketch with a heap.</p>
-        <div class="chips"><span class="chip">Top K</span><span class="chip">Windows</span><span class="chip">Stream aggregation</span><span class="chip">Count-Min</span></div>
-        <div class="meta"><span><b>5</b> chapters</span><span><b>50</b> concepts</span><span><b>8</b> labs</span><span><b>26</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
-      </div>
-      <div class="side">
-        <strong style="color:var(--text)">Problems so far</strong>
-        <ol>
-          <li>YouTube Top K: most-viewed videos over the last hour, day, month and all time</li>
-        </ol>
-      </div>
-    </a>
-
-    <h2>Book notes</h2>
-    <div class="grid">
-      <a class="card" href="notes/ddia/index.html" style="--accent:#f472b6" data-key="ddia_notes_v1" data-total="281">
-        <div class="card-head">
-          <div class="mono">D</div>
-          <div><h3>Designing Data-Intensive Applications</h3><div class="by">Martin Kleppmann</div></div>
-        </div>
-        <p>The foundations of data systems: reliability and scalability, data models and storage engines, encoding, replication, partitioning, transactions, consistency and consensus, batch and stream processing.</p>
-        <div class="chips"><span class="chip">Replication</span><span class="chip">Partitioning</span><span class="chip">Transactions</span><span class="chip">Consensus</span></div>
-        <div class="meta"><span><b>12</b> chapters</span><span><b>181</b> concepts</span><span><b>100</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
+        <p>Core concepts and advanced topics, worked problem breakdowns, and chapter-wise notes for the books behind modern data and AI systems, plus a field guide to databases and an in-browser library of the source books.</p>
+        <div class="chips"><span class="chip">Core concepts</span><span class="chip">Advanced topics</span><span class="chip">Problem breakdowns</span><span class="chip">DDIA</span><span class="chip">Streaming</span><span class="chip">AI engineering</span></div>
+        <div class="meta"><span><b>81</b> chapters</span><span><b>142</b> labs</span><span><b>580</b> Q&amp;A</span><span><b>20</b> slides</span></div>
+        <span class="open">Open high-level design &rarr;</span>
       </a>
 
-      <a class="card" href="notes/streaming-systems/index.html" style="--accent:#38bdf8" data-key="streaming_systems_notes_v1" data-total="200">
+      <a class="card" href="low-level-design/index.html" style="--accent:#00add8">
         <div class="card-head">
-          <div class="mono">S</div>
-          <div><h3>Streaming Systems</h3><div class="by">Akidau, Chernyak &amp; Lax</div></div>
+          <div class="mono">LLD</div>
+          <div><h2>Low-Level Design</h2><div class="by">Languages and building blocks of well-designed programs</div></div>
         </div>
-        <p>The Beam model: event time vs processing time, windowing, watermarks, triggers and accumulation, exactly-once processing, and the theory of streams and tables.</p>
-        <div class="chips"><span class="chip">Watermarks</span><span class="chip">Triggers</span><span class="chip">Exactly-once</span><span class="chip">Streams &amp; tables</span></div>
-        <div class="meta"><span><b>10</b> chapters</span><span><b>118</b> concepts</span><span><b>22</b> labs</span><span><b>82</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
-      </a>
-
-      <a class="card" href="notes/ai-engineering/index.html" style="--accent:#14b8a6" data-key="ai_engineering_notes_v1" data-total="197">
-        <div class="card-head">
-          <div class="mono">AI</div>
-          <div><h3>AI Engineering</h3><div class="by">Chip Huyen</div></div>
-        </div>
-        <p>Building on foundation models: sampling, evaluation, prompt engineering, RAG and agents, finetuning, dataset engineering and inference optimization.</p>
-        <div class="chips"><span class="chip">Evaluation</span><span class="chip">RAG &amp; agents</span><span class="chip">Finetuning</span><span class="chip">Inference</span></div>
-        <div class="meta"><span><b>10</b> chapters</span><span><b>119</b> concepts</span><span><b>22</b> labs</span><span><b>78</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
-      </a>
-
-      <a class="card" href="notes/graphrag/index.html" style="--accent:#a78bfa" data-key="graphrag_notes_v1" data-total="164">
-        <div class="card-head">
-          <div class="mono">G</div>
-          <div><h3>Essential GraphRAG</h3><div class="by">Bratanič &amp; Hane</div></div>
-        </div>
-        <p>Knowledge-graph-enhanced RAG: hybrid search, advanced retrieval, text2cypher, agentic RAG, building graphs with LLMs, Microsoft GraphRAG and RAG evaluation.</p>
-        <div class="chips"><span class="chip">Hybrid search</span><span class="chip">text2cypher</span><span class="chip">Agentic RAG</span><span class="chip">MS GraphRAG</span></div>
-        <div class="meta"><span><b>9</b> chapters</span><span><b>97</b> concepts</span><span><b>16</b> labs</span><span><b>67</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
-      </a>
-
-      <a class="card" href="notes/database-internals/index.html" style="--accent:#4ade80" data-key="database_internals_notes_v1" data-total="165">
-        <div class="card-head">
-          <div class="mono">DI</div>
-          <div><h3>Database Internals</h3><div class="by">Alex Petrov &middot; Part I: Storage Engines</div></div>
-        </div>
-        <p>How storage engines work: B-Trees and their file formats, page layouts and splits, buffer management, WAL and ARIES recovery, concurrency control, B-Tree variants and LSM Trees.</p>
-        <div class="chips"><span class="chip">B-Trees</span><span class="chip">Slotted pages</span><span class="chip">WAL &amp; recovery</span><span class="chip">LSM Trees</span></div>
-        <div class="meta"><span><b>7</b> chapters</span><span><b>107</b> concepts</span><span><b>23</b> labs</span><span><b>58</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
+        <p>Chapter-wise notes for the books on writing the code inside one box, starting with Mastering Go: types, slices and maps, generics, interfaces, packages, goroutines and channels, web services, testing, profiling and the garbage collector. Plus an in-browser library of the source books.</p>
+        <div class="chips"><span class="chip">Mastering Go</span><span class="chip">Generics</span><span class="chip">Interfaces</span><span class="chip">Concurrency</span><span class="chip">Testing &amp; profiling</span><span class="chip">GC</span></div>
+        <div class="meta"><span><b>16</b> chapters</span><span><b>47</b> labs</span><span><b>156</b> Q&amp;A</span></div>
+        <span class="open">Open low-level design &rarr;</span>
       </a>
     </div>
 
-    <h2>Guides &amp; slides</h2>
-    <a class="card wide" href="slides/database-guide/index.html" style="--accent:#f59e0b">
-      <div class="body">
-        <div class="card-head">
-          <div class="mono">DB</div>
-          <div><h3>A Field Guide to Databases</h3><div class="by">Slide deck &middot; 20 slides</div></div>
-        </div>
-        <p>How databases differ and why: OLTP vs OLAP, four independent design axes, data models, B-Tree vs LSM-Tree (with an animated LSM-Tree), separating compute from storage, and distributed SQL.</p>
-        <div class="chips"><span class="chip">OLTP vs OLAP</span><span class="chip">B-Tree vs LSM</span><span class="chip">Distributed SQL</span><span class="chip">NewSQL</span></div>
-        <span class="open">Open slides &rarr;</span>
-      </div>
-      <div class="side">
-        <strong style="color:var(--text)">Covers</strong>
-        <ol>
-          <li>Key-value, SQL, document and wide-column stores</li>
-          <li>Single-node vs distributed</li>
-          <li>Case study: TiDB</li>
-          <li>The whole tour as a matrix</li>
-        </ol>
-      </div>
-    </a>
-
-    <h2>Library</h2>
-    <a class="card wide" href="books/index.html" style="--accent:#14b8a6">
-      <div class="body">
-        <div class="card-head">
-          <div class="mono">PDF</div>
-          <div><h3>Read the books</h3><div class="by">In-browser PDF viewer &middot; 7 books</div></div>
-        </div>
-        <p>The source books behind these notes, readable right in the browser. Switch between books from the viewer, jump to each book's notes, or download the PDF.</p>
-        <span class="open">Open library &rarr;</span>
-      </div>
-      <div class="side">
-        <strong style="color:var(--text)">On the shelf</strong>
-        <ol>
-          <li>Designing Data-Intensive Applications</li>
-          <li>Streaming Systems</li>
-          <li>AI Engineering</li>
-          <li>Essential GraphRAG</li>
-          <li>Database Internals</li>
-          <li>System Design Interview, Vol. 1 &amp; 2</li>
-        </ol>
-      </div>
-    </a>
-
     <footer>
-      <span>Progress is saved in this browser, separately for each book.</span>
+      <span>Progress is saved in this browser, separately for each set of notes.</span>
       <a href="https://github.com/gouravb20/system-design">Source on GitHub</a>
     </footer>
   </div>
@@ -340,19 +148,6 @@
       let theme = localStorage.getItem(THEME_KEY) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
       apply(theme);
       btn.addEventListener("click", () => { theme = theme === "dark" ? "light" : "dark"; localStorage.setItem(THEME_KEY, theme); apply(theme); });
-
-      const countTrue = o => Object.values(o || {}).filter(Boolean).length;
-      document.querySelectorAll(".card[data-key]").forEach(card => {
-        let done = 0;
-        try {
-          const saved = JSON.parse(localStorage.getItem(card.dataset.key) || "{}");
-          Object.values(saved.progress || {}).forEach(p => { done += countTrue(p.conceptsLearned) + countTrue(p.qaReviewed); });
-        } catch (e) {}
-        if (!done) return;
-        const pct = Math.min(100, Math.round(done / +card.dataset.total * 100));
-        card.querySelector(".fill").style.width = pct + "%";
-        card.querySelector(".pct").textContent = pct + "% done";
-      });
     })();
   </script>
 </body>
