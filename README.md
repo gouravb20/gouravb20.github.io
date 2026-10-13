@@ -18,7 +18,7 @@ It is a plain static site (HTML, CSS and JavaScript, no build step and no depend
 Also included:
 
 - [`slides/database-guide`](slides/database-guide/index.html): *A Field Guide to Databases*, a 20-slide deck on OLTP vs OLAP, data models, B-Tree vs LSM-Tree, compute/storage separation and distributed SQL.
-- [`books/`](books/index.html): a library page that opens each source PDF in the browser's built-in PDF viewer (`books/index.html#ddia`, `#database-internals`, ...), with links to the notes and downloads.
+- [`books/`](books/index.html): a library page that opens each source PDF in the browser's built-in PDF viewer (`books/index.html#ddia`, `#database-internals`, ...), with links to the notes and downloads. It also holds Alex Xu's *System Design Interview* volumes 1 and 2 (`#sdi-vol1`, `#sdi-vol2`), linked to the core concepts notes.
 
 ## Features of the notes sites
 

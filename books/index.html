@@ -128,7 +128,7 @@
     <section class="hero">
       <div class="eyebrow">Library</div>
       <h1>The books behind the notes</h1>
-      <p class="lede">Read any of the source books right here in the browser, jump to its interactive notes, or download the PDF.</p>
+      <p class="lede">Read any of the source books right here in the browser, jump to the interactive notes that go with it, or download the PDF.</p>
     </section>
     <div class="grid" id="grid"></div>
   </main>
@@ -169,7 +169,15 @@
         { id: "database-internals", mono: "DI", accent: "#4ade80", title: "Database Internals", by: "Alex Petrov",
           file: "databases/Alex Petrov - Database Internals_ A Deep Dive into How Distributed Data Systems Work-O'Reilly Media (2019).pdf",
           notes: "../notes/database-internals/index.html",
-          blurb: "A deep dive into how distributed data systems work: storage engines (B-Trees, LSM Trees, recovery) and distributed systems." }
+          blurb: "A deep dive into how distributed data systems work: storage engines (B-Trees, LSM Trees, recovery) and distributed systems." },
+        { id: "sdi-vol1", mono: "SD1", accent: "#f87171", title: "System Design Interview, Vol.\u00a01", by: "Alex Xu",
+          file: "interview/system-design-interview-volume-1.pdf",
+          notes: "../notes/core-concepts/index.html", notesLabel: "Core concepts",
+          blurb: "A framework for system design interviews, back-of-the-envelope estimation, and worked designs: rate limiter, consistent hashing, key-value store, unique IDs, URL shortener, web crawler, news feed, chat and autocomplete." },
+        { id: "sdi-vol2", mono: "SD2", accent: "#fb923c", title: "System Design Interview, Vol.\u00a02", by: "Alex Xu & Sahn Lam",
+          file: "interview/system-design-interview-volume-2-compressed.pdf",
+          notes: "../notes/core-concepts/index.html", notesLabel: "Core concepts",
+          blurb: "More worked designs: proximity service, nearby friends, Google Maps, distributed message queue, metrics monitoring, ad click aggregation, hotel reservation, email, S3-like storage, gaming leaderboard, payments and a digital wallet." }
       ];
       const $ = id => document.getElementById(id);
       const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -192,7 +200,7 @@
           <p>${esc(b.blurb)}</p>
           <div class="actions">
             <a class="btn primary" href="#${b.id}">Read</a>
-            <a class="btn" href="${esc(b.notes)}">Notes</a>
+            <a class="btn" href="${esc(b.notes)}">${esc(b.notesLabel || "Notes")}</a>
             <a class="btn" href="${esc(pdfUrl(b))}" download="${esc(fileName(b))}">&#11015; PDF</a>
           </div>
         </article>`).join("");
@@ -217,6 +225,7 @@
         $("readerTitle").innerHTML = `<b>${esc(book.title)}</b> &middot; ${esc(book.by)}`;
         $("bookSelect").value = book.id;
         $("notesBtn").href = book.notes;
+        $("notesBtn").textContent = book.notesLabel || "Notes";
         const url = pdfUrl(book);
         [$("openBtn"), $("fbOpen")].forEach(a => { a.href = url; });
         [$("downloadBtn"), $("fbDownload")].forEach(a => { a.href = url; a.download = fileName(book); });
