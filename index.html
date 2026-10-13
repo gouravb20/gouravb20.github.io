@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1c">
-  <meta name="description" content="Interactive system design notes: Streaming Systems, AI Engineering, Essential GraphRAG and a field guide to databases.">
+  <meta name="description" content="Interactive system design notes: Designing Data-Intensive Applications, Streaming Systems, AI Engineering, Essential GraphRAG, Database Internals and a field guide to databases.">
   <title>System Design · Interactive Notes</title>
   <style>
     :root {
@@ -134,16 +134,28 @@
       <h1>System design, one book at a time</h1>
       <p class="lede">Chapter-wise notes with hands-on labs, cheatsheets, interview Q&amp;A and flashcards for the books behind modern data and AI systems, plus a visual guide to how databases differ.</p>
       <div class="totals">
-        <div class="total"><b>3</b><span>books</span></div>
-        <div class="total"><b>29</b><span>chapters</span></div>
-        <div class="total"><b>60</b><span>interactive labs</span></div>
-        <div class="total"><b>227</b><span>interview Q&amp;A</span></div>
+        <div class="total"><b>5</b><span>books</span></div>
+        <div class="total"><b>48</b><span>chapters</span></div>
+        <div class="total"><b>83</b><span>interactive labs</span></div>
+        <div class="total"><b>409</b><span>interview Q&amp;A</span></div>
         <div class="total"><b>20</b><span>slides</span></div>
       </div>
     </section>
 
     <h2>Book notes</h2>
     <div class="grid">
+      <a class="card" href="https://tiwari1302.github.io/ddia-notes/" style="--accent:#f472b6">
+        <div class="card-head">
+          <div class="mono">D</div>
+          <div><h3>Designing Data-Intensive Applications</h3><div class="by">Martin Kleppmann</div></div>
+        </div>
+        <p>The foundations of data systems: reliability and scalability, data models and storage engines, encoding, replication, partitioning, transactions, consistency and consensus, batch and stream processing.</p>
+        <div class="chips"><span class="chip">Replication</span><span class="chip">Partitioning</span><span class="chip">Transactions</span><span class="chip">Consensus</span></div>
+        <div class="meta"><span><b>12</b> chapters</span><span><b>181</b> concepts</span><span><b>124</b> Q&amp;A</span></div>
+        <div class="prog"><span>Hosted at tiwari1302.github.io &middot; progress saved there</span></div>
+        <span class="open">Open notes &nearr;</span>
+      </a>
+
       <a class="card" href="notes/streaming-systems/index.html" style="--accent:#38bdf8" data-key="streaming_systems_notes_v1" data-total="200">
         <div class="card-head">
           <div class="mono">S</div>
@@ -176,6 +188,18 @@
         <p>Knowledge-graph-enhanced RAG: hybrid search, advanced retrieval, text2cypher, agentic RAG, building graphs with LLMs, Microsoft GraphRAG and RAG evaluation.</p>
         <div class="chips"><span class="chip">Hybrid search</span><span class="chip">text2cypher</span><span class="chip">Agentic RAG</span><span class="chip">MS GraphRAG</span></div>
         <div class="meta"><span><b>9</b> chapters</span><span><b>97</b> concepts</span><span><b>16</b> labs</span><span><b>67</b> Q&amp;A</span></div>
+        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
+        <span class="open">Open notes &rarr;</span>
+      </a>
+
+      <a class="card" href="notes/database-internals/index.html" style="--accent:#4ade80" data-key="database_internals_notes_v1" data-total="165">
+        <div class="card-head">
+          <div class="mono">DI</div>
+          <div><h3>Database Internals</h3><div class="by">Alex Petrov &middot; Part I: Storage Engines</div></div>
+        </div>
+        <p>How storage engines work: B-Trees and their file formats, page layouts and splits, buffer management, WAL and ARIES recovery, concurrency control, B-Tree variants and LSM Trees.</p>
+        <div class="chips"><span class="chip">B-Trees</span><span class="chip">Slotted pages</span><span class="chip">WAL &amp; recovery</span><span class="chip">LSM Trees</span></div>
+        <div class="meta"><span><b>7</b> chapters</span><span><b>107</b> concepts</span><span><b>23</b> labs</span><span><b>58</b> Q&amp;A</span></div>
         <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
         <span class="open">Open notes &rarr;</span>
       </a>
