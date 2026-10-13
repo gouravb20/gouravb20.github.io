@@ -133,12 +133,12 @@
     <section class="hero">
       <div class="eyebrow">Interactive notes</div>
       <h1>System design, one book at a time</h1>
-      <p class="lede">Chapter-wise notes with hands-on labs, cheatsheets, interview Q&amp;A and flashcards for the system design core concepts and the books behind modern data and AI systems, plus a visual guide to how databases differ.</p>
+      <p class="lede">Chapter-wise notes with hands-on labs, cheatsheets, interview Q&amp;A and flashcards for the system design core concepts, the advanced topics and the books behind modern data and AI systems, plus a visual guide to how databases differ.</p>
       <div class="totals">
         <div class="total"><b>5</b><span>books</span></div>
-        <div class="total"><b>66</b><span>chapters</span></div>
-        <div class="total"><b>114</b><span>interactive labs</span></div>
-        <div class="total"><b>500</b><span>interview Q&amp;A</span></div>
+        <div class="total"><b>81</b><span>chapters</span></div>
+        <div class="total"><b>142</b><span>interactive labs</span></div>
+        <div class="total"><b>580</b><span>interview Q&amp;A</span></div>
         <div class="total"><b>20</b><span>slides</span></div>
       </div>
     </section>
@@ -150,7 +150,7 @@
           <div class="mono">CC</div>
           <div><h3>System Design Core Concepts</h3><div class="by">Based on Hello Interview's core concepts &middot; one long book</div></div>
         </div>
-        <p>The ideas that come up in almost every system design interview, from how a request crosses the network to sizing a system with back-of-the-envelope math. Labs cover load balancing, retry storms, idempotency keys, rate limiters, composite indexes, geohashes, cache stampedes, shard keys, sagas, hash rings, quorums and more.</p>
+        <p>The ideas that come up in almost every system design interview, from how a request crosses the network to sizing a system with back-of-the-envelope math. Labs cover retry storms, rate limiters, cache stampedes, hash rings, quorums, geohash lookups and more.</p>
         <div class="chips"><span class="chip">Networking</span><span class="chip">API design</span><span class="chip">Caching</span><span class="chip">Sharding</span><span class="chip">CAP</span></div>
         <div class="meta"><span><b>18</b> chapters</span><span><b>224</b> concepts</span><span><b>31</b> labs</span><span><b>115</b> Q&amp;A</span></div>
         <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
@@ -168,6 +168,52 @@
           <li>Consistent hashing</li>
           <li>CAP theorem</li>
           <li>Numbers to know</li>
+        </ol>
+      </div>
+    </a>
+
+    <h2>Advanced topics</h2>
+    <a class="card wide" href="notes/advanced-topics/index.html" style="--accent:#fb923c" data-key="advanced_topics_notes_v1" data-total="179">
+      <div class="body">
+        <div class="card-head">
+          <div class="mono">AT</div>
+          <div><h3>System Design Advanced Topics</h3><div class="by">Based on Hello Interview's advanced topics and Arpit Bhayani's Morris counter essay</div></div>
+        </div>
+        <p>The deep dives that come up once the core concepts are solid: proximity search, probabilistic data structures for big data (Bloom filters, Count-Min Sketch, HyperLogLog and the Morris counter), vector databases, time series databases and change data capture. Labs cover quadtrees, geohash cells, HyperLogLog registers, Morris counters, HNSW graph search, Gorilla compression, CDC ordering and more.</p>
+        <div class="chips"><span class="chip">Geospatial</span><span class="chip">Sketches</span><span class="chip">Morris counter</span><span class="chip">Vectors</span><span class="chip">Time series</span><span class="chip">CDC</span></div>
+        <div class="meta"><span><b>10</b> chapters</span><span><b>125</b> concepts</span><span><b>20</b> labs</span><span><b>54</b> Q&amp;A</span></div>
+        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
+        <span class="open">Open notes &rarr;</span>
+      </div>
+      <div class="side">
+        <strong style="color:var(--text)">Five parts</strong>
+        <ol>
+          <li>Proximity search</li>
+          <li>Data structures for big data</li>
+          <li>Vector databases</li>
+          <li>Time series databases</li>
+          <li>Change data capture</li>
+        </ol>
+      </div>
+    </a>
+
+    <h2>Problem breakdowns</h2>
+    <a class="card wide" href="notes/problem-breakdowns/index.html" style="--accent:#a3e635" data-key="problem_breakdowns_notes_v1" data-total="76">
+      <div class="body">
+        <div class="card-head">
+          <div class="mono">PB</div>
+          <div><h3>System Design Problem Breakdowns</h3><div class="by">Classic interview problems worked end to end &middot; inspired by Hello Interview's breakdowns</div></div>
+        </div>
+        <p>One interview problem per part, from requirements and back-of-the-envelope numbers to a first working design and the deep dives that make it scale. Starts with YouTube Top K: tumbling vs sliding windows, serving from a precomputed cache, partitioning counters, pre-aggregating in the stream, per-window totals and a Count-Min sketch with a heap.</p>
+        <div class="chips"><span class="chip">Top K</span><span class="chip">Windows</span><span class="chip">Stream aggregation</span><span class="chip">Count-Min</span></div>
+        <div class="meta"><span><b>5</b> chapters</span><span><b>50</b> concepts</span><span><b>8</b> labs</span><span><b>26</b> Q&amp;A</span></div>
+        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
+        <span class="open">Open notes &rarr;</span>
+      </div>
+      <div class="side">
+        <strong style="color:var(--text)">Problems so far</strong>
+        <ol>
+          <li>YouTube Top K: most-viewed videos over the last hour, day, month and all time</li>
         </ol>
       </div>
     </a>

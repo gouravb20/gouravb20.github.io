@@ -1,6 +1,6 @@
 # System Design · Interactive Notes
 
-Chapter-wise interactive study notes for the system design core concepts and the books behind modern data and AI systems, plus a slide deck on how databases differ and an in-browser library of the source books.
+Chapter-wise interactive study notes for the system design core concepts, the advanced topics and the books behind modern data and AI systems, plus a slide deck on how databases differ and an in-browser library of the source books.
 
 It is a plain static site (HTML, CSS and JavaScript, no build step and no dependencies). Open `index.html` in a browser, or serve the folder with any static host such as GitHub Pages.
 
@@ -9,6 +9,8 @@ It is a plain static site (HTML, CSS and JavaScript, no build step and no depend
 | Book | Notes | Chapters | Concepts | Labs | Q&A |
 |---|---|---|---|---|---|
 | System Design Core Concepts (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials)) | [`notes/core-concepts`](notes/core-concepts/index.html) | 18 | 224 | 31 | 115 |
+| System Design Advanced Topics (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search) and [Arpit Bhayani](https://arpitbhayani.me/blogs/morris-counter/)) | [`notes/advanced-topics`](notes/advanced-topics/index.html) | 10 | 125 | 20 | 54 |
+| System Design Problem Breakdowns: YouTube Top K (inspired by [Hello Interview](https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k)) | [`notes/problem-breakdowns`](notes/problem-breakdowns/index.html) | 5 | 50 | 8 | 26 |
 | Designing Data-Intensive Applications (Kleppmann) | [`notes/ddia`](notes/ddia/index.html) | 12 | 181 | - | 100 |
 | Streaming Systems (Akidau, Chernyak & Lax) | [`notes/streaming-systems`](notes/streaming-systems/index.html) | 10 | 118 | 22 | 82 |
 | AI Engineering (Huyen) | [`notes/ai-engineering`](notes/ai-engineering/index.html) | 10 | 119 | 22 | 78 |
@@ -74,6 +76,8 @@ books/                     source PDFs and the library / viewer page
 
 ## Credits
 
-- The core concepts notes follow the topics of [Hello Interview's system design core concepts](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials), rewritten as original notes with labs. Read the originals there.
+- The core concepts notes follow the topics of [Hello Interview's system design core concepts](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials), and the advanced topics notes follow their [advanced topics](https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search) (proximity search, data structures for big data, vector databases, time series databases, change data capture), rewritten as original notes with labs. Read the originals there.
+- The problem breakdowns notes cover the same interview problems as [Hello Interview's problem breakdowns](https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k), starting with Top K. They are written independently, with their own explanations, numbers and labs, and do not reproduce the original articles. Read the originals there.
+- The Morris counter chapter in the advanced topics notes is based on Arpit Bhayani's essay [Space-Efficient Counting: Exploring Morris' Algorithm](https://arpitbhayani.me/blogs/morris-counter/) and his [Python implementation](https://github.com/arpitbbhayani/morris-counter).
 - The DDIA chapter content (concepts, cheatsheets and interview Q&A) is ported from [ddia-notes](https://github.com/tiwari1302/ddia-notes) by Shashank Tiwari, whose site also inspired the design of every notes app here.
 - The books belong to their authors and publishers. The notes are personal study material and are no substitute for reading the books.
