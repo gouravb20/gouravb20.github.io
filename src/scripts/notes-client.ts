@@ -4,13 +4,13 @@
 
 import type { SearchItem } from "../lib/site";
 
-type ChapterProgress = { conceptsLearned: Record<string, boolean>; qaReviewed: Record<string, boolean> };
+type ChapterProgress = { conceptsLearned: Record<string, boolean>; qaReviewed: Record<string, boolean>; sectionsRead?: Record<string, boolean> };
 type Saved = { progress: Record<string, ChapterProgress>; theme: "dark" | "light"; hideDefs: boolean; lastChapter?: string };
 interface LabContext { every(fn: () => void, ms: number): number; clear(h: number): void; onCleanup(fn: () => void): void }
 interface Lab { title: string; blurb: string; mount(el: HTMLElement, ctx: LabContext): void }
 declare global { interface Window { DEMOS?: Record<string, Lab> } }
 
-const TABS = ["concepts", "labs", "cheatsheet", "interview"] as const;
+const TABS = ["learn", "concepts", "labs", "cheatsheet", "interview"] as const;
 type Tab = (typeof TABS)[number];
 const isTab = (s: string): s is Tab => (TABS as readonly string[]).includes(s);
 
@@ -107,6 +107,55 @@ function initContinue() {
     card.hidden = false;
     return;
   }
+}
+
+// ------------------------------------------------------------------ chapter: deep dive
+
+function initLearn(id: string) {
+  const panel = $('[data-panel="learn"]');
+  if (!panel) return;
+  const sections = $$(".deep-section", panel);
+  const read = () => (chapterProgress(id).sectionsRead ??= {});
+  const setDone = (sec: string, on: boolean) => {
+    const btn = $(`.section-done[data-sec="${sec}"]`, panel)!;
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-pressed", String(on));
+    btn.innerHTML = on ? "&#10003; Understood" : "Mark as understood";
+    btn.closest(".deep-section")?.classList.toggle("done", on);
+    $(`.deep-toc li[data-sec="${sec}"]`, panel)?.classList.toggle("done", on);
+  };
+  const count = () => {
+    const done = sections.filter(s => read()[s.dataset.sec!]).length;
+    $(".deep-toc-count", panel)!.textContent = `\u00b7 ${done} of ${sections.length} understood`;
+    const tab = $('[data-tab-count="learn"]');
+    if (tab) tab.textContent = `${done}/${sections.length}`;
+  };
+  for (const s of sections) setDone(s.dataset.sec!, !!read()[s.dataset.sec!]);
+  count();
+
+  panel.addEventListener("click", e => {
+    const t = e.target as HTMLElement;
+    const done = t.closest<HTMLElement>(".section-done");
+    if (done) {
+      const sec = done.dataset.sec!, on = !read()[sec];
+      read()[sec] = on;
+      setDone(sec, on);
+      save(); count();
+      return;
+    }
+    const option = t.closest<HTMLButtonElement>(".dq-option");
+    const quiz = option?.closest<HTMLElement>(".deep-quiz");
+    if (!option || !quiz || option.disabled) return;
+    const answer = Number(quiz.dataset.answer), right = Number(option.dataset.i) === answer;
+    for (const o of $$<HTMLButtonElement>(".dq-option", quiz)) {
+      o.disabled = true;
+      if (Number(o.dataset.i) === answer) o.classList.add("right");
+    }
+    if (!right) option.classList.add("wrong");
+    const ex = $(".dq-explain", quiz)!;
+    ex.hidden = false;
+    ex.className = `dq-explain ${right ? "right" : "wrong"}`;
+  });
 }
 
 // ------------------------------------------------------------------ chapter: concept and Q&A filters
@@ -269,8 +318,9 @@ function toggleQa(header: HTMLElement) {
 let currentTab: Tab | null = null;
 let labCleanups: (() => void)[] = [];
 
-function mountLabs() {
-  for (const el of $$(".lab-body[data-lab]")) {
+/** Labs live on the labs tab and inside deep dive sections; only the visible panel's labs run. */
+function mountLabs(panel: HTMLElement) {
+  for (const el of $$(".lab-body[data-lab]", panel)) {
     const lab = window.DEMOS?.[el.dataset.lab!];
     el.innerHTML = "";
     if (!lab) { el.innerHTML = '<div class="lab-note bad">This lab failed to load.</div>'; continue; }
@@ -289,26 +339,28 @@ function unmountLabs() {
   for (const el of $$(".lab-body[data-lab]")) el.innerHTML = "";
 }
 
-function showTab(tab: Tab, labId?: string) {
+/** `target` is the id of an element to scroll to: a lab card or a deep dive section. */
+function showTab(tab: Tab, target?: string) {
   if (tab !== currentTab) {
-    if (currentTab === "labs") unmountLabs();
+    unmountLabs();
     for (const p of $$("[data-panel]")) p.hidden = p.dataset.panel !== tab;
     for (const t of $$(".tabs .tab")) t.classList.toggle("active", t.dataset.tab === tab);
     currentTab = tab;
-    if (tab === "labs") mountLabs();
+    const panel = $(`[data-panel="${tab}"]`);
+    if (panel && (tab === "labs" || tab === "learn")) mountLabs(panel);
   }
-  if (labId) {
-    const el = document.getElementById(`lab-${labId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
-    }
+  const el = target && document.getElementById(target);
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
   }
 }
 function showFromHash() {
   const h = decodeURIComponent(location.hash.slice(1));
-  if (h.startsWith("lab-")) showTab("labs", h.slice(4));
-  else showTab(isTab(h) ? h : "concepts");
+  const first = ($(".tabs")?.dataset.firstTab ?? "concepts") as Tab;
+  if (h.startsWith("lab-")) showTab("labs", h);
+  else if (h.startsWith("learn-") && $('[data-panel="learn"]')) showTab("learn", h);
+  else showTab(isTab(h) && $(`[data-panel="${h}"]`) ? h : first);
 }
 
 function initTabs() {
@@ -434,6 +486,7 @@ function handleImport(e: Event) {
           const cur = state.progress[id] || { conceptsLearned: {}, qaReviewed: {} };
           cur.conceptsLearned = { ...cur.conceptsLearned, ...inc?.conceptsLearned };
           cur.qaReviewed = { ...cur.qaReviewed, ...inc?.qaReviewed };
+          cur.sectionsRead = { ...cur.sectionsRead, ...inc?.sectionsRead };
           state.progress[id] = cur;
         }
       } else {
@@ -516,6 +569,7 @@ initChrome();
 if (chapterId) {
   if (state.lastChapter !== chapterId) { state.lastChapter = chapterId; save(); }
   initChapter(chapterId);
+  initLearn(chapterId);
   initSelfTest();
   initFilters();
   initTabs();

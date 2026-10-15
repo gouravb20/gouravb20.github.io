@@ -1,6 +1,8 @@
 ---
 import { getCollection } from "astro:content";
+import path from "node:path";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
+import { deepRenderer } from "../../../../../lib/notes-source.mjs";
 import { SITE_NAME, TRACKS, appPath, chapterPath, plain, summary, url, type Chapter, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
@@ -26,7 +28,14 @@ const DIFFS = [["easy", "Easy"], ["med", "Medium"], ["hard", "Hard"]] as const;
 const diffCounts: Record<string, number> = {};
 for (const qa of ch.interview) diffCounts[diffOf(qa.diff)] = (diffCounts[diffOf(qa.diff)] ?? 0) + 1;
 
-const path = chapterPath(notes, ch);
+const deep = notes.deep[ch.id];
+const deepHtml = deep
+  ? deepRenderer(path.join(process.cwd(), "public")).render(deep, { sectionHref: (id: string) => `#learn-${id}`, labInfo: (id: string) => notes.labInfo[id] })
+  : "";
+const deepLabs = deep ? deep.sections.some(s => s.blocks.some(b => b.type === "lab")) : false;
+const firstTab = deep ? "learn" : "concepts";
+
+const pagePath = chapterPath(notes, ch);
 const bookTitle = plain(book.title);
 const title = `${plain(ch.title)} · ${book.shortTitle ?? bookTitle}`;
 const description = summary(ch.overview);
@@ -39,7 +48,7 @@ const structuredData = [
     name: plain(ch.title),
     headline: plain(ch.title),
     description: summary(ch.overview, 300),
-    url: abs(path),
+    url: abs(pagePath),
     learningResourceType: "Study notes",
     educationalLevel: "Professional",
     teaches: ch.concepts.map(c => plain(c.term)),
@@ -54,12 +63,12 @@ const structuredData = [
       { "@type": "ListItem", position: 1, name: SITE_NAME, item: abs("") },
       { "@type": "ListItem", position: 2, name: TRACKS[notes.track] ?? notes.track, item: abs(`${notes.track}/`) },
       { "@type": "ListItem", position: 3, name: bookTitle, item: abs(appPath(notes)) },
-      { "@type": "ListItem", position: 4, name: plain(ch.title), item: abs(path) },
+      { "@type": "ListItem", position: 4, name: plain(ch.title), item: abs(pagePath) },
     ],
   },
 ];
 ---
-<NotesLayout notes={notes} chapter={ch.id} title={title} description={description} path={path} structuredData={structuredData} labs={ch.labs.length > 0}>
+<NotesLayout notes={notes} chapter={ch.id} title={title} description={description} path={pagePath} structuredData={structuredData} labs={ch.labs.length > 0 || deepLabs}>
   <div class="chapter-header">
     <div class="chapter-label" set:html={`Chapter ${ch.number} &middot; ${parts[ch.part]}`} />
     <h1 set:html={ch.title} />
@@ -67,12 +76,19 @@ const structuredData = [
     {ch.source && <div class="chapter-source">Reference: <a href={ch.source.url} target="_blank" rel="noopener" set:html={ch.source.title} /> &#8599;</div>}
   </div>
 
-  <nav class="tabs" aria-label="Chapter sections">
-    <a class="tab active" href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
+  <nav class="tabs" aria-label="Chapter sections" data-first-tab={firstTab}>
+    {deep && <a class="tab learn-tab active" href="#learn" data-tab="learn">Deep Dive <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
+    <a class={`tab${deep ? "" : " active"}`} href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
     <a class="tab labs-tab" href="#labs" data-tab="labs">&#9654; Interactive Labs <span class="tab-count">{ch.labs.length}</span></a>
     <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>
     <a class="tab" href="#interview" data-tab="interview">Interview Q&amp;A <span class="tab-count" data-tab-count="interview">0/{ch.interview.length}</span></a>
   </nav>
+
+  {deep && (
+    <section id="learn" data-panel="learn">
+      <Fragment set:html={deepHtml} />
+    </section>
+  )}
 
   <section id="concepts" data-panel="concepts">
     <h2 class="sr-only">Core concepts</h2>

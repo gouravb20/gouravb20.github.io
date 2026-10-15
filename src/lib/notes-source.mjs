@@ -16,6 +16,7 @@ const partNumber = name => Number((name.match(/-part(\d+)\.js$/) || [])[1] || 0)
  * @property {boolean} legacy    true when the folder still has its own index.html
  * @property {string[]} scripts  every script the app loads, in order (absolute paths)
  * @property {string[]} labScripts  the lab scripts (shared labkit.js, then demos*.js), relative to public/
+ * @property {string[]} deepScripts the chapters' deep dives, deep/<chapter id>.js (absolute paths)
  */
 
 /**
@@ -46,11 +47,15 @@ export function findApps(publicDir) {
 function appFiles(publicDir, dir, track, slug) {
   const index = path.join(dir, "index.html");
   const toPublic = (/** @type {string} */ p) => path.relative(publicDir, p).split(path.sep).join("/");
+  const deepDir = path.join(dir, "deep");
+  const deepScripts = fs.existsSync(deepDir)
+    ? fs.readdirSync(deepDir).filter(n => n.endsWith(".js")).sort().map(n => path.join(deepDir, n))
+    : [];
   if (fs.existsSync(index)) {
     const html = fs.readFileSync(index, "utf8");
     const scripts = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => path.resolve(dir, m[1]));
     const labScripts = scripts.filter(s => /^(labkit|demos(-part\d+)?)\.js$/.test(path.basename(s))).map(toPublic);
-    return { dir, track, slug, legacy: true, scripts, labScripts };
+    return { dir, track, slug, legacy: true, scripts, labScripts, deepScripts };
   }
   const names = fs.readdirSync(dir);
   const pick = (/** @type {string} */ prefix) => names
@@ -58,13 +63,14 @@ function appFiles(publicDir, dir, track, slug) {
     .sort((a, b) => partNumber(a) - partNumber(b))
     .map(n => path.join(dir, n));
   const labs = [path.join(publicDir, "shared", "labkit.js"), ...pick("demos")];
-  return { dir, track, slug, legacy: false, scripts: [...pick("data"), ...labs], labScripts: labs.map(toPublic) };
+  return { dir, track, slug, legacy: false, scripts: [...pick("data"), ...labs], labScripts: labs.map(toPublic), deepScripts };
 }
 
 /**
- * Runs an app's scripts (except the browser-only app.js) and returns what they define.
+ * Runs an app's scripts (except the browser-only app.js and deep.js) and its deep dives, and returns what they define.
+ * `DEEP` maps chapter id -> deep dive; `deepFiles` maps chapter id -> the file that defined it.
  * @param {AppFiles} app
- * @returns {{ DATA: any, DEMOS: Record<string, any>, errors: string[] }}
+ * @returns {{ DATA: any, DEMOS: Record<string, any>, DEEP: Record<string, any>, deepFiles: Record<string, string>, errors: string[] }}
  */
 export function loadApp(app) {
   /** @type {string[]} */
@@ -72,11 +78,37 @@ export function loadApp(app) {
   /** @type {any} */
   const ctx = vm.createContext({ console });
   ctx.window = ctx;
-  for (const file of app.scripts) {
-    if (path.basename(file) === "app.js") continue;
-    if (!fs.existsSync(file)) { errors.push(`${file}: missing`); continue; }
+  const run = (/** @type {string} */ file) => {
+    if (!fs.existsSync(file)) { errors.push(`${file}: missing`); return; }
     try { vm.runInContext(fs.readFileSync(file, "utf8"), ctx, { filename: file }); }
     catch (e) { errors.push(`${file}: throws while loading: ${e instanceof Error ? e.message : e}`); }
+  };
+  for (const file of app.scripts) if (!["app.js", "deep.js"].includes(path.basename(file))) run(file);
+  /** @type {Record<string, string>} */
+  const deepFiles = {};
+  ctx.DEEP = {};
+  for (const file of app.deepScripts) {
+    const before = new Set(Object.keys(ctx.DEEP));
+    run(file);
+    for (const id of Object.keys(ctx.DEEP)) if (!before.has(id)) deepFiles[id] = file;
   }
-  return { DATA: ctx.DATA, DEMOS: ctx.DEMOS || {}, errors };
+  return { DATA: ctx.DATA, DEMOS: ctx.DEMOS || {}, DEEP: ctx.DEEP, deepFiles, errors };
+}
+
+/** @type {{ render: (deep: any, opts: any) => string, sectionText: (section: any) => string } | undefined} */
+let renderer;
+/**
+ * The browser's deep dive renderer (public/shared/deep.js), run once in a sandbox.
+ * @param {string} publicDir
+ */
+export function deepRenderer(publicDir) {
+  if (!renderer) {
+    /** @type {any} */
+    const ctx = vm.createContext({});
+    ctx.window = ctx;
+    const file = path.join(publicDir, "shared", "deep.js");
+    vm.runInContext(fs.readFileSync(file, "utf8"), ctx, { filename: file });
+    renderer = ctx.DeepRender;
+  }
+  return /** @type {NonNullable<typeof renderer>} */ (renderer);
 }

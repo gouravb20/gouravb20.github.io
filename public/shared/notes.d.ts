@@ -83,5 +83,48 @@ interface LabContext {
   onCleanup(fn: () => void): void;
 }
 
+/**
+ * A chapter's long-form Deep Dive, in `notes/<book>/deep/<chapter id>.js`:
+ * `window.DEEP = window.DEEP || {}; DEEP.ch5 = { ... };`. Rendered by shared/deep.js.
+ * Authoring guide: "Writing a deep dive" in README.md.
+ */
+interface DeepDive {
+  /** One to three paragraphs that make the chapter's problem felt. */
+  hook: string;
+  sections: DeepSection[];
+  /** 4-8 lessons to remember. */
+  takeaways: string[];
+  /** Only link URLs that certainly exist; otherwise leave `url` out. */
+  furtherReading?: { title: string; url?: string; note?: string }[];
+}
+
+interface DeepSection {
+  /** Lowercase slug, unique in the chapter; in URLs and progress, so don't rename it. */
+  id: string;
+  title: string;
+  /** Small label above the title, e.g. "Motivation". */
+  kicker?: string;
+  blocks: DeepBlock[];
+}
+
+type DeepBlock =
+  | { type: "text"; html: string }
+  | { type: "problem" | "idea" | "analogy"; html: string; title?: string }
+  | { type: "callout"; tone: "insight" | "warning" | "interview" | "history" | "modern" | "tip" | "mistake"; html: string; title?: string }
+  /** Inline SVG with a viewBox; colours only through the --dg-* variables. */
+  | { type: "diagram"; svg: string; title?: string; caption?: string }
+  | { type: "realworld"; items: { org: string; title?: string; html: string }[]; title?: string }
+  | { type: "tradeoffs"; pros: string[]; cons: string[]; prosLabel?: string; consLabel?: string; title?: string }
+  | { type: "compare"; items: { title: string; html: string; tone?: "ok" | "bad" | "warn" | "info" }[]; title?: string }
+  | { type: "table"; headers: string[]; rows: (string | number)[][]; title?: string; note?: string }
+  /** `code` is shown as escaped plain text. */
+  | { type: "code"; code: string; lang?: string; title?: string; caption?: string }
+  | { type: "steps" | "keypoints" | "list"; items: string[]; title?: string }
+  /** `answer` is the index of the correct option. */
+  | { type: "quiz"; q: string; options: string[]; answer: number; explain: string }
+  /** Mounts one of the book's labs (a DEMOS key) inside the section. */
+  | { type: "lab"; id: string; caption?: string };
+
 declare var DATA: NotesData;
 declare var DEMOS: Record<string, Lab>;
+declare var DEEP: Record<string, DeepDive>;

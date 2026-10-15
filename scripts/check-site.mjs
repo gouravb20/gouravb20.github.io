@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkDeep } from "../src/lib/deep-check.mjs";
 import { findApps, loadApp } from "../src/lib/notes-source.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -34,9 +35,13 @@ const apps = new Map();
 
 for (const app of findApps(PUBLIC)) {
   const name = rel(app.dir);
-  const { DATA: D, DEMOS, errors } = loadApp(app);
+  const loaded = loadApp(app);
+  const { DATA: D, DEMOS, errors } = loaded;
   problems.push(...errors.map(e => `${name}: ${e}`));
   if (!D || !Array.isArray(D.chapters)) { problems.push(`${name}: window.DATA.chapters is missing`); continue; }
+  const deep = checkDeep({ name, ...loaded, deepScripts: app.deepScripts });
+  problems.push(...deep.problems);
+  warnings.push(...deep.warnings);
 
   for (const f of BOOK_FIELDS) if (typeof D.book?.[f] !== "string" || !D.book[f]) problems.push(`${name}: DATA.book.${f} is missing`);
   for (const [id, d] of Object.entries(DEMOS)) {

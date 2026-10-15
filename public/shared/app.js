@@ -1,11 +1,13 @@
 // Interactive book notes - app shell (shared by every notes site)
-// Depends on DATA (data*.js) and DEMOS (demos*.js); book-specific strings live in DATA.book
+// Depends on DATA (data*.js), DEMOS (demos*.js) and DeepRender (deep.js); book-specific strings live in DATA.book.
+// Deep dives (deep/<chapter>.js, filling DEEP) load on demand.
 // The data contract is typed in shared/notes.d.ts and enforced by scripts/check-site.mjs.
 
 const BOOK = DATA.book;
 const STORAGE_KEY = BOOK.storageKey;
 const MOBILE_BREAKPOINT = 768;
-const TABS = ["concepts", "labs", "cheatsheet", "interview"];
+const TABS = ["learn", "concepts", "labs", "cheatsheet", "interview"];
+const DEFAULT_TAB = "learn";
 // Book-wide pages, routed as #/glossary and #/cheatsheet alongside the chapters
 const VIEWS = { glossary: "Glossary", cheatsheet: "All cheatsheets" };
 
@@ -42,7 +44,9 @@ function saveState() {
 }
 function getChapterProgress(chId) {
   if (!state.progress[chId]) state.progress[chId] = { conceptsLearned: {}, qaReviewed: {} };
-  return state.progress[chId];
+  const p = state.progress[chId];
+  if (!p.sectionsRead) p.sectionsRead = {};
+  return p;
 }
 function countTrue(obj) { return Object.keys(obj || {}).filter(k => obj[k]).length; }
 function applyTheme() {
@@ -83,15 +87,16 @@ function computeOverallPct() {
 // ============================================================
 function parseHash() {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  if (!parts.length) return { chapter: "dashboard", tab: "concepts", lab: null };
-  if (VIEWS[parts[0]]) return { chapter: parts[0], tab: "concepts", lab: null };
+  if (!parts.length) return { chapter: "dashboard", tab: DEFAULT_TAB, lab: null };
+  if (VIEWS[parts[0]]) return { chapter: parts[0], tab: DEFAULT_TAB, lab: null };
   const ch = DATA.chapters.find(c => c.id === parts[0]);
-  if (!ch) return { chapter: "dashboard", tab: "concepts", lab: null };
-  const tab = TABS.includes(parts[1]) ? parts[1] : "concepts";
+  if (!ch) return { chapter: "dashboard", tab: DEFAULT_TAB, lab: null };
+  const tab = TABS.includes(parts[1]) ? parts[1] : DEFAULT_TAB;
   return { chapter: ch.id, tab, lab: parts[2] || null };
 }
+/** `lab` is a lab id on the labs tab and a section id on the learn tab. */
 function navigate(chapter, tab, lab) {
-  const hash = chapter === "dashboard" ? "#/" : VIEWS[chapter] ? `#/${chapter}` : `#/${chapter}/${tab || "concepts"}${lab ? "/" + lab : ""}`;
+  const hash = chapter === "dashboard" ? "#/" : VIEWS[chapter] ? `#/${chapter}` : `#/${chapter}/${tab || DEFAULT_TAB}${lab ? "/" + lab : ""}`;
   if (location.hash === hash) { applyRoute(); return; }
   location.hash = hash;
 }
@@ -102,16 +107,19 @@ function applyRoute() {
   state.currentTab = r.tab;
   if (chapterChanged) { state.revealed.clear(); state.conceptQuery = ""; }
   if (r.chapter !== "dashboard" && !VIEWS[r.chapter] && state.lastChapter !== r.chapter) { state.lastChapter = r.chapter; saveState(); }
+  pendingTarget = r.lab ? (r.tab === "learn" ? "learn-" : "lab-") + r.lab : null;
   render();
-  if (r.lab) {
-    const el = document.getElementById("lab-" + r.lab);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
-    }
-  } else if (chapterChanged) {
-    window.scrollTo(0, 0);
-  }
+  if (!scrollToPending() && chapterChanged) window.scrollTo(0, 0);
+}
+// Deep dives render after their file loads, so a #/ch3/learn/<section> target may have to wait.
+let pendingTarget = null;
+function scrollToPending() {
+  const el = pendingTarget && document.getElementById(pendingTarget);
+  if (!el) return false;
+  pendingTarget = null;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  return true;
 }
 
 // ============================================================
@@ -159,7 +167,7 @@ function renderSidebar() {
   sb.querySelectorAll(".chapter-item").forEach(el => {
     el.addEventListener("click", () => {
       if (isMobile()) closeDrawer();
-      navigate(el.dataset.chapter, "concepts");
+      navigate(el.dataset.chapter, DEFAULT_TAB);
     });
   });
 }
@@ -185,8 +193,12 @@ function renderMain() {
   const tabBtn = (id, label, count, extra) =>
     `<button class="tab ${extra || ""} ${state.currentTab === id ? "active" : ""}" data-tab="${id}">${label} <span class="tab-count">${count}</span></button>`;
 
+  const deep = DEEP[ch.id];
+  const learnCount = deep ? `${deep.sections.filter(s => prog.sectionsRead[s.id]).length}/${deep.sections.length}` : "&hellip;";
+
   let body = "";
-  if (state.currentTab === "concepts") body = renderConcepts(ch);
+  if (state.currentTab === "learn") body = renderLearn(ch);
+  else if (state.currentTab === "concepts") body = renderConcepts(ch);
   else if (state.currentTab === "labs") body = renderLabsShell(ch);
   else if (state.currentTab === "cheatsheet") body = renderCheatsheet(ch);
   else body = renderInterview(ch);
@@ -201,6 +213,7 @@ function renderMain() {
       ${ch.source ? `<div class="chapter-source">Reference: <a href="${ch.source.url}" target="_blank" rel="noopener">${ch.source.title}</a> &#8599;</div>` : ""}
     </div>
     <div class="tabs">
+      ${tabBtn("learn", "Deep Dive", learnCount, "learn-tab")}
       ${tabBtn("concepts", "Core Concepts", `${doneC}/${ch.concepts.length}`)}
       ${tabBtn("labs", "&#9654; Interactive Labs", ch.labs.length, "labs-tab")}
       ${tabBtn("cheatsheet", "Cheatsheet", ch.cheatsheet.length)}
@@ -224,7 +237,7 @@ function renderMain() {
     state.revealed.add(+card.dataset.card);
     card.classList.add("revealed");
   }));
-  m.querySelectorAll("[data-nav]").forEach(n => n.addEventListener("click", () => navigate(n.dataset.nav, "concepts")));
+  m.querySelectorAll("[data-nav]").forEach(n => n.addEventListener("click", () => navigate(n.dataset.nav, DEFAULT_TAB)));
   m.querySelectorAll("[data-demo-link]").forEach(b => b.addEventListener("click", e => {
     e.stopPropagation();
     const owner = DATA.chapters.find(c => c.labs.includes(b.dataset.demoLink)) || ch;
@@ -250,7 +263,89 @@ function renderMain() {
     applyQaFilter(m);
   }));
   wireFilters(m);
-  if (state.currentTab === "labs") mountLabs(ch);
+  if (state.currentTab === "learn") wireLearn(m, ch);
+  if (state.currentTab === "labs" || state.currentTab === "learn") mountLabs(ch);
+}
+
+// ============================================================
+// Deep Dive
+// ============================================================
+/** chapter id -> the pending load, or "missing" when the chapter has no deep dive file; loaded ones are in DEEP. */
+const deepStatus = {};
+window.DEEP = window.DEEP || {};
+function loadDeep(chId) {
+  if (DEEP[chId]) return Promise.resolve(true);
+  if (deepStatus[chId] === "missing") return Promise.resolve(false);
+  if (!deepStatus[chId]) {
+    deepStatus[chId] = new Promise(resolve => {
+      const sc = document.createElement("script");
+      sc.src = `deep/${chId}.js`;
+      sc.onload = () => { if (!DEEP[chId]) deepStatus[chId] = "missing"; resolve(!!DEEP[chId]); };
+      sc.onerror = () => { deepStatus[chId] = "missing"; sc.remove(); resolve(false); };
+      document.head.appendChild(sc);
+    });
+  }
+  return deepStatus[chId];
+}
+function renderLearn(ch) {
+  const deep = DEEP[ch.id];
+  if (deep) {
+    const p = getChapterProgress(ch.id);
+    return DeepRender.render(deep, {
+      sectionHref: id => `#/${ch.id}/learn/${id}`,
+      labInfo: id => DEMOS[id],
+      done: id => !!p.sectionsRead[id],
+    });
+  }
+  if (deepStatus[ch.id] === "missing") {
+    return `<div class="empty-tab">The deep dive for this chapter isn't written yet. Start with the <a href="#/${ch.id}/concepts">core concepts</a>.</div>`;
+  }
+  loadDeep(ch.id).then(() => {
+    if (state.currentChapter === ch.id && state.currentTab === "learn") { renderMain(); scrollToPending(); }
+  });
+  return '<div class="deep-loading">Loading the deep dive&hellip;</div>';
+}
+function wireLearn(m, ch) {
+  const deep = DEEP[ch.id];
+  if (!deep) return;
+  const p = getChapterProgress(ch.id);
+  const count = () => {
+    const done = deep.sections.filter(s => p.sectionsRead[s.id]).length;
+    m.querySelector(".deep-toc-count").textContent = `\u00b7 ${done} of ${deep.sections.length} understood`;
+    const tab = m.querySelector('.tab[data-tab="learn"] .tab-count');
+    if (tab) tab.textContent = `${done}/${deep.sections.length}`;
+  };
+  count();
+  m.querySelectorAll(".section-done").forEach(btn => btn.addEventListener("click", () => {
+    const id = btn.dataset.sec, on = !p.sectionsRead[id];
+    p.sectionsRead[id] = on;
+    saveState();
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-pressed", String(on));
+    btn.innerHTML = on ? "&#10003; Understood" : "Mark as understood";
+    btn.closest(".deep-section").classList.toggle("done", on);
+    m.querySelector(`.deep-toc li[data-sec="${id}"]`).classList.toggle("done", on);
+    count();
+  }));
+  m.querySelectorAll("[data-sec-link]").forEach(a => a.addEventListener("click", e => {
+    e.preventDefault();
+    history.replaceState(null, "", a.getAttribute("href"));
+    document.getElementById("learn-" + a.dataset.secLink).scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+  wireQuizzes(m);
+}
+function wireQuizzes(root) {
+  root.querySelectorAll(".deep-quiz").forEach(q => q.querySelectorAll(".dq-option").forEach(opt => opt.addEventListener("click", () => {
+    const answer = +q.dataset.answer, right = +opt.dataset.i === answer;
+    q.querySelectorAll(".dq-option").forEach(o => {
+      o.disabled = true;
+      if (+o.dataset.i === answer) o.classList.add("right");
+    });
+    if (!right) opt.classList.add("wrong");
+    const ex = q.querySelector(".dq-explain");
+    ex.hidden = false;
+    ex.className = `dq-explain ${right ? "right" : "wrong"}`;
+  })));
 }
 
 // Filters live in `state` so they survive the re-render that follows marking a card as learned.
@@ -496,15 +591,15 @@ function renderDashboard(m) {
     }).join("")}</div>
     <div class="chapter-footer" style="margin-top:30px;">
       <div style="color:var(--text-muted);font-size:13px;">
-        <strong>How to use:</strong> every chapter has Core Concepts, Interactive Labs, a Cheatsheet and Interview Q&amp;A. To test yourself, hide the definitions on the Concepts tab, or try each interview question before opening its answer.
+        <strong>How to use:</strong> every chapter opens with a Deep Dive that explains the ideas step by step, with diagrams, real-world examples and quick self-checks. Then come Core Concepts, Interactive Labs, a Cheatsheet and Interview Q&amp;A. To test yourself, hide the definitions on the Concepts tab, or try each interview question before opening its answer.
         Concept cards with a <span style="color:var(--accent-3)">&#9654; See it live</span> button jump straight to the lab that demonstrates them.
         Progress is saved in this browser; use <strong>Export</strong> and <strong>Import</strong> to move it between devices.
         Keys: <kbd>/</kbd> search (<kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Enter</kbd> to pick a result), <kbd>j</kbd> / <kbd>k</kbd> next / previous chapter.
       </div>
     </div>`;
-  m.querySelectorAll("[data-chapter]").forEach(el => el.addEventListener("click", () => navigate(el.dataset.chapter, "concepts")));
+  m.querySelectorAll("[data-chapter]").forEach(el => el.addEventListener("click", () => navigate(el.dataset.chapter, DEFAULT_TAB)));
   const cont = m.querySelector(".continue-card");
-  if (cont) cont.addEventListener("keydown", e => { if (e.key === "Enter") navigate(cont.dataset.chapter, "concepts"); });
+  if (cont) cont.addEventListener("keydown", e => { if (e.key === "Enter") navigate(cont.dataset.chapter, DEFAULT_TAB); });
 }
 
 // ============================================================
@@ -608,6 +703,10 @@ function buildSearchIndex() {
   const add = (ch, kind, title, snippet, text, tab, lab) =>
     out.push({ ch, kind, title: stripTags(title), snippet, tab, lab, text: stripTags(title + " " + text).toLowerCase() });
   DATA.chapters.forEach(ch => {
+    (DEEP[ch.id] ? DEEP[ch.id].sections : []).forEach(s => {
+      const text = DeepRender.sectionText(s);
+      add(ch, "Deep dive", s.title, text.slice(s.title.length + 1, s.title.length + 121), text, "learn", s.id);
+    });
     ch.concepts.forEach(c => add(ch, "Concept", c.term, stripTags(c.def).slice(0, 120), `${c.def} ${c.why || ""} ${c.ex || ""}`, "concepts"));
     ch.labs.forEach(id => { const d = DEMOS[id]; if (d) add(ch, "Lab", d.title, stripTags(d.blurb).slice(0, 120), d.blurb, "labs", id); });
     ch.interview.forEach(x => add(ch, "Q&A", x.q, stripTags(x.a).slice(0, 120) + "...", x.a, "interview"));
@@ -636,8 +735,17 @@ function highlight(text, q) {
   const words = q.trim().split(/\s+/).filter(w => w.length > 1).map(w => escapeHtml(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   return words.length ? safe.replace(new RegExp(`(${words.join("|")})`, "gi"), "<mark>$1</mark>") : safe;
 }
+let allDeepRequested = false;
 function renderSearch(q) {
   const box = document.getElementById("searchResults");
+  if (!allDeepRequested && q.trim().length >= 2) {
+    allDeepRequested = true;
+    Promise.all(DATA.chapters.map(ch => loadDeep(ch.id))).then(() => {
+      searchIndex = null;
+      const sb = document.getElementById("searchBox");
+      if (document.activeElement === sb && sb.value.trim().length >= 2) renderSearch(sb.value);
+    });
+  }
   const rs = runSearch(q);
   if (!rs.length) {
     const typed = q.trim().length >= 2;
@@ -707,6 +815,7 @@ function handleImport(e) {
           const inc = data.progress[chId] || {};
           cur.conceptsLearned = Object.assign({}, cur.conceptsLearned, inc.conceptsLearned);
           cur.qaReviewed = Object.assign({}, cur.qaReviewed, inc.qaReviewed);
+          cur.sectionsRead = Object.assign({}, cur.sectionsRead, inc.sectionsRead);
           state.progress[chId] = cur;
         });
       } else {
@@ -786,7 +895,7 @@ function init() {
     if ((e.key === "j" || e.key === "k") && !e.ctrlKey && !e.metaKey && !e.altKey) {
       const i = DATA.chapters.findIndex(c => c.id === state.currentChapter);
       const target = i < 0 ? (e.key === "j" ? DATA.chapters[0] : null) : DATA.chapters[i + (e.key === "j" ? 1 : -1)];
-      if (target) navigate(target.id, "concepts");
+      if (target) navigate(target.id, DEFAULT_TAB);
     }
   });
   window.addEventListener("resize", () => { if (!isMobile()) closeDrawer(); });

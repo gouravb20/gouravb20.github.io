@@ -40,6 +40,7 @@ Paths in the table are relative to `public/low-level-design/`. Also included:
 
 Every book gets the same app:
 
+- **Deep Dive** for every chapter: a long-form explanation that starts from the problem each idea solves, with diagrams, the book's labs embedded where they fit, real-world systems, trade-offs, interview angles and one-question self-checks. Mark sections as understood as you go.
 - **Core concepts** with definitions, why each one matters and examples. Mark them as learned, and filter a chapter's cards by text or by to learn / learned.
 - **Interactive labs**: small simulators built on the book's own examples (watermarks and triggers, B-Tree splits, ARIES recovery, LSM compaction, Bloom filters, KV caches, hybrid search and more).
 - **Cheatsheets** with trade-off tables, and **interview Q&A** with difficulty levels (answers stay collapsed until opened). Filter questions by difficulty, hide the ones you've reviewed, or expand them all.
@@ -126,6 +127,25 @@ All of it runs in CI on pull requests and pushes to `main` (`.github/workflows/c
 3. Write labs in `demos.js` as `window.DEMOS[id] = { title, blurb, mount(el, ctx) }` and list their ids in each chapter's `labs`.
 4. Add a card to the track's hub `index.html` with `data-key` set to the book's `storageKey`. Copy the `data-count` markup from an existing card, add a README table row, then run `npm run build` and `node scripts/check-site.mjs --fix` to fill in `data-total` and every count.
 
+## Writing a deep dive
+
+Each chapter's **Deep Dive** tab is a long-form explanation in `notes/<book>/deep/<chapter id>.js`:
+
+```js
+window.DEEP = window.DEEP || {};
+DEEP.ch16 = { hook: `<p>...</p>`, sections: [{ id: "the-ring", title: "...", kicker: "The key idea", blocks: [...] }], takeaways: [...], furtherReading: [...] };
+```
+
+The format is typed in `public/shared/notes.d.ts` (`DeepDive`), rendered by `public/shared/deep.js` (in the browser for single-page apps, at build time for Astro pages) and loaded only when a reader opens the chapter. [`core-concepts/deep/ch16.js`](public/high-level-design/notes/core-concepts/deep/ch16.js) is a complete example.
+
+- **Teach in order:** the problem (what breaks without the idea), the key idea in a sentence or two, how it works, a diagram or one of the book's labs, real systems that use it, trade-offs, the interview angle, and a one-question quiz that tests understanding rather than recall.
+- **Blocks:** `text`, `problem`, `idea`, `analogy`, `callout` (tones `insight`, `warning`, `interview`, `history`, `modern`, `tip`, `mistake`), `diagram` (inline SVG), `realworld`, `tradeoffs`, `compare`, `table`, `code`, `steps`, `keypoints`, `list`, `quiz` and `lab` (mounts one of the book's labs inside the section).
+- **Write original explanations.** Never copy sentences from the books or from other sites; quote at most a short phrase, with attribution. Only state facts, numbers and incidents you are sure are true and publicly documented, and only link URLs you are sure exist.
+- **Diagrams:** an `<svg>` with a `viewBox` (at most 640 wide) and no fixed width, font sizes of 12 or more, and colours only through the `--dg-*` variables (`--dg-1` to `--dg-6`, each with `-soft`, plus `--dg-ok`, `--dg-bad`, `--dg-ink`, `--dg-muted`, `--dg-line`, `--dg-panel`) so both themes work. Prefix marker and gradient ids with the book and chapter (`cc16-arrow`), because every diagram on a page shares one id namespace.
+- Section ids are in URLs and saved progress ("Mark as understood"), so don't rename them once published.
+
+Check deep dives without building: `node scripts/check-deep.mjs [book folder]`. `npm run check` runs the same checks, and `astro check` type-checks the files.
+
 ## Moving a single-page app to Astro
 
 1. Add `mono`, `shortTitle` and `tagline` to the app's `DATA.book` (the logo letters, name and tagline from its `index.html` top bar).
@@ -137,7 +157,7 @@ All of it runs in CI on pull requests and pushes to `main` (`.github/workflows/c
 
 Pages is published by `.github/workflows/deploy.yml` on every push to `main` (or run it by hand from the Actions tab). It relies on **Settings → Pages → Build and deployment → Source** being **GitHub Actions**; publishing the branch directly would serve the repository root, while the site lives in `public/` and `src/`.
 
-Search engines read `robots.txt` only at the domain root, so it lives in the [gouravb20.github.io](https://github.com/gouravb20/gouravb20.github.io) repository. It keeps crawlers off the book PDFs (`Disallow: /system-design/*.pdf$`).
+Search engines read `robots.txt` only at the domain root, so it lives in the [gouravb20.github.io](https://github.com/gouravb20/gouravb20.github.io) repository. It keeps crawlers off the book PDFs (`Disallow: /system-design/*.pdf$`) and advertises this site's sitemap (`Sitemap: …/system-design/sitemap-index.xml`) so pages can be discovered without waiting for inbound links. Hub pages also ship canonical URLs, Open Graph tags, JSON-LD (`WebSite` / `Dataset` / `CollectionPage`), and a machine-readable [`dataset.jsonld`](public/dataset.jsonld). After deploy, submit the sitemap once in [Google Search Console](https://search.google.com/search-console) and [Bing Webmaster Tools](https://www.bing.com/webmasters) if you want indexing sooner.
 
 ## Credits
 

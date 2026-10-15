@@ -7,7 +7,8 @@
     ".astro/types.d.ts",
     "src",
     "public/shared/notes.d.ts",
-    "public/*/notes/*/data*.js"
+    "public/*/notes/*/data*.js",
+    "public/*/notes/*/deep/*.js"
   ],
   "exclude": ["dist", "node_modules"]
 }

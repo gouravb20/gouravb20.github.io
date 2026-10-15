@@ -34,11 +34,34 @@ const chapter = z.strictObject({
   interview: z.array(z.strictObject({ q: text, a: text, diff: z.enum(["easy", "med", "medium", "hard"]).optional() })),
 });
 
+const titled = { title: text.optional() };
+const block = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("text"), html: text }),
+  z.strictObject({ type: z.enum(["problem", "idea", "analogy"]), html: text, ...titled }),
+  z.strictObject({ type: z.literal("callout"), tone: z.enum(["insight", "warning", "interview", "history", "modern", "tip", "mistake"]), html: text, ...titled }),
+  z.strictObject({ type: z.literal("diagram"), svg: z.string().regex(/^\s*(<style[\s\S]*?<\/style>\s*)?<svg[\s\S]*<\/svg>\s*$/), caption: text.optional(), ...titled }),
+  z.strictObject({ type: z.literal("realworld"), items: z.array(z.strictObject({ org: text, title: text.optional(), html: text })).min(1), ...titled }),
+  z.strictObject({ type: z.literal("tradeoffs"), pros: z.array(text).min(1), cons: z.array(text).min(1), prosLabel: text.optional(), consLabel: text.optional(), ...titled }),
+  z.strictObject({ type: z.literal("compare"), items: z.array(z.strictObject({ title: text, html: text, tone: z.enum(["ok", "bad", "warn", "info"]).optional() })).min(2), ...titled }),
+  z.strictObject({ type: z.literal("table"), headers: z.array(z.string()), rows: z.array(z.array(z.union([z.string(), z.number()]))), note: text.optional(), ...titled }),
+  z.strictObject({ type: z.literal("code"), code: text, lang: z.string().optional(), caption: text.optional(), ...titled }),
+  z.strictObject({ type: z.enum(["steps", "keypoints", "list"]), items: z.array(text).min(1), ...titled }),
+  z.strictObject({ type: z.literal("quiz"), q: text, options: z.array(text).min(2), answer: z.number().int().min(0), explain: text }),
+  z.strictObject({ type: z.literal("lab"), id: z.string(), caption: text.optional() }),
+]);
+const deepDive = z.strictObject({
+  hook: text,
+  sections: z.array(z.strictObject({ id: z.string().regex(/^[a-z0-9-]+$/), title: text, kicker: text.optional(), blocks: z.array(block).min(1) })).min(1),
+  takeaways: z.array(text),
+  furtherReading: z.array(z.strictObject({ title: text, url: z.url().optional(), note: text.optional() })).optional(),
+});
+
 const schema = z
   .strictObject({
     track: z.string(),
     slug: z.string(),
     labScripts: z.array(z.string()),
+    deep: z.record(z.string(), deepDive),
     labInfo: z.record(z.string(), z.strictObject({ title: text, blurb: text })),
     book: z.strictObject({
       title: text,
@@ -68,6 +91,19 @@ const schema = z
       for (const id of ch.labs) if (!d.labInfo[id]) issue(`lab ${id} is not defined in any demos file`);
       for (const c of ch.concepts) if (c.demo && !d.labInfo[c.demo]) issue(`concept "${c.term}" links to missing lab ${c.demo}`);
     }
+    for (const [id, deep] of Object.entries(d.deep)) {
+      const issue = (message: string) => ctx.addIssue({ code: "custom", message: `deep dive ${id}: ${message}` });
+      if (!ids.has(id)) issue("no chapter has this id");
+      const seen = new Set<string>();
+      for (const s of deep.sections) {
+        if (seen.has(s.id)) issue(`duplicate section id ${s.id}`);
+        seen.add(s.id);
+        for (const b of s.blocks) {
+          if (b.type === "lab" && !d.labInfo[b.id]) issue(`section ${s.id} embeds missing lab ${b.id}`);
+          if (b.type === "quiz" && b.answer >= b.options.length) issue(`section ${s.id}: quiz answer ${b.answer} is out of range`);
+        }
+      }
+    }
   });
 
 const notes = defineCollection({
@@ -79,12 +115,12 @@ const notes = defineCollection({
         store.clear();
         for (const app of findApps(publicDir)) {
           if (app.legacy) continue;
-          const { DATA, DEMOS, errors } = loadApp(app);
+          const { DATA, DEMOS, DEEP, errors } = loadApp(app);
           if (errors.length) throw new Error(errors.join("\n"));
           const id = `${app.track}/${app.slug}`;
           const labInfo = Object.fromEntries(Object.entries(DEMOS).map(([k, v]) => [k, { title: v.title, blurb: v.blurb }]));
           // Plain objects from this realm; the vm context's objects have their own prototypes.
-          const raw = JSON.parse(JSON.stringify({ ...DATA, track: app.track, slug: app.slug, labScripts: app.labScripts, labInfo }));
+          const raw = JSON.parse(JSON.stringify({ ...DATA, track: app.track, slug: app.slug, labScripts: app.labScripts, labInfo, deep: DEEP }));
           const data = await parseData({ id, data: raw });
           store.set({ id, data, digest: generateDigest(data) });
         }
