@@ -10,7 +10,10 @@ window.DATA = {
     exportPrefix: `problem-breakdowns-progress`,
     pillarsTitle: `Four habits for any breakdown`,
     takeawaysTitle: `Ten things to remember`,
-    labsIntro: `Each lab models one decision in the design. The numbers come from simple, stated assumptions rather than production measurements, so read them as shapes and ratios, not benchmarks. Labs reset when you leave the tab.`
+    labsIntro: `Each lab models one decision in the design. The numbers come from simple, stated assumptions rather than production measurements, so read them as shapes and ratios, not benchmarks. Labs reset when you leave the tab.`,
+    mono: `PB`,
+    shortTitle: `Problem Breakdowns`,
+    tagline: `Interactive interview prep`
   },
   parts: {
     1: `Part I &middot; YouTube Top K`

@@ -24,6 +24,10 @@ interface Book {
   pillarsTitle: string;
   takeawaysTitle: string;
   labsIntro: string;
+  /** Top-bar brand for Astro-rendered apps (legacy apps hard-code it in index.html): logo letters, name, tagline. */
+  mono?: string;
+  shortTitle?: string;
+  tagline?: string;
 }
 
 interface Chapter {

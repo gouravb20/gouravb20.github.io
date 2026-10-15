@@ -1,0 +1,93 @@
+---
+import { getCollection } from "astro:content";
+import NotesLayout from "../../../../layouts/NotesLayout.astro";
+import { SITE_NAME, TRACKS, appPath, chapterPath, plain, summary, url, type Notes } from "../../../../lib/site";
+
+export async function getStaticPaths() {
+  const all = await getCollection("notes");
+  return all.map(e => ({ params: { track: e.data.track, app: e.data.slug }, props: { notes: e.data } }));
+}
+
+const { notes } = Astro.props as { notes: Notes };
+const { book, chapters } = notes;
+const sum = (f: (c: Notes["chapters"][number]) => number) => chapters.reduce((s, c) => s + f(c), 0);
+const totals = { concepts: sum(c => c.concepts.length), qa: sum(c => c.interview.length), labs: sum(c => c.labs.length) };
+
+const path = appPath(notes);
+const title = plain(book.title);
+const site = Astro.site!;
+const abs = (p: string) => new URL(url(p), site).href;
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Course",
+    name: title,
+    description: summary(book.subtitle, 300),
+    url: abs(path),
+    provider: { "@type": "Organization", name: SITE_NAME, url: abs("") },
+    hasPart: chapters.map(ch => ({ "@type": "LearningResource", name: plain(ch.title), url: abs(chapterPath(notes, ch)) })),
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: SITE_NAME, item: abs("") },
+      { "@type": "ListItem", position: 2, name: TRACKS[notes.track] ?? notes.track, item: abs(`${notes.track}/`) },
+      { "@type": "ListItem", position: 3, name: title, item: abs(path) },
+    ],
+  },
+];
+---
+<NotesLayout notes={notes} title={`${title} · ${SITE_NAME}`} description={summary(book.subtitle)} path={path} structuredData={structuredData}>
+  <script slot="head" is:inline data-app-url={url(path)} data-chapters={chapters.map(c => c.id).join(" ")}>
+    // Old single-page links (#/ch2/labs/someLab) now live on per-chapter pages.
+    (function (d) {
+      var m = location.hash.match(/^#\/([\w-]+)(?:\/(\w+))?(?:\/([\w-]+))?/);
+      if (d && d.appUrl && d.chapters && m && d.chapters.split(" ").indexOf(m[1]) >= 0)
+        location.replace(d.appUrl + m[1] + "/" + (m[3] ? "#lab-" + m[3] : m[2] && m[2] !== "concepts" ? "#" + m[2] : ""));
+    })(document.currentScript && document.currentScript.dataset);
+  </script>
+
+  <div class="dash-hero">
+    <h1 set:html={book.title} />
+    <p set:html={book.subtitle} />
+  </div>
+  <div class="dash-stats">
+    <div class="stat-card"><div class="stat-label">Overall progress</div><div class="stat-value" id="statOverall">0%</div></div>
+    <div class="stat-card"><div class="stat-label">Concepts learned</div><div class="stat-value"><span id="statConcepts">0</span><span class="small"> / {totals.concepts}</span></div></div>
+    <div class="stat-card"><div class="stat-label">Q&amp;A reviewed</div><div class="stat-value"><span id="statQa">0</span><span class="small"> / {totals.qa}</span></div></div>
+    <div class="stat-card"><div class="stat-label">Interactive labs</div><div class="stat-value">{totals.labs}</div></div>
+  </div>
+
+  <h2 class="dash-section-title" set:html={book.pillarsTitle} />
+  <div class="four-q">
+    {notes.fourQuestions.map(q => (
+      <div class={`four-q-card ${q.cls}`}>
+        <h3 class="four-q-title"><span class={`q q-${q.cls}`} set:html={q.q} /></h3>
+        <div set:html={q.text} />
+        <div class="muted" style="margin-top:6px" set:html={q.answer} />
+      </div>
+    ))}
+  </div>
+
+  <h2 class="dash-section-title" set:html={book.takeawaysTitle} />
+  <div class="takeaways"><ol>{notes.takeaways.map(t => <li set:html={t} />)}</ol></div>
+
+  <h2 class="dash-section-title">Chapters</h2>
+  <div class="dash-chapters">
+    {chapters.map(ch => (
+      <a class="dash-chapter-card" href={url(chapterPath(notes, ch))} data-chapter-card={ch.id} data-total={ch.concepts.length + ch.interview.length}>
+        <div class="dcc-head"><div class="dcc-num">{ch.number}</div><div class="dcc-title" set:html={ch.title} /></div>
+        <div class="dcc-meta"><span>{ch.concepts.length} concepts &middot; {ch.labs.length} labs &middot; {ch.interview.length} Q&amp;A</span><span class="dcc-pct">0%</span></div>
+        <div class="dcc-prog-bar"><div class="dcc-prog-fill" style="width:0%"></div></div>
+      </a>
+    ))}
+  </div>
+  <div class="chapter-footer" style="margin-top:30px;">
+    <div style="color:var(--text-muted);font-size:13px;">
+      <strong>How to use:</strong> every chapter has Core Concepts, Interactive Labs, a Cheatsheet, Interview Q&amp;A, and Flashcards.
+      Concept cards with a <span style="color:var(--accent-3)">&#9654; See it live</span> button jump straight to the lab that demonstrates them.
+      Progress is saved in this browser; use <strong>Export</strong> and <strong>Import</strong> to move it between devices.
+    </div>
+  </div>
+</NotesLayout>
