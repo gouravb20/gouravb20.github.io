@@ -11,7 +11,7 @@ import { findApps, loadApp } from "../src/lib/notes-source.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(ROOT, "public");
 const DIST = path.join(ROOT, "dist");
-const BASE = "/system-design/";
+const BASE = "/learn/";
 const FIX = process.argv.includes("--fix");
 const problems = [];
 const warnings = [];
@@ -171,7 +171,7 @@ function existsExact(p) {
 }
 
 let linkCount = 0;
-/** `siteRoot` is where BASE-absolute links ("/system-design/...") resolve; null for files outside the site. */
+/** `siteRoot` is where BASE-absolute links ("/learn/...") resolve; null for files outside the site. */
 function checkRef(file, ref, i, src, siteRoot) {
   if (/^(?:[a-z]+:|\/\/|#)/i.test(ref) || ref.includes("${")) return;
   let target = ref.split("#")[0].split("?")[0];

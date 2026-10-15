@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const site = "https://gouravb20.github.io";
-const base = "/system-design";
+const base = "/learn";
 
 // The sitemap plugin only knows Astro's own pages; list the static pages served from public/ too.
 function publicPages(dir = "public", out = []) {
@@ -24,7 +24,7 @@ function publicPages(dir = "public", out = []) {
 // GitHub Pages (and `astro preview`) serve public/<dir>/index.html for "<dir>/"; the dev server only serves
 // public files by exact path. Match the host in dev.
 // By the time Vite middleware runs, Astro has stripped the base from req.url (req.originalUrl keeps it) and
-// already answered requests outside the base, so "/" itself still 404s in dev: open /system-design/.
+// already answered requests outside the base, so "/" itself still 404s in dev: open /learn/.
 function publicDirectoryIndex() {
   return {
     name: "public-directory-index",

@@ -10,7 +10,7 @@ export const TRACKS: Record<string, string> = {
   "low-level-design": "Low-level design",
 };
 
-/** Site-absolute URL under the configured base, e.g. url("shared/styles.css") -> "/system-design/shared/styles.css". */
+/** Site-absolute URL under the configured base, e.g. url("shared/styles.css") -> "/learn/shared/styles.css". */
 export function url(path = ""): string {
   return `${import.meta.env.BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
 }

@@ -4,15 +4,15 @@
     "dcat": "http://www.w3.org/ns/dcat#",
     "dct": "http://purl.org/dc/terms/"
   },
-  "@id": "https://gouravb20.github.io/system-design/",
+  "@id": "https://gouravb20.github.io/learn/",
   "@type": ["WebSite", "Dataset", "dcat:Dataset"],
   "name": "System Design Notes",
   "alternateName": "Interactive system design study notes",
-  "url": "https://gouravb20.github.io/system-design/",
+  "url": "https://gouravb20.github.io/learn/",
   "description": "Interactive system design study notes in two tracks: high-level design (distributed systems, data and AI) and low-level design (languages and building blocks), with chapter pages, labs, glossaries and interview Q&A.",
   "inLanguage": "en",
   "isAccessibleForFree": true,
-  "license": "https://github.com/gouravb20/system-design",
+  "license": "https://github.com/gouravb20/learn",
   "creator": {
     "@type": "Person",
     "name": "Gourav Bansal",
@@ -35,28 +35,28 @@
     {
       "@type": "CollectionPage",
       "name": "High-Level Design",
-      "url": "https://gouravb20.github.io/system-design/high-level-design/"
+      "url": "https://gouravb20.github.io/learn/high-level-design/"
     },
     {
       "@type": "CollectionPage",
       "name": "Low-Level Design",
-      "url": "https://gouravb20.github.io/system-design/low-level-design/"
+      "url": "https://gouravb20.github.io/learn/low-level-design/"
     }
   ],
   "dct:title": "System Design Notes",
   "dct:description": "Interactive system design study notes with labs and interview Q&A.",
-  "dcat:landingPage": "https://gouravb20.github.io/system-design/",
-  "dcat:theme": "https://gouravb20.github.io/system-design/",
+  "dcat:landingPage": "https://gouravb20.github.io/learn/",
+  "dcat:theme": "https://gouravb20.github.io/learn/",
   "dcat:distribution": [
     {
       "@type": "dcat:Distribution",
-      "dcat:accessURL": "https://gouravb20.github.io/system-design/sitemap-index.xml",
+      "dcat:accessURL": "https://gouravb20.github.io/learn/sitemap-index.xml",
       "dcat:mediaType": "application/xml",
       "dct:title": "HTML page sitemap"
     },
     {
       "@type": "dcat:Distribution",
-      "dcat:accessURL": "https://gouravb20.github.io/system-design/dataset.jsonld",
+      "dcat:accessURL": "https://gouravb20.github.io/learn/dataset.jsonld",
       "dcat:mediaType": "application/ld+json",
       "dct:title": "Site dataset description (JSON-LD)"
     }

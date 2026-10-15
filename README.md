@@ -1,6 +1,6 @@
 # System Design · Interactive Notes
 
-Interactive system design study notes in two tracks, published at [gouravb20.github.io/system-design](https://gouravb20.github.io/system-design/):
+Interactive system design study notes in two tracks, published at [gouravb20.github.io/learn](https://gouravb20.github.io/learn/):
 
 - [`high-level-design/`](public/high-level-design/index.html): chapter-wise notes for the system design core concepts, the advanced topics, worked problem breakdowns and the books behind modern data and AI systems, plus a slide deck on how databases differ and an in-browser library of the source books.
 - [`low-level-design/`](public/low-level-design/index.html): chapter-wise notes for the languages and building blocks behind well-designed programs, starting with *Mastering Go*, plus an in-browser library of the source books.
@@ -59,17 +59,17 @@ Requires Node.js 22.12 or later.
 
 ```sh
 npm install
-npm run dev        # http://localhost:4321/system-design/ (rebuilds as you edit)
+npm run dev        # http://localhost:4321/learn/ (rebuilds as you edit)
 npm run build      # writes the site to dist/
 npm run preview    # serves dist/ exactly as GitHub Pages will
 ```
 
-Every URL lives under `/system-design/`, as on GitHub Pages, so the dev server's bare `http://localhost:4321/` is a 404.
+Every URL lives under `/learn/`, as on GitHub Pages, so the dev server's bare `http://localhost:4321/` is a 404.
 
 ## Project layout
 
 ```
-public/                        served as-is under /system-design/
+public/                        served as-is under /learn/
   index.html                   landing page: pick high-level or low-level design
   shared/                      used by every notes app in both tracks
     app.js                     single-page app shell: routing, tabs, search, progress, export/import
@@ -157,7 +157,7 @@ Check deep dives without building: `node scripts/check-deep.mjs [book folder]`. 
 
 Pages is published by `.github/workflows/deploy.yml` on every push to `main` (or run it by hand from the Actions tab). It relies on **Settings → Pages → Build and deployment → Source** being **GitHub Actions**; publishing the branch directly would serve the repository root, while the site lives in `public/` and `src/`.
 
-Search engines read `robots.txt` only at the domain root, so it lives in the [gouravb20.github.io](https://github.com/gouravb20/gouravb20.github.io) repository. It keeps crawlers off the book PDFs (`Disallow: /system-design/*.pdf$`) and advertises this site's sitemap (`Sitemap: …/system-design/sitemap-index.xml`) so pages can be discovered without waiting for inbound links. Hub pages also ship canonical URLs, Open Graph tags, JSON-LD (`WebSite` / `Dataset` / `CollectionPage`), and a machine-readable [`dataset.jsonld`](public/dataset.jsonld). After deploy, submit the sitemap once in [Google Search Console](https://search.google.com/search-console) and [Bing Webmaster Tools](https://www.bing.com/webmasters) if you want indexing sooner.
+Search engines read `robots.txt` only at the domain root, so it lives in the [gouravb20.github.io](https://github.com/gouravb20/gouravb20.github.io) repository. It keeps crawlers off the book PDFs (`Disallow: /learn/*.pdf$`) and advertises this site's sitemap (`Sitemap: …/learn/sitemap-index.xml`) so pages can be discovered without waiting for inbound links. Hub pages also ship canonical URLs, Open Graph tags, JSON-LD (`WebSite` / `Dataset` / `CollectionPage`), and a machine-readable [`dataset.jsonld`](public/dataset.jsonld). After deploy, submit the sitemap once in [Google Search Console](https://search.google.com/search-console) and [Bing Webmaster Tools](https://www.bing.com/webmasters) if you want indexing sooner.
 
 ## Credits
 
