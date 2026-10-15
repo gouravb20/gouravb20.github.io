@@ -16,6 +16,8 @@ function publicPages(dir = "public", out = []) {
       out.push(`${site}${base}/${rel}`);
     }
   }
+  // Machine-readable site description (JSON-LD / DCAT), linked from the landing page.
+  out.push(`${site}${base}/dataset.jsonld`);
   return out;
 }
 
