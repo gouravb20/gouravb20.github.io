@@ -34,6 +34,10 @@ function loadState() {
     if (saved.theme) state.theme = saved.theme;
     state.hideDefs = !!saved.hideDefs;
     if (saved.lastChapter) state.lastChapter = saved.lastChapter;
+    // One-time migrate per-book theme into the site-wide look preference.
+    if (window.SDLooks && saved.theme && !localStorage.getItem(window.SDLooks.THEME_KEY)) {
+      window.SDLooks.applyTheme(saved.theme === "light" ? "light" : "dark");
+    }
   } catch (e) { console.warn("Could not load state", e); }
   applyTheme();
 }
@@ -50,6 +54,10 @@ function getChapterProgress(chId) {
 }
 function countTrue(obj) { return Object.keys(obj || {}).filter(k => obj[k]).length; }
 function applyTheme() {
+  if (window.SDLooks) {
+    window.SDLooks.applyTheme();
+    return;
+  }
   document.body.classList.toggle("light", state.theme === "light");
   const t = document.getElementById("themeToggle");
   if (t) t.textContent = state.theme === "light" ? "Dark" : "Light";
@@ -605,13 +613,32 @@ function renderDashboard(m) {
 // ============================================================
 // Glossary and all cheatsheets
 // ============================================================
+function shortLabel(termHtml) {
+  const t = stripTags(termHtml).trim();
+  const abbr = t.match(/\(([A-Za-z][A-Za-z0-9+./-]{1,10})\)\s*$/);
+  if (abbr) return abbr[1];
+  const head = t.split(":")[0].trim();
+  const words = head.split(/[\s/]+/).filter(Boolean);
+  while (words.length && /^(a|an|the)$/i.test(words[0])) words.shift();
+  if (words.length >= 3 && /^vs\.?$/i.test(words[1])) return words.slice(0, 3).join(" ").slice(0, 40);
+  return (words.slice(0, 2).join(" ") || t).slice(0, 40);
+}
+function oneLine(html, max = 90) {
+  const t = stripTags(html).replace(/\s+/g, " ").trim();
+  if (t.length <= max) return escapeHtml(t);
+  return escapeHtml(t.slice(0, t.lastIndexOf(" ", max - 1)).replace(/[\s,;:.–—-]+$/, "") + "…");
+}
 function renderGlossary(m) {
   const all = [];
-  DATA.chapters.forEach(ch => ch.concepts.forEach((c, i) => all.push({ ch, c, i, term: stripTags(c.term).trim() })));
-  all.sort((a, b) => a.term.localeCompare(b.term, undefined, { sensitivity: "base" }));
+  DATA.chapters.forEach(ch => ch.concepts.forEach((c, i) => {
+    const term = stripTags(c.term).trim();
+    const label = shortLabel(c.term);
+    all.push({ ch, c, i, term, label });
+  }));
+  all.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }) || a.term.localeCompare(b.term, undefined, { sensitivity: "base" }));
   const groups = {};
   all.forEach(x => {
-    const L = x.term.charAt(0).toUpperCase();
+    const L = x.label.charAt(0).toUpperCase();
     (groups[/[A-Z]/.test(L) ? L : "#"] ||= []).push(x);
   });
   const letters = Object.keys(groups).sort();
@@ -620,14 +647,14 @@ function renderGlossary(m) {
     <div class="chapter-header">
       <div class="chapter-label">Reference</div>
       <h1>Glossary</h1>
-      <div class="overview-text">${all.length} terms from every chapter, A to Z. Click a term to open it in its chapter.</div>
+      <div class="overview-text">${all.length} terms · short labels · click for the chapter</div>
       <div class="ref-tools">
-        <input type="search" class="tool-filter" id="glFilter" placeholder="Filter terms and definitions..." aria-label="Filter glossary" autocomplete="off">
+        <input type="search" class="tool-filter" id="glFilter" placeholder="Filter…" aria-label="Filter glossary" autocomplete="off">
         <select class="sel" id="glChapter" aria-label="Only show one chapter">
           <option value="">All chapters</option>
           ${DATA.chapters.filter(ch => ch.concepts.length).map(ch => `<option value="${ch.id}">Ch ${ch.number}: ${stripTags(ch.title)}</option>`).join("")}
         </select>
-        <span id="glCount">${all.length} terms &middot; ${learned} learned</span>
+        <span id="glCount">${all.length} · ${learned} learned</span>
       </div>
     </div>
     <nav class="letter-bar" aria-label="Jump to letter">${letters.map(L => `<a href="#gl-${L}" data-letter="${L}">${L}</a>`).join("")}</nav>
@@ -635,9 +662,10 @@ function renderGlossary(m) {
       <div class="gl-group" id="gl-${L}">
         <div class="gl-letter">${L}</div>
         ${groups[L].map(x => `
-          <div class="gl-item" data-ch="${x.ch.id}">
-            <div class="gl-term"><span>${x.c.term}</span><span class="gl-ch">Ch ${x.ch.number}</span>${getChapterProgress(x.ch.id).conceptsLearned[x.i] ? '<span class="gl-done" title="Learned">&#10003;</span>' : ""}</div>
-            <div class="gl-def">${x.c.def}</div>
+          <div class="gl-item" data-ch="${x.ch.id}" title="${escapeHtml(x.term)}">
+            <div class="gl-term"><span>${escapeHtml(x.label)}</span><span class="gl-ch">${x.ch.number}</span>${getChapterProgress(x.ch.id).conceptsLearned[x.i] ? '<span class="gl-done" title="Learned">&#10003;</span>' : ""}</div>
+            <div class="gl-def">${oneLine(x.c.def)}</div>
+            <span class="gl-full">${escapeHtml(x.term)}</span>
           </div>`).join("")}
       </div>`).join("")}
     <div class="empty-tab filter-empty" id="glEmpty" hidden></div>`;
@@ -796,7 +824,17 @@ function doExport() {
   showToast("Progress exported. Use Import on your other device.");
 }
 function doImportPick() { document.getElementById("importFile").click(); }
-function doToggleTheme() { state.theme = state.theme === "light" ? "dark" : "light"; saveState(); applyTheme(); }
+function doToggleTheme() {
+  if (window.SDLooks) {
+    window.SDLooks.cycleTheme();
+    state.theme = window.SDLooks.themePref;
+    saveState();
+    return;
+  }
+  state.theme = state.theme === "light" ? "dark" : "light";
+  saveState();
+  applyTheme();
+}
 function doReset() {
   if (confirm("Reset all progress? This cannot be undone.")) { state.progress = {}; saveState(); render(); }
 }

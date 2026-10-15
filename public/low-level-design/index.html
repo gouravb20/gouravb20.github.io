@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#0a0f1c">
   <meta name="description" content="Interactive low-level design notes: chapter-wise notes on Mastering Go with hands-on labs, cheatsheets and interview Q&A.">
   <title>Low-Level Design · Interactive Notes</title>
+  <script src="../shared/looks.js"></script>
   <link rel="canonical" href="https://gouravb20.github.io/system-design/low-level-design/">
   <link rel="sitemap" type="application/xml" title="Sitemap" href="https://gouravb20.github.io/system-design/sitemap-index.xml">
   <meta property="og:type" content="website">
@@ -219,12 +220,16 @@
 
   <script>
     (function () {
-      const THEME_KEY = "system_design_hub_theme";
-      const root = document.documentElement, btn = document.getElementById("themeToggle");
-      const apply = t => { root.dataset.theme = t; btn.textContent = t === "dark" ? "Light" : "Dark"; };
-      let theme = localStorage.getItem(THEME_KEY) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-      apply(theme);
-      btn.addEventListener("click", () => { theme = theme === "dark" ? "light" : "dark"; localStorage.setItem(THEME_KEY, theme); apply(theme); });
+      if (window.SDLooks) {
+        try {
+          if (!localStorage.getItem(SDLooks.THEME_KEY)) {
+            const old = localStorage.getItem("system_design_hub_theme");
+            if (old === "light" || old === "dark") SDLooks.applyTheme(old);
+          }
+        } catch (e) {}
+        SDLooks.boot();
+        SDLooks.ensureControls();
+      }
 
       const countTrue = o => Object.values(o || {}).filter(Boolean).length;
       document.querySelectorAll(".card[data-key]").forEach(card => {

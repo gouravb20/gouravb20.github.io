@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1c">
+  <script src="../../shared/looks.js"></script>
   <meta name="description" content="Library of the books behind the system design notes, readable in the browser.">
   <title>Library · System Design</title>
   <style>
@@ -184,12 +185,16 @@
       const pdfUrl = b => encodeURI(b.file).replace(/'/g, "%27");
       const fileName = b => b.file.split("/").pop();
 
-      const THEME_KEY = "system_design_hub_theme";
-      const root = document.documentElement, themeBtn = $("themeToggle");
-      const applyTheme = t => { root.dataset.theme = t; themeBtn.textContent = t === "dark" ? "Light" : "Dark"; };
-      let theme = localStorage.getItem(THEME_KEY) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-      applyTheme(theme);
-      themeBtn.addEventListener("click", () => { theme = theme === "dark" ? "light" : "dark"; localStorage.setItem(THEME_KEY, theme); applyTheme(theme); });
+      if (window.SDLooks) {
+        try {
+          if (!localStorage.getItem(SDLooks.THEME_KEY)) {
+            const old = localStorage.getItem("system_design_hub_theme");
+            if (old === "light" || old === "dark") SDLooks.applyTheme(old);
+          }
+        } catch (e) {}
+        SDLooks.boot();
+        SDLooks.ensureControls();
+      }
 
       $("grid").innerHTML = BOOKS.map(b => `
         <article class="book" style="--accent:${b.accent}">

@@ -1,0 +1,186 @@
+/* Token-only port of ddia-notes look: editorial */
+:root[data-skin="editorial"] {
+  color-scheme: dark;
+  --bg: #1b1916;
+  --bg-2: #211f1b;
+  --bg-3: #2a2722;
+  --bg-4: #34302a;
+  --border: #3a362f;
+  --border-strong: #5b5448;
+  --text: #e6dece;
+  --text-strong: #f6efe0;
+  --text-muted: #aca290;
+  --accent: #e8674b;
+  --accent-strong: #b8391f;
+  --accent-ink: #f2785c;
+  --accent-2: #94b3de;
+  --accent-3: #ddb15a;
+  --good: #95c582;
+  --bad: #ef7a64;
+  --warn: #e2b55a;
+  --easy: #95c582;
+  --med: #e2b55a;
+  --hard: #ef7a64;
+  --shadow: 0 1px 0 rgba(0,0,0,0.3), 0 14px 34px rgba(0,0,0,0.38);
+  --radius: 0px;
+  --round: 0;
+  --accent-grad-end: #b8391f;
+
+  --font-serif: "Source Serif 4", "Source Serif Pro", "Iowan Old Style", Charter, "Palatino Linotype", Palatino, Georgia, serif;
+  --font-sans: "Source Sans 3", "Source Sans Pro", "Gill Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-serif);
+  --font-reading: var(--font-serif);
+  --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Skin-private tokens */
+  --ed-rule: #9a8f7c;          /* heavy rules (2px): softer than the cream ink at night */
+  --ed-hair: var(--border);    /* hairlines */
+  --ed-card: #25221d;          /* index-card stock (flashcards) */
+  --ed-hl: rgba(221,177,90,0.26);
+  --ed-wash: rgba(255,240,210,0.035);
+  --ed-measure: 38em;          /* comfortable line length for long-form text */
+
+  --c-problem: #f2785c;
+  --c-idea: #94b3de;
+  --c-analogy: #6fc3c9;
+  --c-insight: #c3a2dd;
+  --c-warning: #e2b55a;
+  --c-interview: #ee8aa5;
+  --c-history: #c9a77c;
+  --c-modern: #95c582;
+  --c-tip: #95c582;
+  --c-mistake: #ef7a64;
+
+  /* Figures: ink-line drawings on night paper, earthy categorical palette */
+  --viz-bg: #1f1d19;
+  --viz-panel: #26231e;
+  --viz-ink: #ebe3d2;
+  --viz-muted: #aca290;
+  --viz-line: #6e665a;
+  --viz-grid: #2e2b25;
+  --viz-node: #23211c;
+  --viz-node-stroke: #8d8473;
+  --viz-c1: #c3a2dd;  /* plum   (leader / primary) */
+  --viz-c2: #6fc3c9;  /* teal   (followers / replicas) */
+  --viz-c3: #ddb15a;  /* ochre */
+  --viz-c4: #a8c487;  /* sage */
+  --viz-c5: #ee8aa5;  /* madder rose */
+  --viz-c6: #94b3de;  /* ink blue (clients) */
+  --viz-c7: #e8a05e;  /* burnt sienna */
+  --viz-c8: #c9c466;  /* olive */
+  --viz-c1-soft: rgba(195,162,221,0.17);
+  --viz-c2-soft: rgba(111,195,201,0.15);
+  --viz-c3-soft: rgba(221,177,90,0.16);
+  --viz-c4-soft: rgba(168,196,135,0.15);
+  --viz-c5-soft: rgba(238,138,165,0.15);
+  --viz-c6-soft: rgba(148,179,222,0.15);
+  --viz-c7-soft: rgba(232,160,94,0.16);
+  --viz-c8-soft: rgba(201,196,102,0.15);
+  --viz-ok: #84cc7c;
+  --viz-bad: #f2685a;
+  --viz-warn: #e9b44c;
+  --viz-info: #94b3de;
+  --viz-accent: #e8674b;
+  --viz-ok-soft: rgba(132,204,124,0.15);
+  --viz-bad-soft: rgba(242,104,90,0.16);
+  --viz-warn-soft: rgba(233,180,76,0.16);
+  --viz-info-soft: rgba(148,179,222,0.15);
+}
+
+:root[data-skin="editorial"] body.light,
+:root[data-skin="editorial"][data-theme="light"] {
+  --bg: #f7f3ea;
+  --bg-2: #fbf8f1;
+  --bg-3: #efe9dc;
+  --bg-4: #e5ddcc;
+  --border: #dcd3c1;
+  --border-strong: #b5a990;
+  --text: #24211c;
+  --text-strong: #131210;
+  --text-muted: #635b4e;
+  --accent: #c2371d;
+  --accent-strong: #b2301a;
+  --accent-ink: #ab2f1a;
+  --accent-2: #2a4e7c;
+  --accent-3: #865b08;
+  --good: #2f7343;
+  --bad: #b3261e;
+  --warn: #865b08;
+  --easy: #2f7343;
+  --med: #865b08;
+  --hard: #b3261e;
+  --shadow: 0 1px 2px rgba(60,44,20,0.10), 0 10px 28px rgba(60,44,20,0.10);
+
+  --ed-rule: #24211c;
+  --ed-hair: #dcd3c1;
+  --ed-card: #fffdf7;
+  --ed-hl: rgba(226,170,52,0.30);
+  --ed-wash: rgba(90,60,20,0.035);
+
+  --c-problem: #b2301a;
+  --c-idea: #2a4e7c;
+  --c-analogy: #18707a;
+  --c-insight: #6b3c85;
+  --c-warning: #865b08;
+  --c-interview: #9c2f55;
+  --c-history: #77552c;
+  --c-modern: #2f7343;
+  --c-tip: #2f7343;
+  --c-mistake: #b3261e;
+
+  --viz-bg: #fbf8f1;
+  --viz-panel: #f3eee2;
+  --viz-ink: #24211c;
+  --viz-muted: #645c4f;
+  --viz-line: #a99e89;
+  --viz-grid: #ebe4d5;
+  --viz-node: #fffdf8;
+  --viz-node-stroke: #8a7f6c;
+  --viz-c1: #6b3c85;  /* plum */
+  --viz-c2: #18707a;  /* teal */
+  --viz-c3: #946409;  /* ochre */
+  --viz-c4: #4b7a3e;  /* sage */
+  --viz-c5: #b5345c;  /* madder rose */
+  --viz-c6: #2c5a96;  /* ink blue */
+  --viz-c7: #a95816;  /* burnt sienna */
+  --viz-c8: #69751a;  /* olive */
+  --viz-c1-soft: rgba(107,60,133,0.11);
+  --viz-c2-soft: rgba(24,112,122,0.11);
+  --viz-c3-soft: rgba(148,100,9,0.13);
+  --viz-c4-soft: rgba(75,122,62,0.12);
+  --viz-c5-soft: rgba(181,52,92,0.10);
+  --viz-c6-soft: rgba(44,90,150,0.10);
+  --viz-c7-soft: rgba(169,88,22,0.12);
+  --viz-c8-soft: rgba(105,117,26,0.12);
+  --viz-ok: #2f7a45;
+  --viz-bad: #c4261c;
+  --viz-warn: #9a650a;
+  --viz-info: #2c5a96;
+  --viz-accent: #c2371d;
+  --viz-ok-soft: rgba(47,122,69,0.11);
+  --viz-bad-soft: rgba(196,38,28,0.10);
+  --viz-warn-soft: rgba(154,101,10,0.13);
+  --viz-info-soft: rgba(44,90,150,0.10);
+}
+
+:root[data-skin="editorial"] {
+  --dg-1: var(--viz-c2); --dg-1-soft: var(--viz-c2-soft, color-mix(in srgb, var(--viz-c2) 18%, transparent));
+  --dg-2: var(--viz-c6); --dg-2-soft: var(--viz-c6-soft, color-mix(in srgb, var(--viz-c6) 18%, transparent));
+  --dg-3: var(--viz-c3); --dg-3-soft: var(--viz-c3-soft, color-mix(in srgb, var(--viz-c3) 18%, transparent));
+  --dg-4: var(--viz-c1); --dg-4-soft: var(--viz-c1-soft, color-mix(in srgb, var(--viz-c1) 18%, transparent));
+  --dg-5: var(--viz-c5); --dg-5-soft: var(--viz-c5-soft, color-mix(in srgb, var(--viz-c5) 18%, transparent));
+  --dg-6: var(--viz-muted); --dg-6-soft: color-mix(in srgb, var(--viz-muted) 18%, transparent);
+  --dg-ok: var(--viz-ok, var(--good)); --dg-ok-soft: var(--viz-ok-soft, color-mix(in srgb, var(--good) 16%, transparent));
+  --dg-bad: var(--viz-bad, var(--bad)); --dg-bad-soft: var(--viz-bad-soft, color-mix(in srgb, var(--bad) 16%, transparent));
+  --dg-ink: var(--viz-ink, var(--text)); --dg-muted: var(--viz-muted, var(--text-muted));
+  --dg-line: var(--viz-line, var(--border)); --dg-panel: var(--viz-panel, var(--bg-2));
+  color-scheme: dark;
+}
+:root[data-skin="editorial"] body.light,
+:root[data-skin="editorial"][data-theme="light"] { color-scheme: light; }
+:root[data-skin="editorial"] body {
+  font-family: var(--font-sans, inherit);
+}
+:root[data-skin="editorial"] code, :root[data-skin="editorial"] pre, :root[data-skin="editorial"] .mono {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}

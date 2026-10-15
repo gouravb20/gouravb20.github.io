@@ -33,6 +33,23 @@ export function plain(html: string): string {
     .trim();
 }
 
+/**
+ * Short glossary label: prefer a trailing abbreviation in parentheses, otherwise the first
+ * one or two words before a colon (drop leading a/an/the). Keeps the A–Z list scannable.
+ */
+export function shortLabel(html: string): string {
+  const t = plain(html);
+  const abbr = t.match(/\(([A-Za-z][A-Za-z0-9+./-]{1,10})\)\s*$/);
+  if (abbr) return abbr[1].toUpperCase() === abbr[1] || abbr[1].length <= 6 ? abbr[1] : abbr[1];
+  const head = t.split(":")[0].trim();
+  const words = head.split(/[\s/]+/).filter(Boolean);
+  while (words.length && /^(a|an|the)$/i.test(words[0])) words.shift();
+  if (!words.length) return t.slice(0, 24);
+  // Keep "Exact vs approximate" style contrasts as three tokens.
+  if (words.length >= 3 && /^vs\.?$/i.test(words[1])) return words.slice(0, 3).join(" ");
+  return words.slice(0, 2).join(" ");
+}
+
 /** Plain-text summary cut at a word boundary, for meta descriptions. */
 export function summary(html: string, max = 158): string {
   const text = plain(html);

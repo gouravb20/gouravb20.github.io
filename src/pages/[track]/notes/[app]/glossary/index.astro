@@ -1,7 +1,7 @@
 ---
 import { getCollection } from "astro:content";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
-import { SITE_NAME, TRACKS, appPath, chapterPath, plain, url, type Notes } from "../../../../../lib/site";
+import { SITE_NAME, TRACKS, appPath, chapterPath, plain, shortLabel, summary, url, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -12,11 +12,15 @@ const { notes } = Astro.props as { notes: Notes };
 const { book, chapters } = notes;
 
 const terms = chapters
-  .flatMap(ch => ch.concepts.map((c, i) => ({ ch, c, i, term: plain(c.term) })))
-  .sort((a, b) => a.term.localeCompare(b.term, "en", { sensitivity: "base" }));
+  .flatMap(ch => ch.concepts.map((c, i) => {
+    const term = plain(c.term);
+    const label = shortLabel(c.term);
+    return { ch, c, i, term, label, sort: label };
+  }))
+  .sort((a, b) => a.sort.localeCompare(b.sort, "en", { sensitivity: "base" }) || a.term.localeCompare(b.term, "en", { sensitivity: "base" }));
 const groups = new Map<string, typeof terms>();
 for (const t of terms) {
-  const first = t.term.charAt(0).toUpperCase();
+  const first = t.label.charAt(0).toUpperCase();
   const key = /[A-Z]/.test(first) ? first : "#";
   groups.set(key, [...(groups.get(key) ?? []), t]);
 }
@@ -25,7 +29,7 @@ const letters = [...groups.keys()].sort();
 const path = `${appPath(notes)}glossary/`;
 const bookTitle = plain(book.title);
 const title = `Glossary · ${book.shortTitle ?? bookTitle}`;
-const description = `${terms.length} terms from ${bookTitle}, A to Z, each with a short definition and a link to its chapter.`;
+const description = `${terms.length} terms from ${bookTitle}, A to Z — short labels with one-line definitions.`;
 const site = Astro.site!;
 const abs = (p: string) => new URL(url(p), site).href;
 const structuredData = [
@@ -52,14 +56,14 @@ const structuredData = [
   <div class="chapter-header">
     <div class="chapter-label">Reference</div>
     <h1>Glossary</h1>
-    <div class="overview-text">{terms.length} terms from every chapter, A to Z. Click a term to open its chapter.</div>
+    <div class="overview-text">{terms.length} terms · short labels · click for the chapter</div>
     <div class="ref-tools" hidden>
-      <input type="search" class="tool-filter" id="glFilter" placeholder="Filter terms and definitions..." aria-label="Filter glossary" autocomplete="off">
+      <input type="search" class="tool-filter" id="glFilter" placeholder="Filter…" aria-label="Filter glossary" autocomplete="off">
       <select class="sel" id="glChapter" aria-label="Only show one chapter">
         <option value="">All chapters</option>
         {chapters.filter(ch => ch.concepts.length).map(ch => <option value={ch.id}>Ch {ch.number}: {plain(ch.title)}</option>)}
       </select>
-      <span id="glCount" data-total={terms.length}>{terms.length} terms</span>
+      <span id="glCount" data-total={terms.length}>{terms.length}</span>
     </div>
   </div>
 
@@ -71,9 +75,10 @@ const structuredData = [
     <section class="gl-group" id={`gl-${L}`}>
       <h2 class="gl-letter">{L}</h2>
       {groups.get(L)!.map(t => (
-        <a class="gl-item" href={url(chapterPath(notes, t.ch))} data-ch={t.ch.id} data-idx={t.i}>
-          <div class="gl-term"><span set:html={t.c.term} /><span class="gl-ch">Ch {t.ch.number}</span></div>
-          <div class="gl-def" set:html={t.c.def.replace(/<\/?a\b[^>]*>/gi, "")} />
+        <a class="gl-item" href={url(chapterPath(notes, t.ch))} data-ch={t.ch.id} data-idx={t.i} title={t.term}>
+          <div class="gl-term"><span>{t.label}</span><span class="gl-ch">{t.ch.number}</span></div>
+          <div class="gl-def">{summary(t.c.def, 90)}</div>
+          <span class="gl-full">{t.term}</span>
         </a>
       ))}
     </section>

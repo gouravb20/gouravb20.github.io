@@ -40,6 +40,15 @@ const ring = 2 * Math.PI * 8;
   <link rel="icon" href={url("favicon.svg")} type="image/svg+xml">
   <link rel="sitemap" href={url("sitemap-index.xml")}>
   <link rel="stylesheet" href={url("shared/styles.css")}>
+  <script is:inline>
+    (function () {
+      try {
+        var s = localStorage.getItem("system_design_skin");
+        if (s && s !== "classic") document.documentElement.setAttribute("data-skin", s);
+      } catch (e) {}
+    })();
+  </script>
+  <script src={url("shared/looks.js")} is:inline></script>
   {structuredData.map(d => <script type="application/ld+json" set:html={jsonLd(d)} />)}
   <slot name="head" />
 </head>
@@ -51,7 +60,10 @@ const ring = 2 * Math.PI * 8;
   data-chapter={chapter ?? ""}
 >
   <script is:inline>
-    try { if (JSON.parse(localStorage.getItem(document.body.dataset.storageKey || "") || "{}").theme === "light") document.body.classList.add("light"); } catch (e) {}
+    try {
+      if (window.SDLooks) window.SDLooks.boot();
+      else if (JSON.parse(localStorage.getItem(document.body.dataset.storageKey || "") || "{}").theme === "light") document.body.classList.add("light");
+    } catch (e) {}
   </script>
 
   <header class="topbar">

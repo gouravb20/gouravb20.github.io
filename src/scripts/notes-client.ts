@@ -5,10 +5,19 @@
 import type { SearchItem } from "../lib/site";
 
 type ChapterProgress = { conceptsLearned: Record<string, boolean>; qaReviewed: Record<string, boolean>; sectionsRead?: Record<string, boolean> };
-type Saved = { progress: Record<string, ChapterProgress>; theme: "dark" | "light"; hideDefs: boolean; lastChapter?: string };
+type Saved = { progress: Record<string, ChapterProgress>; theme: "dark" | "light" | "auto"; hideDefs: boolean; lastChapter?: string };
 interface LabContext { every(fn: () => void, ms: number): number; clear(h: number): void; onCleanup(fn: () => void): void }
 interface Lab { title: string; blurb: string; mount(el: HTMLElement, ctx: LabContext): void }
-declare global { interface Window { DEMOS?: Record<string, Lab> } }
+interface SDLooksApi {
+  THEME_KEY: string;
+  themePref: string;
+  resolvedTheme(): "dark" | "light";
+  applyTheme(pref?: string): void;
+  cycleTheme(): void;
+  ensureControls(): void;
+  boot(): void;
+}
+declare global { interface Window { DEMOS?: Record<string, Lab>; SDLooks?: SDLooksApi } }
 
 const TABS = ["learn", "concepts", "labs", "cheatsheet", "interview"] as const;
 type Tab = (typeof TABS)[number];
@@ -27,7 +36,11 @@ const chapterId = cfg.chapter || null;
 const state: Saved = (() => {
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    return { progress: s.progress || {}, theme: s.theme === "light" ? "light" : "dark", hideDefs: !!s.hideDefs, lastChapter: typeof s.lastChapter === "string" ? s.lastChapter : undefined };
+    const theme = s.theme === "light" || s.theme === "auto" ? s.theme : "dark";
+    if (window.SDLooks && s.theme && !localStorage.getItem(window.SDLooks.THEME_KEY)) {
+      window.SDLooks.applyTheme(theme === "auto" ? "auto" : theme);
+    }
+    return { progress: s.progress || {}, theme, hideDefs: !!s.hideDefs, lastChapter: typeof s.lastChapter === "string" ? s.lastChapter : undefined };
   } catch {
     return { progress: {}, theme: "dark", hideDefs: false };
   }
@@ -445,10 +458,25 @@ function moveSearchSelection(delta: number) {
 // ------------------------------------------------------------------ theme, export / import / reset, toast
 
 function applyTheme() {
+  if (window.SDLooks) {
+    window.SDLooks.applyTheme();
+    window.SDLooks.ensureControls();
+    return;
+  }
   document.body.classList.toggle("light", state.theme === "light");
   byId("themeToggle").textContent = state.theme === "light" ? "Dark" : "Light";
 }
-const toggleTheme = () => { state.theme = state.theme === "light" ? "dark" : "light"; save(); applyTheme(); };
+const toggleTheme = () => {
+  if (window.SDLooks) {
+    window.SDLooks.cycleTheme();
+    state.theme = window.SDLooks.themePref as Saved["theme"];
+    save();
+    return;
+  }
+  state.theme = state.theme === "light" ? "dark" : "light";
+  save();
+  applyTheme();
+};
 
 let toastTimer: number | undefined;
 function showToast(msg: string, isError = false) {

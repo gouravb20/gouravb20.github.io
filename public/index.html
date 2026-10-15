@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#0a0f1c">
   <meta name="description" content="Interactive system design notes in two tracks: high-level design (distributed systems, data and AI books, core concepts) and low-level design (Mastering Go and the building blocks of well-designed programs).">
   <title>System Design · High-Level and Low-Level Design</title>
+  <script src="shared/looks.js"></script>
   <link rel="canonical" href="https://gouravb20.github.io/system-design/">
   <link rel="sitemap" type="application/xml" title="Sitemap" href="https://gouravb20.github.io/system-design/sitemap-index.xml">
   <link rel="alternate" type="application/ld+json" title="Dataset" href="https://gouravb20.github.io/system-design/dataset.jsonld">
@@ -180,12 +181,15 @@
 
   <script>
     (function () {
-      const THEME_KEY = "system_design_hub_theme";
-      const root = document.documentElement, btn = document.getElementById("themeToggle");
-      const apply = t => { root.dataset.theme = t; btn.textContent = t === "dark" ? "Light" : "Dark"; };
-      let theme = localStorage.getItem(THEME_KEY) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-      apply(theme);
-      btn.addEventListener("click", () => { theme = theme === "dark" ? "light" : "dark"; localStorage.setItem(THEME_KEY, theme); apply(theme); });
+      if (!window.SDLooks) return;
+      try {
+        if (!localStorage.getItem(SDLooks.THEME_KEY)) {
+          const old = localStorage.getItem("system_design_hub_theme");
+          if (old === "light" || old === "dark") SDLooks.applyTheme(old);
+        }
+      } catch (e) {}
+      SDLooks.boot();
+      SDLooks.ensureControls();
     })();
   </script>
 </body>

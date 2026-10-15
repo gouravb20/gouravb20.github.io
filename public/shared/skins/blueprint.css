@@ -1,0 +1,188 @@
+/* Token-only port of ddia-notes look: blueprint */
+:root[data-skin="blueprint"] {
+  --bg: #0d2c56;
+  --bg-2: #0f315e;
+  --bg-3: #143a6c;
+  --bg-4: #1a4479;
+  --border: rgba(127, 176, 235, 0.30);
+  --border-strong: rgba(160, 200, 245, 0.58);
+  --text: #e8f1fc;
+  --text-strong: #ffffff;
+  --text-muted: #a3bde0;
+  --accent: #7fdcff;
+  --accent-strong: #e4f5ff;   /* solid "inverted" fills: navy text sits on them */
+  --accent-ink: #9fe6ff;
+  --accent-2: #8fdcff;
+  --accent-3: #ffc54d;
+  --good: #5ee69a;
+  --bad: #ff6b6b;
+  --warn: #ffc54d;
+  --easy: #5ee69a;
+  --med: #ffc54d;
+  --hard: #ff8080;
+  --shadow: none;
+  --radius: 0px;
+  --round: 0;
+  --accent-grad-end: var(--accent-strong);
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", "Roboto Condensed", "Arial Narrow", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-reading: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  /* Skin-private tokens */
+  --bp-on-accent: #0a2547;                      /* text on --accent-strong */
+  --bp-tick: #d6ecff;                           /* corner tick marks */
+  --bp-grid-minor: rgba(127, 176, 235, 0.06);
+  --bp-grid-major: rgba(127, 176, 235, 0.12);
+  --bp-well: #0a2549;                           /* code wells, recessed panels */
+  --bp-wash: 4%;                                /* tone wash inside annotation frames */
+
+  /* Callout tones: annotation inks */
+  --c-problem: #ff8a65;
+  --c-idea: #7fe3ff;
+  --c-analogy: #c9b6ff;
+  --c-insight: #8fc1ff;
+  --c-warning: #ffc84d;
+  --c-interview: #ff9ecf;
+  --c-history: #d9c29a;
+  --c-modern: #6ee7a0;
+  --c-tip: #6ee7a0;
+  --c-mistake: #ff6b6b;
+
+  /* Visualization palette: line work on cyanotype */
+  --viz-bg: #0b2850;
+  --viz-panel: #0f315e;
+  --viz-ink: #eef5ff;
+  --viz-muted: #a6c0e2;
+  --viz-line: #6189bd;
+  --viz-grid: #1b4274;
+  --viz-node: #0e2f5a;
+  --viz-node-stroke: #c3d6ee;
+  --viz-c1: #cdb4ff;  /* lilac: leader / primary */
+  --viz-c2: #5ce1f0;  /* cyan: followers / replicas */
+  --viz-c3: #ffc54d;  /* amber */
+  --viz-c4: #6ee7a0;  /* green */
+  --viz-c5: #ff9ecf;  /* pink */
+  --viz-c6: #74adff;  /* cornflower: clients */
+  --viz-c7: #ff9a57;  /* orange */
+  --viz-c8: #c4f06a;  /* lime */
+  /* Fills: cool hues are faint washes (the stroke carries the meaning); warm hues would turn
+     purple-grey as a translucent wash over blue, so they are deep, nearly opaque shades instead. */
+  --viz-c1-soft: rgba(205, 180, 255, 0.13);
+  --viz-c2-soft: rgba(92, 225, 240, 0.11);
+  --viz-c3-soft: rgba(112, 82, 8, 0.74);
+  --viz-c4-soft: rgba(110, 231, 160, 0.11);
+  --viz-c5-soft: rgba(112, 26, 84, 0.62);
+  --viz-c6-soft: rgba(116, 173, 255, 0.14);
+  --viz-c7-soft: rgba(122, 50, 14, 0.74);
+  --viz-c8-soft: rgba(72, 100, 16, 0.70);
+  --viz-ok: #5ee69a;
+  --viz-bad: #ff6b6b;
+  --viz-warn: #ffc54d;
+  --viz-info: #74adff;
+  --viz-accent: #cdb4ff;
+  --viz-ok-soft: rgba(94, 230, 154, 0.12);
+  --viz-bad-soft: rgba(122, 24, 40, 0.74);
+  --viz-warn-soft: rgba(112, 82, 8, 0.74);
+  --viz-info-soft: rgba(116, 173, 255, 0.13);
+}
+
+:root[data-skin="blueprint"] body.light,
+:root[data-skin="blueprint"][data-theme="light"] {
+  --bg: #f9fbfd;
+  --bg-2: #ffffff;
+  --bg-3: #eef3f9;
+  --bg-4: #e2eaf4;
+  --border: rgba(18, 54, 110, 0.20);
+  --border-strong: rgba(18, 54, 110, 0.45);
+  --text: #0b2545;
+  --text-strong: #051833;
+  --text-muted: #4a6283;
+  --accent: #1f4fbf;
+  --accent-strong: #12366e;
+  --accent-ink: #1a47ad;
+  --accent-2: #0a5f99;
+  --accent-3: #a35a00;
+  --good: #137a49;
+  --bad: #c01f28;
+  --warn: #a35a00;
+  --easy: #137a49;
+  --med: #a35a00;
+  --hard: #c01f28;
+  --shadow: none;
+  --accent-grad-end: var(--accent-strong);
+
+  --bp-on-accent: #ffffff;
+  --bp-tick: #12366e;
+  --bp-grid-minor: rgba(31, 79, 191, 0.055);
+  --bp-grid-major: rgba(31, 79, 191, 0.11);
+  --bp-well: #f2f6fb;
+  --bp-wash: 3%;
+
+  --c-problem: #c2410c;
+  --c-idea: #0b6f93;
+  --c-analogy: #6d3fd1;
+  --c-insight: #1f5fd6;
+  --c-warning: #a35a00;
+  --c-interview: #b0266a;
+  --c-history: #7a5a32;
+  --c-modern: #137a49;
+  --c-tip: #137a49;
+  --c-mistake: #c01f28;
+
+  --viz-bg: #fbfcfe;
+  --viz-panel: #ffffff;
+  --viz-ink: #0b2545;
+  --viz-muted: #4f6789;
+  --viz-line: #8ea6c4;
+  --viz-grid: #e2eaf4;
+  --viz-node: #ffffff;
+  --viz-node-stroke: #49668c;
+  --viz-c1: #6d3fd1;
+  --viz-c2: #0a7ea4;
+  --viz-c3: #b26b00;
+  --viz-c4: #138a52;
+  --viz-c5: #c2306f;
+  --viz-c6: #1f5fd6;
+  --viz-c7: #c9520c;
+  --viz-c8: #5a860c;
+  --viz-c1-soft: rgba(109, 63, 209, 0.09);
+  --viz-c2-soft: rgba(10, 126, 164, 0.09);
+  --viz-c3-soft: rgba(178, 107, 0, 0.10);
+  --viz-c4-soft: rgba(19, 138, 82, 0.09);
+  --viz-c5-soft: rgba(194, 48, 111, 0.09);
+  --viz-c6-soft: rgba(31, 95, 214, 0.09);
+  --viz-c7-soft: rgba(201, 82, 12, 0.09);
+  --viz-c8-soft: rgba(90, 134, 12, 0.10);
+  --viz-ok: #138a52;
+  --viz-bad: #d0242b;
+  --viz-warn: #b26b00;
+  --viz-info: #1f5fd6;
+  --viz-accent: #6d3fd1;
+  --viz-ok-soft: rgba(19, 138, 82, 0.09);
+  --viz-bad-soft: rgba(208, 36, 43, 0.08);
+  --viz-warn-soft: rgba(178, 107, 0, 0.10);
+  --viz-info-soft: rgba(31, 95, 214, 0.08);
+}
+
+:root[data-skin="blueprint"] {
+  --dg-1: var(--viz-c2); --dg-1-soft: var(--viz-c2-soft, color-mix(in srgb, var(--viz-c2) 18%, transparent));
+  --dg-2: var(--viz-c6); --dg-2-soft: var(--viz-c6-soft, color-mix(in srgb, var(--viz-c6) 18%, transparent));
+  --dg-3: var(--viz-c3); --dg-3-soft: var(--viz-c3-soft, color-mix(in srgb, var(--viz-c3) 18%, transparent));
+  --dg-4: var(--viz-c1); --dg-4-soft: var(--viz-c1-soft, color-mix(in srgb, var(--viz-c1) 18%, transparent));
+  --dg-5: var(--viz-c5); --dg-5-soft: var(--viz-c5-soft, color-mix(in srgb, var(--viz-c5) 18%, transparent));
+  --dg-6: var(--viz-muted); --dg-6-soft: color-mix(in srgb, var(--viz-muted) 18%, transparent);
+  --dg-ok: var(--viz-ok, var(--good)); --dg-ok-soft: var(--viz-ok-soft, color-mix(in srgb, var(--good) 16%, transparent));
+  --dg-bad: var(--viz-bad, var(--bad)); --dg-bad-soft: var(--viz-bad-soft, color-mix(in srgb, var(--bad) 16%, transparent));
+  --dg-ink: var(--viz-ink, var(--text)); --dg-muted: var(--viz-muted, var(--text-muted));
+  --dg-line: var(--viz-line, var(--border)); --dg-panel: var(--viz-panel, var(--bg-2));
+  color-scheme: dark;
+}
+:root[data-skin="blueprint"] body.light,
+:root[data-skin="blueprint"][data-theme="light"] { color-scheme: light; }
+:root[data-skin="blueprint"] body {
+  font-family: var(--font-sans, inherit);
+}
+:root[data-skin="blueprint"] code, :root[data-skin="blueprint"] pre, :root[data-skin="blueprint"] .mono {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}

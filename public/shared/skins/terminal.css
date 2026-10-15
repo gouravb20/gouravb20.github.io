@@ -1,0 +1,188 @@
+/* Token-only port of ddia-notes look: terminal */
+:root[data-skin="terminal"] {
+  --bg: #0b0d0c;
+  --bg-2: #0f1211;
+  --bg-3: #161a18;
+  --bg-4: #1e2421;
+  --border: #29312d;
+  --border-strong: #3e4a44;
+  --text: #d3dbd5;
+  --text-strong: #f1f6f2;
+  --text-muted: #8f9c94;
+  --accent: #4be38a;
+  --accent-strong: #4be38a;
+  --accent-ink: #62ec9a;
+  --accent-2: #5fd4e6;
+  --accent-3: #ffb547;
+  --good: #4be38a;
+  --bad: #ff6a61;
+  --warn: #ffb547;
+  --easy: #4be38a;
+  --med: #ffb547;
+  --hard: #ff6a61;
+  --shadow: none;
+  --radius: 0px;
+  --round: 0;
+  --accent-grad-end: #4be38a;
+
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --font-sans: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --font-display: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --font-reading: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-label: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* skin-private tokens */
+  --on-accent: #03130a;      /* text on phosphor fills (reverse video) */
+  --t-deep: #070908;         /* code, logs: the "inside" of a terminal */
+  --t-title: #121614;        /* pane title bars */
+  --t-rule: #3e4a44;         /* pane frame lines */
+  --t-dim: #5c6a62;          /* empty meter cells, tree lines */
+  --t-hover: #151b18;
+  --t-sel: color-mix(in srgb, #4be38a 14%, #0b0d0c);
+
+  --c-problem: #ff8f52;
+  --c-idea: #4be38a;
+  --c-analogy: #5fd4e6;
+  --c-insight: #7fb4ff;
+  --c-warning: #ffc04d;
+  --c-interview: #f282d6;
+  --c-history: #cdb78f;
+  --c-modern: #b8ee62;
+  --c-tip: #4be38a;
+  --c-mistake: #ff6a61;
+
+  --viz-bg: #090b0a;
+  --viz-panel: #0f1311;
+  --viz-ink: #d8e2db;
+  --viz-muted: #8d9c93;
+  --viz-line: #4a5951;
+  --viz-grid: #1a201d;
+  --viz-node: #111614;
+  --viz-node-stroke: #56665d;
+  --viz-c1: #b896ff;   /* violet: leaders, primaries */
+  --viz-c2: #4fd8eb;   /* cyan: followers, replicas */
+  --viz-c3: #ffbe4d;   /* amber */
+  --viz-c4: #4be38a;   /* phosphor green */
+  --viz-c5: #ff7ab2;   /* pink */
+  --viz-c6: #6aa8ff;   /* blue: clients */
+  --viz-c7: #ff8c42;   /* orange */
+  --viz-c8: #c6f15c;   /* lime */
+  --viz-c1-soft: rgba(184,150,255,0.17);
+  --viz-c2-soft: rgba(79,216,235,0.15);
+  --viz-c3-soft: rgba(255,190,77,0.15);
+  --viz-c4-soft: rgba(75,227,138,0.15);
+  --viz-c5-soft: rgba(255,122,178,0.16);
+  --viz-c6-soft: rgba(106,168,255,0.16);
+  --viz-c7-soft: rgba(255,140,66,0.16);
+  --viz-c8-soft: rgba(198,241,92,0.15);
+  --viz-ok: #4be38a;
+  --viz-bad: #ff5f57;
+  --viz-warn: #ffbe4d;
+  --viz-info: #6aa8ff;
+  --viz-accent: #4be38a;
+  --viz-ok-soft: rgba(75,227,138,0.15);
+  --viz-bad-soft: rgba(255,95,87,0.16);
+  --viz-warn-soft: rgba(255,190,77,0.15);
+  --viz-info-soft: rgba(106,168,255,0.15);
+}
+
+:root[data-skin="terminal"] body.light,
+:root[data-skin="terminal"][data-theme="light"] {
+  --bg: #f2f0e9;
+  --bg-2: #f9f8f3;
+  --bg-3: #e9e6dc;
+  --bg-4: #dfdbd0;
+  --border: #cdc8ba;
+  --border-strong: #a19b8c;
+  --text: #1e2320;
+  --text-strong: #0b0e0c;
+  --text-muted: #545b56;
+  --accent: #116f37;
+  --accent-strong: #116f37;
+  --accent-ink: #0d6331;
+  --accent-2: #0a6575;
+  --accent-3: #8a5300;
+  --good: #116f37;
+  --bad: #b5241b;
+  --warn: #8a5300;
+  --easy: #116f37;
+  --med: #8a5300;
+  --hard: #b5241b;
+  --shadow: none;
+  --accent-grad-end: #116f37;
+
+  --on-accent: #f9f8f3;
+  --t-deep: #ebe8df;
+  --t-title: #e7e3d8;
+  --t-rule: #8f8a7c;
+  --t-dim: #b9b3a4;
+  --t-hover: #ebe8df;
+  --t-sel: color-mix(in srgb, #13773a 12%, #f9f8f3);
+
+  --c-problem: #b04510;
+  --c-idea: #116f37;
+  --c-analogy: #0a6575;
+  --c-insight: #2155ad;
+  --c-warning: #865100;
+  --c-interview: #a2236c;
+  --c-history: #6d5534;
+  --c-modern: #4a6b08;
+  --c-tip: #116f37;
+  --c-mistake: #b5241b;
+
+  --viz-bg: #f7f6f0;
+  --viz-panel: #fbfaf6;
+  --viz-ink: #1b201d;
+  --viz-muted: #5a625c;
+  --viz-line: #a7a394;
+  --viz-grid: #e4e1d6;
+  --viz-node: #fdfcf8;
+  --viz-node-stroke: #8d897b;
+  --viz-c1: #7440d0;
+  --viz-c2: #0a7c8e;
+  --viz-c3: #a06200;
+  --viz-c4: #157a3c;
+  --viz-c5: #c0287a;
+  --viz-c6: #2462c4;
+  --viz-c7: #c2510e;
+  --viz-c8: #5b870b;
+  --viz-c1-soft: rgba(116,64,208,0.12);
+  --viz-c2-soft: rgba(10,124,142,0.12);
+  --viz-c3-soft: rgba(173,106,0,0.13);
+  --viz-c4-soft: rgba(23,128,63,0.12);
+  --viz-c5-soft: rgba(192,40,122,0.11);
+  --viz-c6-soft: rgba(36,98,196,0.11);
+  --viz-c7-soft: rgba(194,81,14,0.12);
+  --viz-c8-soft: rgba(91,135,11,0.13);
+  --viz-ok: #157a3c;
+  --viz-bad: #c42a20;
+  --viz-warn: #985c00;
+  --viz-info: #2462c4;
+  --viz-accent: #116f37;
+  --viz-ok-soft: rgba(23,128,63,0.12);
+  --viz-bad-soft: rgba(196,42,32,0.11);
+  --viz-warn-soft: rgba(173,106,0,0.13);
+  --viz-info-soft: rgba(36,98,196,0.11);
+}
+
+:root[data-skin="terminal"] {
+  --dg-1: var(--viz-c2); --dg-1-soft: var(--viz-c2-soft, color-mix(in srgb, var(--viz-c2) 18%, transparent));
+  --dg-2: var(--viz-c6); --dg-2-soft: var(--viz-c6-soft, color-mix(in srgb, var(--viz-c6) 18%, transparent));
+  --dg-3: var(--viz-c3); --dg-3-soft: var(--viz-c3-soft, color-mix(in srgb, var(--viz-c3) 18%, transparent));
+  --dg-4: var(--viz-c1); --dg-4-soft: var(--viz-c1-soft, color-mix(in srgb, var(--viz-c1) 18%, transparent));
+  --dg-5: var(--viz-c5); --dg-5-soft: var(--viz-c5-soft, color-mix(in srgb, var(--viz-c5) 18%, transparent));
+  --dg-6: var(--viz-muted); --dg-6-soft: color-mix(in srgb, var(--viz-muted) 18%, transparent);
+  --dg-ok: var(--viz-ok, var(--good)); --dg-ok-soft: var(--viz-ok-soft, color-mix(in srgb, var(--good) 16%, transparent));
+  --dg-bad: var(--viz-bad, var(--bad)); --dg-bad-soft: var(--viz-bad-soft, color-mix(in srgb, var(--bad) 16%, transparent));
+  --dg-ink: var(--viz-ink, var(--text)); --dg-muted: var(--viz-muted, var(--text-muted));
+  --dg-line: var(--viz-line, var(--border)); --dg-panel: var(--viz-panel, var(--bg-2));
+  color-scheme: dark;
+}
+:root[data-skin="terminal"] body.light,
+:root[data-skin="terminal"][data-theme="light"] { color-scheme: light; }
+:root[data-skin="terminal"] body {
+  font-family: var(--font-sans, inherit);
+}
+:root[data-skin="terminal"] code, :root[data-skin="terminal"] pre, :root[data-skin="terminal"] .mono {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
