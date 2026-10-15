@@ -37,6 +37,9 @@
     try { localStorage.setItem(key, value); } catch { /* ignore */ }
   }
 
+  // The site check evaluates this file in Node, which has no DOM.
+  if (typeof document === "undefined") return;
+
   let activeSkin = document.documentElement.getAttribute("data-skin") || read(SKIN_KEY, "classic");
   if (!SKINS.some(s => s.id === activeSkin)) activeSkin = "classic";
   let themePref = read(THEME_KEY, "");
@@ -257,9 +260,6 @@
     resolvedTheme, applyTheme, applySkin, cycleTheme, ensureControls, boot, closeMenu,
   };
   global.SDLooks = api;
-
-  // The site check loads this file in Node, where there is no document.
-  if (typeof document === "undefined") return;
 
   // Run as soon as this script executes (in <head> or at end of body).
   boot();
