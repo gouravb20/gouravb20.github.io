@@ -4,7 +4,7 @@
 window.DATA = {
   book: {
     title: "Streaming Systems",
-    subtitle: "Chapter-wise interactive notes on <em>Streaming Systems: The What, Where, When, and How of Large-Scale Data Processing</em> by Tyler Akidau, Slava Chernyak &amp; Reuven Lax. Every chapter has concept cards, a cheatsheet, interview Q&amp;A, flashcards, and <strong>interactive labs</strong> built on the book's own example data (the nine team scores, Table 2-1, the conversion-attribution pipeline, and more).",
+    subtitle: "Chapter-wise interactive notes on <em>Streaming Systems: The What, Where, When, and How of Large-Scale Data Processing</em> by Tyler Akidau, Slava Chernyak &amp; Reuven Lax. Every chapter has concept cards, a cheatsheet, interview Q&amp;A and <strong>interactive labs</strong> built on the book's own example data (the nine team scores, Table 2-1, the conversion-attribution pipeline, and more).",
     storageKey: "streaming_systems_notes_v1",
     appId: "streaming-systems-notes",
     exportPrefix: "streaming-systems-progress",

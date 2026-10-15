@@ -2,7 +2,7 @@
 window.DATA = {
   book: {
     title: `Essential GraphRAG`,
-    subtitle: `Chapter-wise interactive notes on Bratanič &amp; Hane's <em>Essential GraphRAG: Knowledge Graph-Enhanced RAG</em>. Every chapter has core concepts, hands-on labs (chunking, hybrid search, parent-document retrieval, text2cypher, agentic routing, entity resolution, community detection, RAGAS...), a cheatsheet, interview Q&amp;A and flashcards.`,
+    subtitle: `Chapter-wise interactive notes on Bratanič &amp; Hane's <em>Essential GraphRAG: Knowledge Graph-Enhanced RAG</em>. Every chapter has core concepts, hands-on labs (chunking, hybrid search, parent-document retrieval, text2cypher, agentic routing, entity resolution, community detection, RAGAS...), a cheatsheet and interview Q&amp;A.`,
     storageKey: `graphrag_notes_v1`,
     appId: `graphrag-notes`,
     exportPrefix: `graphrag-progress`,

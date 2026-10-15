@@ -5,6 +5,8 @@ interface Props {
   notes: Notes;
   /** Chapter id, or undefined on the dashboard. */
   chapter?: string;
+  /** Book-wide page shown instead of a chapter. */
+  view?: "glossary" | "cheatsheet";
   title: string;
   description: string;
   /** Path under the base, ending in "/". */
@@ -14,7 +16,7 @@ interface Props {
   labs?: boolean;
 }
 
-const { notes, chapter, title, description, path, structuredData, labs = false } = Astro.props;
+const { notes, chapter, view, title, description, path, structuredData, labs = false } = Astro.props;
 const { book } = notes;
 const canonical = new URL(url(path), Astro.site).href;
 const brand = book.shortTitle ?? plain(book.title);
@@ -96,8 +98,14 @@ const ring = 2 * Math.PI * 8;
   <div class="layout">
     <aside class="sidebar" id="sidebar">
       <nav aria-label="Chapters">
-        <a class={`chapter-item${chapter ? "" : " active"}`} href={url(appPath(notes))}>
+        <a class={`chapter-item${chapter || view ? "" : " active"}`} href={url(appPath(notes))}>
           <div class="chapter-num">&#10022;</div><div class="chapter-title">Dashboard</div>
+        </a>
+        <a class={`chapter-item${view === "glossary" ? " active" : ""}`} href={url(`${appPath(notes)}glossary/`)} aria-current={view === "glossary" ? "page" : undefined}>
+          <div class="chapter-num">A&ndash;Z</div><div class="chapter-title">Glossary</div>
+        </a>
+        <a class={`chapter-item${view === "cheatsheet" ? " active" : ""}`} href={url(`${appPath(notes)}cheatsheet/`)} aria-current={view === "cheatsheet" ? "page" : undefined}>
+          <div class="chapter-num">&#8801;</div><div class="chapter-title">All cheatsheets</div>
         </a>
         {sortedParts(notes).map(part => (
           <>

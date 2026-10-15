@@ -3,7 +3,7 @@
 window.DATA = {
   book: {
     title: `Mastering Go`,
-    subtitle: `Chapter-wise interactive notes on Mihalis Tsoukalos' <em>Mastering Go, 4th edition</em> (Go 1.21 / 1.22). Every chapter has core concepts, hands-on labs (slice growth, iota, map iteration, generics constraints, method sets, defer order, the Go scheduler, channels and select, worker pools, mutexes vs atomics, context cancellation, HTTP timeouts, REST routing, table-driven tests, fuzzing, benchmarks, escape analysis, the tri-color GC...), a cheatsheet, interview Q&amp;A and flashcards.`,
+    subtitle: `Chapter-wise interactive notes on Mihalis Tsoukalos' <em>Mastering Go, 4th edition</em> (Go 1.21 / 1.22). Every chapter has core concepts, hands-on labs (slice growth, iota, map iteration, generics constraints, method sets, defer order, the Go scheduler, channels and select, worker pools, mutexes vs atomics, context cancellation, HTTP timeouts, REST routing, table-driven tests, fuzzing, benchmarks, escape analysis, the tri-color GC...), a cheatsheet and interview Q&amp;A.`,
     storageKey: `mastering_go_notes_v1`,
     appId: `mastering-go-notes`,
     exportPrefix: `mastering-go-progress`,

@@ -3,7 +3,7 @@
 window.DATA = {
   book: {
     title: `Designing Data-Intensive Applications`,
-    subtitle: `Chapter-wise interactive notes on Martin Kleppmann's <em>Designing Data-Intensive Applications</em>. All 12 chapters: core concepts, cheatsheets with trade-off tables, interview Q&amp;A with difficulty levels and flashcards. Chapter content ported from <a href="https://github.com/tiwari1302/ddia-notes" target="_blank" rel="noopener" style="color:var(--accent)">ddia-notes</a> by Shashank Tiwari.`,
+    subtitle: `Chapter-wise interactive notes on Martin Kleppmann's <em>Designing Data-Intensive Applications</em>. All 12 chapters: core concepts, cheatsheets with trade-off tables and interview Q&amp;A with difficulty levels. Chapter content ported from <a href="https://github.com/tiwari1302/ddia-notes" target="_blank" rel="noopener" style="color:var(--accent)">ddia-notes</a> by Shashank Tiwari.`,
     storageKey: `ddia_notes_v1`,
     appId: `ddia-notes`,
     exportPrefix: `ddia-progress`,

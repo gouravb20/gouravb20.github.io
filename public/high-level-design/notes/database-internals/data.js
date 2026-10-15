@@ -2,7 +2,7 @@
 window.DATA = {
   book: {
     title: `Database Internals`,
-    subtitle: `Chapter-wise interactive notes on Part I (<em>Storage Engines</em>) of Alex Petrov's <em>Database Internals: A Deep Dive into How Distributed Data Systems Work</em>. Every chapter has core concepts, hands-on labs (B-Tree splits and merges, slotted pages, page caches, ARIES recovery, isolation anomalies, Bw-Trees, LSM compaction, Bloom filters, SSD garbage collection...), a cheatsheet, interview Q&amp;A and flashcards.`,
+    subtitle: `Chapter-wise interactive notes on Part I (<em>Storage Engines</em>) of Alex Petrov's <em>Database Internals: A Deep Dive into How Distributed Data Systems Work</em>. Every chapter has core concepts, hands-on labs (B-Tree splits and merges, slotted pages, page caches, ARIES recovery, isolation anomalies, Bw-Trees, LSM compaction, Bloom filters, SSD garbage collection...), a cheatsheet and interview Q&amp;A.`,
     storageKey: `database_internals_notes_v1`,
     appId: `database-internals-notes`,
     exportPrefix: `database-internals-progress`,

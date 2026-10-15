@@ -1,16 +1,16 @@
 // Browser side of the Astro-rendered notes pages. The HTML already holds all content; this adds progress
-// tracking, tabs, labs, flashcards, search, theme and import/export on top of it.
+// tracking, tabs, labs, the definitions self-test, search, theme and import/export on top of it.
 // Progress is stored exactly as the single-page app (public/shared/app.js) stores it, under DATA.book.storageKey.
 
 import type { SearchItem } from "../lib/site";
 
 type ChapterProgress = { conceptsLearned: Record<string, boolean>; qaReviewed: Record<string, boolean> };
-type Saved = { progress: Record<string, ChapterProgress>; theme: "dark" | "light" };
+type Saved = { progress: Record<string, ChapterProgress>; theme: "dark" | "light"; hideDefs: boolean; lastChapter?: string };
 interface LabContext { every(fn: () => void, ms: number): number; clear(h: number): void; onCleanup(fn: () => void): void }
 interface Lab { title: string; blurb: string; mount(el: HTMLElement, ctx: LabContext): void }
 declare global { interface Window { DEMOS?: Record<string, Lab> } }
 
-const TABS = ["concepts", "labs", "cheatsheet", "interview", "flashcards"] as const;
+const TABS = ["concepts", "labs", "cheatsheet", "interview"] as const;
 type Tab = (typeof TABS)[number];
 const isTab = (s: string): s is Tab => (TABS as readonly string[]).includes(s);
 
@@ -27,9 +27,9 @@ const chapterId = cfg.chapter || null;
 const state: Saved = (() => {
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    return { progress: s.progress || {}, theme: s.theme === "light" ? "light" : "dark" };
+    return { progress: s.progress || {}, theme: s.theme === "light" ? "light" : "dark", hideDefs: !!s.hideDefs, lastChapter: typeof s.lastChapter === "string" ? s.lastChapter : undefined };
   } catch {
-    return { progress: {}, theme: "dark" };
+    return { progress: {}, theme: "dark", hideDefs: false };
   }
 })();
 
@@ -77,10 +77,141 @@ function refreshProgress() {
 
   if (chapterId) {
     const p = state.progress[chapterId];
+    const learned = countTrue(p?.conceptsLearned), concepts = $$(".learn-toggle").length;
     const c = $('[data-tab-count="concepts"]'), q = $('[data-tab-count="interview"]');
-    if (c) c.textContent = `${countTrue(p?.conceptsLearned)}/${$$(".learn-toggle").length}`;
+    if (c) c.textContent = `${learned}/${concepts}`;
     if (q) q.textContent = `${countTrue(p?.qaReviewed)}/${$$(".review-btn").length}`;
+    const todo = $('[data-show-count="todo"]'), done = $('[data-show-count="done"]');
+    if (todo) todo.textContent = String(concepts - learned);
+    if (done) done.textContent = String(learned);
   }
+}
+
+// ------------------------------------------------------------------ dashboard: continue where you left off
+
+function initContinue() {
+  const card = byId<HTMLAnchorElement>("continueCard");
+  if (!card) return;
+  const cards = $$<HTMLAnchorElement>("[data-chapter-card]");
+  const start = Math.max(0, cards.findIndex(c => c.dataset.chapterCard === state.lastChapter));
+  for (let n = 0; n < cards.length; n++) {
+    const c = cards[(start + n) % cards.length], d = c.dataset;
+    const p = state.progress[d.chapterCard!];
+    const cp = pct(p ? countTrue(p.conceptsLearned) + countTrue(p.qaReviewed) : 0, Number(d.total));
+    if (cp === 100) continue;
+    card.href = c.href;
+    $(".continue-label", card)!.textContent = state.lastChapter ? "Continue where you left off" : "Start here";
+    $(".continue-title", card)!.textContent = `Chapter ${d.number}: ${d.title}`;
+    $(".continue-meta", card)!.textContent =
+      `${cp}% done \u00b7 ${countTrue(p?.conceptsLearned)}/${d.concepts} concepts \u00b7 ${countTrue(p?.qaReviewed)}/${d.qa} Q&A`;
+    card.hidden = false;
+    return;
+  }
+}
+
+// ------------------------------------------------------------------ chapter: concept and Q&A filters
+
+function initFilters() {
+  let query = "", show = "all", diff = "all", hideReviewed = false;
+  const conceptEmpty = byId("conceptEmpty"), qaEmpty = byId("qaEmpty");
+  const applyConcepts = () => {
+    if (!conceptEmpty) return;
+    const q = query.toLowerCase().trim();
+    let n = 0;
+    for (const card of $$(".concept-card")) {
+      const text = `${$(".concept-term", card)!.textContent} ${$(".concept-def", card)!.textContent}`.toLowerCase();
+      const learned = card.classList.contains("learned");
+      card.hidden = (!!q && !text.includes(q)) || (show !== "all" && (show === "done") !== learned);
+      if (!card.hidden) n++;
+    }
+    conceptEmpty.hidden = n > 0;
+    conceptEmpty.textContent = q ? `No concepts match "${query.trim()}".`
+      : show === "done" ? "Nothing marked as learned yet. Tick the circle on a card once you can explain it."
+      : "Every concept in this chapter is marked as learned.";
+  };
+  const applyQa = () => {
+    if (!qaEmpty) return;
+    let n = 0;
+    for (const it of $$(".qa-item")) {
+      it.hidden = (diff !== "all" && it.dataset.diff !== diff) || (hideReviewed && it.classList.contains("reviewed"));
+      if (!it.hidden) n++;
+    }
+    qaEmpty.hidden = n > 0;
+  };
+  const segment = (attr: string, set: (v: string) => void, apply: () => void) => {
+    const buttons = $$(`[data-${attr}]`);
+    for (const b of buttons) b.addEventListener("click", () => {
+      set(b.getAttribute(`data-${attr}`)!);
+      for (const x of buttons) x.classList.toggle("on", x === b);
+      apply();
+    });
+  };
+
+  const filter = byId<HTMLInputElement>("conceptFilter");
+  filter?.addEventListener("input", () => { query = filter.value; applyConcepts(); });
+  segment("show", v => { show = v; }, applyConcepts);
+  segment("diff", v => { diff = v; }, applyQa);
+  const hide = byId<HTMLInputElement>("qaHideReviewed");
+  hide?.addEventListener("change", () => { hideReviewed = hide.checked; applyQa(); });
+  const expand = byId("qaExpandAll");
+  expand?.addEventListener("click", () => {
+    const items = $$(".qa-item:not([hidden])");
+    const open = !items.every(it => it.classList.contains("open"));
+    for (const it of items) {
+      it.classList.toggle("open", open);
+      $(".qa-header", it)?.setAttribute("aria-expanded", String(open));
+    }
+    expand.textContent = open ? "Collapse all" : "Expand all";
+  });
+  // Marking a card changes which filter it falls under.
+  document.addEventListener("click", e => {
+    if ((e.target as HTMLElement).closest(".learn-toggle")) applyConcepts();
+    if ((e.target as HTMLElement).closest(".review-btn")) applyQa();
+  });
+  const qaBar = $(".qa-toolbar");
+  if (qaBar) qaBar.hidden = false;
+}
+
+// ------------------------------------------------------------------ glossary and the all-chapters cheatsheet
+
+function initGlossary() {
+  const filter = byId<HTMLInputElement>("glFilter"), chapter = byId<HTMLSelectElement>("glChapter"), count = byId("glCount");
+  if (!filter || !chapter || !count) return;
+  const items = $$<HTMLAnchorElement>(".gl-item");
+  let learned = 0;
+  for (const it of items) {
+    if (!state.progress[it.dataset.ch!]?.conceptsLearned[it.dataset.idx!]) continue;
+    learned++;
+    $(".gl-term", it)!.insertAdjacentHTML("beforeend", '<span class="gl-done" title="Learned">&#10003;</span>');
+  }
+  const total = items.length;
+  const apply = () => {
+    const q = filter.value.toLowerCase().trim();
+    let n = 0;
+    for (const it of items) {
+      it.hidden = (!!q && !it.textContent!.toLowerCase().includes(q)) || (!!chapter.value && it.dataset.ch !== chapter.value);
+      if (!it.hidden) n++;
+    }
+    for (const g of $$(".gl-group")) {
+      g.hidden = !$(".gl-item:not([hidden])", g);
+      $(`.letter-bar [data-letter="${g.id.slice(3)}"]`)?.classList.toggle("off", g.hidden);
+    }
+    count.textContent = q || chapter.value ? `${n} of ${total} terms` : `${total} terms \u00b7 ${learned} learned`;
+    const empty = byId("glEmpty");
+    empty.hidden = n > 0;
+    empty.textContent = `No terms match "${filter.value.trim()}"${chapter.value ? " in this chapter" : ""}. Try a shorter word, or search everything with /.`;
+  };
+  filter.addEventListener("input", apply);
+  chapter.addEventListener("change", apply);
+  $(".ref-tools")!.hidden = false;
+  apply();
+}
+
+function initPrint() {
+  const btn = byId("printBtn");
+  if (!btn) return;
+  btn.addEventListener("click", () => window.print());
+  btn.parentElement!.hidden = false;
 }
 
 // ------------------------------------------------------------------ chapter: concepts and Q&A
@@ -165,7 +296,6 @@ function showTab(tab: Tab, labId?: string) {
     for (const t of $$(".tabs .tab")) t.classList.toggle("active", t.dataset.tab === tab);
     currentTab = tab;
     if (tab === "labs") mountLabs();
-    if (tab === "flashcards") { flash.index = 0; flash.flipped = false; renderFlashcards(); }
   }
   if (labId) {
     const el = document.getElementById(`lab-${labId}`);
@@ -194,67 +324,28 @@ function initTabs() {
   showFromHash();
 }
 
-// ------------------------------------------------------------------ chapter: flashcards
+// ------------------------------------------------------------------ chapter: definitions self-test
 
-const flash = { index: 0, flipped: false, deck: [] as { front: string; back: string; kind: string }[] };
-
-function buildDeck() {
-  const deck: typeof flash.deck = [];
-  for (const c of $$(".concept-card")) {
-    const html = (sel: string) => $(sel, c)?.innerHTML;
-    const why = html(".concept-why"), ex = html(".concept-example");
-    deck.push({
-      front: html(".concept-term") ?? "",
-      back: (html(".concept-def") ?? "") + (why ? `<br><br><em>Why it matters:</em> ${why}` : "") + (ex ? `<br><em>Example:</em> ${ex}` : ""),
-      kind: "Concept",
-    });
-  }
-  for (const q of $$(".qa-item")) deck.push({ front: $(".qa-q", q)!.innerHTML, back: $(".qa-body-inner", q)!.innerHTML, kind: "Question" });
-  return deck;
-}
-
-function renderFlashcards() {
-  const panel = byId("flashcards");
-  if (!flash.deck.length) flash.deck = buildDeck();
-  if (!flash.deck.length) { panel.innerHTML = '<div class="empty-tab">No cards for this chapter.</div>'; return; }
-  const n = flash.deck.length;
-  flash.index = Math.max(0, Math.min(flash.index, n - 1));
-  const card = flash.deck[flash.index];
-  panel.innerHTML = `
-    <div class="fc-stage">
-      <div class="flashcard ${flash.flipped ? "flipped" : ""}">
-        <div class="fc-face fc-front"><div class="fc-label">${card.kind} &middot; tap to flip</div><div class="fc-content">${card.front}</div></div>
-        <div class="fc-face fc-back"><div class="fc-label">Answer &middot; tap to flip</div><div class="fc-content">${card.back}</div></div>
-      </div>
-    </div>
-    <div class="fc-nav">
-      <button class="iconbtn" data-fc-nav="prev">&larr; Prev</button>
-      <span class="fc-counter">${flash.index + 1} / ${n}</span>
-      <button class="iconbtn" data-fc-nav="next">Next &rarr;</button>
-      <button class="iconbtn" data-fc-nav="shuffle">&#8644; Shuffle</button>
-    </div>
-    <div class="cs-note" style="text-align:center;margin-top:16px;">Tip: <kbd>Space</kbd> flips &middot; <kbd>&larr;</kbd> <kbd>&rarr;</kbd> navigate</div>`;
-}
-function flipCard() {
-  flash.flipped = !flash.flipped;
-  $(".flashcard")?.classList.toggle("flipped", flash.flipped);
-}
-function moveCard(dir: string) {
-  const n = flash.deck.length;
-  if (!n) return;
-  if (dir === "prev") flash.index = (flash.index - 1 + n) % n;
-  else if (dir === "next") flash.index = (flash.index + 1) % n;
-  else flash.index = Math.floor(Math.random() * n);
-  flash.flipped = false;
-  renderFlashcards();
-}
-function initFlashcards() {
-  byId("flashcards").addEventListener("click", e => {
+function initSelfTest() {
+  const bar = $(".concepts-toolbar"), toggle = $(".selftest-toggle"), hint = $(".selftest-hint"), grid = $(".concepts-grid");
+  if (!bar || !toggle || !hint || !grid) return;
+  const apply = () => {
+    const on = state.hideDefs;
+    grid.classList.toggle("selftest", on);
+    toggle.classList.toggle("on", on);
+    toggle.setAttribute("aria-pressed", String(on));
+    toggle.textContent = on ? "Show definitions" : "Hide definitions";
+    hint.textContent = on ? "Recall each definition, then click the card to check." : "Test yourself: hide the definitions and reveal one card at a time.";
+    for (const card of $$(".concept-card.revealed")) card.classList.remove("revealed");
+  };
+  toggle.addEventListener("click", () => { state.hideDefs = !state.hideDefs; save(); apply(); });
+  grid.addEventListener("click", e => {
     const t = e.target as HTMLElement;
-    const nav = t.closest<HTMLElement>("[data-fc-nav]");
-    if (nav) { e.stopPropagation(); moveCard(nav.dataset.fcNav!); }
-    else if (t.closest(".flashcard")) flipCard();
+    if (!state.hideDefs || t.closest(".learn-toggle, .concept-demo-link")) return;
+    t.closest(".concept-card")?.classList.add("revealed");
   });
+  bar.hidden = false;
+  apply();
 }
 
 // ------------------------------------------------------------------ search
@@ -262,20 +353,41 @@ function initFlashcards() {
 let index: Promise<SearchItem[]> | null = null;
 const loadIndex = () => (index ??= fetch(cfg.searchUrl!).then(r => r.json() as Promise<SearchItem[]>).catch(() => { index = null; return []; }));
 
+const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function highlight(text: string, words: string[]) {
+  const safe = escapeHtml(text);
+  const pattern = words.filter(w => w.length > 1).map(w => escapeHtml(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  return pattern ? safe.replace(new RegExp(`(${pattern})`, "gi"), "<mark>$1</mark>") : safe;
+}
+
+/** Every word must match; hits in the title rank first. */
 async function runSearch(q: string) {
   const box = byId("searchResults");
   const qq = q.toLowerCase().trim();
   if (qq.length < 2) { box.classList.remove("open"); box.innerHTML = ""; return; }
-  const results = (await loadIndex()).filter(it => it.text.includes(qq)).slice(0, 30);
+  const words = qq.split(/\s+/);
+  const score = (it: SearchItem) => { const t = it.title.toLowerCase(); return (t.startsWith(qq) ? 3 : 0) + (t.includes(qq) ? 5 : 0); };
+  const results = (await loadIndex())
+    .filter(it => words.every(w => it.text.includes(w)))
+    .sort((a, b) => score(b) - score(a))
+    .slice(0, 30);
   if (byId<HTMLInputElement>("searchBox").value.toLowerCase().trim() !== qq) return;
-  if (!results.length) { box.classList.remove("open"); box.innerHTML = ""; return; }
-  box.innerHTML = results.map(r => `
-    <a class="sr-item" href="${r.href}">
-      <div class="sr-label">Ch ${r.n} &middot; ${r.kind}</div>
-      <div class="sr-title">${r.title}</div>
-      ${r.snippet ? `<div class="sr-snippet">${r.snippet.replace(/</g, "&lt;")}</div>` : ""}
-    </a>`).join("");
   box.classList.add("open");
+  if (!results.length) { box.innerHTML = `<div class="sr-empty">No matches for "${escapeHtml(q.trim())}"</div>`; return; }
+  box.innerHTML = `<div class="sr-head">${results.length === 30 ? "Top 30" : results.length} result${results.length === 1 ? "" : "s"} &middot; <kbd>&uarr;</kbd> <kbd>&darr;</kbd> to move, <kbd>Enter</kbd> to open</div>` +
+    results.map((r, i) => `
+    <a class="sr-item${i === 0 ? " active" : ""}" href="${r.href}">
+      <div class="sr-label">Ch ${r.n} &middot; ${r.kind}</div>
+      <div class="sr-title">${highlight(r.title, words)}</div>
+      ${r.snippet ? `<div class="sr-snippet">${highlight(r.snippet, words)}</div>` : ""}
+    </a>`).join("");
+}
+function moveSearchSelection(delta: number) {
+  const items = $$(".sr-item", byId("searchResults"));
+  if (!items.length) return;
+  const i = (items.findIndex(el => el.classList.contains("active")) + delta + items.length) % items.length;
+  items.forEach((el, j) => el.classList.toggle("active", j === i));
+  items[i].scrollIntoView({ block: "nearest" });
 }
 
 // ------------------------------------------------------------------ theme, export / import / reset, toast
@@ -361,6 +473,13 @@ function initChrome() {
   const box = byId<HTMLInputElement>("searchBox"), results = byId("searchResults");
   box.addEventListener("input", () => runSearch(box.value));
   box.addEventListener("focus", () => { loadIndex(); if (box.value) runSearch(box.value); });
+  box.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); moveSearchSelection(e.key === "ArrowDown" ? 1 : -1); }
+    else if (e.key === "Enter") {
+      const active = $<HTMLAnchorElement>(".sr-item.active", results);
+      if (active) { e.preventDefault(); active.click(); }
+    }
+  });
   results.addEventListener("click", e => {
     if (!(e.target as HTMLElement).closest(".sr-item")) return;
     box.value = ""; results.classList.remove("open");
@@ -380,10 +499,11 @@ function initChrome() {
     }
     if (e.key === "Escape") { closeDrawer(); closeMoreMenu(); }
     if (e.key === "/") { e.preventDefault(); box.focus(); }
-    if (currentTab === "flashcards") {
-      if (e.key === " ") { e.preventDefault(); flipCard(); }
-      if (e.key === "ArrowRight") moveCard("next");
-      if (e.key === "ArrowLeft") moveCard("prev");
+    if ((e.key === "j" || e.key === "k") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const target = chapterId
+        ? $<HTMLAnchorElement>(`.chapter-footer a[rel="${e.key === "j" ? "next" : "prev"}"]`)
+        : e.key === "j" ? $<HTMLAnchorElement>("a.chapter-item[data-chapter]") : null;
+      if (target) location.href = target.href;
     }
   });
   window.addEventListener("resize", () => { if (!isMobile()) closeDrawer(); });
@@ -394,8 +514,13 @@ function initChrome() {
 applyTheme();
 initChrome();
 if (chapterId) {
+  if (state.lastChapter !== chapterId) { state.lastChapter = chapterId; save(); }
   initChapter(chapterId);
-  initFlashcards();
+  initSelfTest();
+  initFilters();
   initTabs();
 }
 refreshProgress();
+initContinue();
+initGlossary();
+initPrint();

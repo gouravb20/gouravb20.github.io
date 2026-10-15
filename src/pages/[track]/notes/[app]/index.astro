@@ -63,6 +63,19 @@ const structuredData = [
     <div class="stat-card"><div class="stat-label">Interactive labs</div><div class="stat-value">{totals.labs}</div></div>
   </div>
 
+  <a class="continue-card" id="continueCard" href={url(chapterPath(notes, chapters[0]))} hidden>
+    <div class="continue-body">
+      <div class="continue-label">Start here</div>
+      <div class="continue-title"></div>
+      <div class="continue-meta"></div>
+    </div>
+    <div class="continue-go">&rarr;</div>
+  </a>
+  <div class="reference-links">
+    <a class="iconbtn" href={url(`${path}glossary/`)}>A&ndash;Z Glossary of all {totals.concepts} terms</a>
+    <a class="iconbtn" href={url(`${path}cheatsheet/`)}>&#8801; Every cheatsheet on one printable page</a>
+  </div>
+
   <h2 class="dash-section-title" set:html={book.pillarsTitle} />
   <div class="four-q">
     {notes.fourQuestions.map(q => (
@@ -80,7 +93,7 @@ const structuredData = [
   <h2 class="dash-section-title">Chapters</h2>
   <div class="dash-chapters">
     {chapters.map(ch => (
-      <a class="dash-chapter-card" href={url(chapterPath(notes, ch))} data-chapter-card={ch.id} data-total={ch.concepts.length + ch.interview.length}>
+      <a class="dash-chapter-card" href={url(chapterPath(notes, ch))} data-chapter-card={ch.id} data-total={ch.concepts.length + ch.interview.length} data-number={ch.number} data-title={plain(ch.title)} data-concepts={ch.concepts.length} data-qa={ch.interview.length}>
         <div class="dcc-head"><div class="dcc-num">{ch.number}</div><div class="dcc-title" set:html={ch.title} /></div>
         <div class="dcc-meta"><span>{ch.concepts.length} concepts &middot; {ch.labs.length} labs &middot; {ch.interview.length} Q&amp;A</span><span class="dcc-pct">0%</span></div>
         <div class="dcc-prog-bar"><div class="dcc-prog-fill" style="width:0%"></div></div>
@@ -89,9 +102,10 @@ const structuredData = [
   </div>
   <div class="chapter-footer" style="margin-top:30px;">
     <div style="color:var(--text-muted);font-size:13px;">
-      <strong>How to use:</strong> every chapter has Core Concepts, Interactive Labs, a Cheatsheet, Interview Q&amp;A, and Flashcards.
+      <strong>How to use:</strong> every chapter has Core Concepts, Interactive Labs, a Cheatsheet and Interview Q&amp;A. To test yourself, hide the definitions on the Concepts tab, or try each interview question before opening its answer.
       Concept cards with a <span style="color:var(--accent-3)">&#9654; See it live</span> button jump straight to the lab that demonstrates them.
       Progress is saved in this browser; use <strong>Export</strong> and <strong>Import</strong> to move it between devices.
+      Keys: <kbd>/</kbd> search (<kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Enter</kbd> to pick a result), <kbd>j</kbd> / <kbd>k</kbd> next / previous chapter.
     </div>
   </div>
 </NotesLayout>

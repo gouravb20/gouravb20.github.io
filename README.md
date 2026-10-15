@@ -40,12 +40,16 @@ Paths in the table are relative to `public/low-level-design/`. Also included:
 
 Every book gets the same app:
 
-- **Core concepts** with definitions, why each one matters and examples. Mark them as learned.
+- **Core concepts** with definitions, why each one matters and examples. Mark them as learned, and filter a chapter's cards by text or by to learn / learned.
 - **Interactive labs**: small simulators built on the book's own examples (watermarks and triggers, B-Tree splits, ARIES recovery, LSM compaction, Bloom filters, KV caches, hybrid search and more).
-- **Cheatsheets** with trade-off tables, **interview Q&A** with difficulty levels, and **flashcards**.
-- Full-text search (press `/`), light and dark themes, and a mobile layout.
+- **Cheatsheets** with trade-off tables, and **interview Q&A** with difficulty levels (answers stay collapsed until opened). Filter questions by difficulty, hide the ones you've reviewed, or expand them all.
+- **Self-test**: hide the definitions on the Concepts tab and reveal one card at a time.
+- **Glossary**: every term in the book A to Z, filterable by text and by chapter, with your learned terms ticked.
+- **All cheatsheets on one page**, with a print stylesheet for a compact black-on-white copy (or a PDF).
+- A **Continue** card on the dashboard that opens the first unfinished chapter, starting from the one you read last.
+- Full-text search (press `/`; every word must match, title hits rank first, <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd> pick a result), <kbd>j</kbd> / <kbd>k</kbd> for the next / previous chapter, light and dark themes, and a mobile layout.
 - Progress is saved in `localStorage`, separately for each book. **Export** and **Import** move it between devices. The hub page shows progress for every book.
-- Bookmarkable chapters, tabs and labs. Astro-rendered apps use real URLs (`problem-breakdowns/ch2/#lab-servingStrategy`); single-page apps use hash routes (`#/ch3/labs/btree`). When an app moves to Astro, its old hash links redirect to the new pages and saved progress carries over.
+- Bookmarkable chapters, tabs and labs. Astro-rendered apps use real URLs (`problem-breakdowns/ch2/#lab-servingStrategy`, `problem-breakdowns/glossary/`); single-page apps use hash routes (`#/ch3/labs/btree`, `#/glossary`, `#/cheatsheet`). When an app moves to Astro, its old hash links redirect to the new pages and saved progress carries over.
 - Astro-rendered apps also get per-page titles, descriptions, canonical URLs, Open Graph tags, structured data (Course, LearningResource, BreadcrumbList) and a sitemap. Their content is in the HTML, so it reads fine without JavaScript; only labs and progress tracking need it.
 
 ## Running locally
@@ -84,8 +88,8 @@ src/
   content.config.ts            loads every Astro-rendered app's data*.js and demos*.js, validates them with Zod
   lib/notes-source.mjs         finds notes apps and runs their scripts; shared with scripts/check-site.mjs
   layouts/NotesLayout.astro    page shell: SEO tags, top bar, chapter sidebar
-  pages/[track]/notes/[app]/   dashboard, one page per chapter, and search.json
-  scripts/notes-client.ts      browser side: progress, tabs, labs, flashcards, search, theme, import/export
+  pages/[track]/notes/[app]/   dashboard, one page per chapter, glossary/, cheatsheet/ and search.json
+  scripts/notes-client.ts      browser side: progress, tabs, labs, self-test, search, theme, import/export
 scripts/check-site.mjs         checks data, labs, counts and links (see below)
 ```
 

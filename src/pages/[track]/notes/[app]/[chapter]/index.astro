@@ -21,6 +21,10 @@ const next = chapters[index + 1];
 const chUrl = (c: Chapter) => url(chapterPath(notes, c));
 const labOwner = (id: string) => chapters.find(c => c.labs.includes(id)) ?? ch;
 const diffClass = (d?: string) => (d === "easy" ? "diff-easy" : d === "hard" ? "diff-hard" : "diff-med");
+const diffOf = (d?: string) => (d === "easy" || d === "hard" ? d : "med");
+const DIFFS = [["easy", "Easy"], ["med", "Medium"], ["hard", "Hard"]] as const;
+const diffCounts: Record<string, number> = {};
+for (const qa of ch.interview) diffCounts[diffOf(qa.diff)] = (diffCounts[diffOf(qa.diff)] ?? 0) + 1;
 
 const path = chapterPath(notes, ch);
 const bookTitle = plain(book.title);
@@ -68,11 +72,20 @@ const structuredData = [
     <a class="tab labs-tab" href="#labs" data-tab="labs">&#9654; Interactive Labs <span class="tab-count">{ch.labs.length}</span></a>
     <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>
     <a class="tab" href="#interview" data-tab="interview">Interview Q&amp;A <span class="tab-count" data-tab-count="interview">0/{ch.interview.length}</span></a>
-    <a class="tab" href="#flashcards" data-tab="flashcards">Flashcards <span class="tab-count">{ch.concepts.length + ch.interview.length}</span></a>
   </nav>
 
   <section id="concepts" data-panel="concepts">
     <h2 class="sr-only">Core concepts</h2>
+    <div class="concepts-toolbar" hidden>
+      <input type="search" class="tool-filter" id="conceptFilter" placeholder={`Filter ${ch.concepts.length} concepts...`} aria-label="Filter concepts" autocomplete="off">
+      <div class="seg" role="group" aria-label="Show">
+        <button class="on" data-show="all">All</button>
+        <button data-show="todo">To learn <span class="seg-count" data-show-count="todo"></span></button>
+        <button data-show="done">Learned <span class="seg-count" data-show-count="done"></span></button>
+      </div>
+      <button class="iconbtn selftest-toggle" aria-pressed="false">Hide definitions</button>
+      <span class="selftest-hint">Test yourself: hide the definitions and reveal one card at a time.</span>
+    </div>
     <div class="concepts-grid">
       {ch.concepts.map((c, i) => {
         const lab = c.demo ? notes.labInfo[c.demo] : undefined;
@@ -84,10 +97,12 @@ const structuredData = [
             {c.why && <div class="concept-why" set:html={c.why} />}
             {c.ex && <div class="concept-example" set:html={c.ex} />}
             {lab && c.demo && <a class="concept-demo-link" href={`${chUrl(labOwner(c.demo))}#lab-${c.demo}`}>&#9654; See it live: <Fragment set:html={lab.title} /></a>}
+            <button class="iconbtn reveal-btn">Reveal</button>
           </div>
         );
       })}
     </div>
+    <div class="empty-tab filter-empty" id="conceptEmpty" hidden></div>
   </section>
 
   <section id="labs" data-panel="labs">
@@ -110,6 +125,7 @@ const structuredData = [
 
   <section id="cheatsheet" data-panel="cheatsheet">
     <h2 class="sr-only">Cheatsheet</h2>
+    <div class="cheatsheet-actions"><a class="iconbtn" href={url(`${appPath(notes)}cheatsheet/`)}>&#8801; All chapters, printable</a></div>
     {ch.cheatsheet.map(cs => (
       <div class="cheatsheet-block">
         <h3 set:html={cs.title} />
@@ -128,8 +144,17 @@ const structuredData = [
 
   <section id="interview" data-panel="interview">
     <h2 class="sr-only">Interview questions and answers</h2>
+    <div class="concepts-toolbar qa-toolbar" hidden>
+      <div class="seg" role="group" aria-label="Difficulty">
+        <button class="on" data-diff="all">All <span class="seg-count">{ch.interview.length}</span></button>
+        {DIFFS.filter(([d]) => diffCounts[d]).map(([d, label]) => <button data-diff={d}>{label} <span class="seg-count">{diffCounts[d]}</span></button>)}
+      </div>
+      <label class="tool-check"><input type="checkbox" id="qaHideReviewed"> Hide reviewed</label>
+      <button class="iconbtn" id="qaExpandAll">Expand all</button>
+    </div>
+    <p class="tab-tip">Answer out loud first, then open the model answer and compare.</p>
     {ch.interview.map((qa, i) => (
-      <div class="qa-item">
+      <div class="qa-item" data-diff={diffOf(qa.diff)}>
         <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
           <span class={`diff-badge ${diffClass(qa.diff)}`}>{qa.diff ?? "med"}</span>
           <h3 class="qa-q" set:html={qa.q} />
@@ -141,9 +166,8 @@ const structuredData = [
         </div>
       </div>
     ))}
+    <div class="empty-tab filter-empty" id="qaEmpty" hidden>No questions left with these filters.</div>
   </section>
-
-  <section id="flashcards" data-panel="flashcards" hidden></section>
 
   <nav class="chapter-footer" aria-label="Chapters">
     {prev ? <a class="nav-btn" href={chUrl(prev)} rel="prev"><div class="nav-btn-label">&larr; Previous</div>Ch {prev.number}: <Fragment set:html={prev.title} /></a> : <div></div>}

@@ -4,7 +4,7 @@
 window.DATA = {
   book: {
     title: `System Design Core Concepts`,
-    subtitle: `The core concepts that come up in almost every system design interview, read as one book: <strong>networking</strong>, <strong>API design</strong>, <strong>data modeling</strong>, <strong>database indexing</strong>, <strong>caching</strong>, <strong>sharding</strong>, <strong>consistent hashing</strong>, the <strong>CAP theorem</strong> and the <strong>numbers to know</strong>. Every chapter has concepts, labs, a cheatsheet, interview Q&amp;A and flashcards. Topics follow Hello Interview's <a href="https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials" target="_blank" rel="noopener" style="color:var(--accent)">Core Concepts</a> series; the notes and labs are written independently.`,
+    subtitle: `The core concepts that come up in almost every system design interview, read as one book: <strong>networking</strong>, <strong>API design</strong>, <strong>data modeling</strong>, <strong>database indexing</strong>, <strong>caching</strong>, <strong>sharding</strong>, <strong>consistent hashing</strong>, the <strong>CAP theorem</strong> and the <strong>numbers to know</strong>. Every chapter has concepts, labs, a cheatsheet and interview Q&amp;A. Topics follow Hello Interview's <a href="https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials" target="_blank" rel="noopener" style="color:var(--accent)">Core Concepts</a> series; the notes and labs are written independently.`,
     storageKey: `core_concepts_notes_v1`,
     appId: `core-concepts-notes`,
     exportPrefix: `core-concepts-progress`,

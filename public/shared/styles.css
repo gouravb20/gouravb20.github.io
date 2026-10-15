@@ -243,6 +243,26 @@ body.light .q-how { color: #1d4ed8; }
   border-radius: 999px; padding: 4px 12px; cursor: pointer; font-family: inherit;
 }
 .concept-demo-link:hover { background: var(--accent-3); color: #111; }
+
+/* Self-test: definitions stay hidden until the reader reveals a card */
+.concepts-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; font-size: 13px; color: var(--text-muted); }
+.selftest-toggle.on { background: var(--accent); color: white; border-color: var(--accent); }
+.reveal-btn { display: none; }
+.concepts-grid.selftest .concept-card:not(.revealed) { cursor: pointer; }
+.concepts-grid.selftest .concept-card:not(.revealed) :is(.concept-def, .concept-why, .concept-example, .concept-demo-link) { display: none; }
+.concepts-grid.selftest .concept-card:not(.revealed) .reveal-btn { display: inline-block; margin-top: 4px; }
+
+/* Filters above the concepts, the Q&A list and the glossary */
+.tool-filter {
+  background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
+  padding: 7px 12px; font-size: 13px; font-family: inherit; outline: none; width: 240px; max-width: 100%;
+}
+.tool-filter:focus { border-color: var(--accent); }
+.tool-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.tool-check input { accent-color: var(--accent); }
+.seg-count { opacity: 0.75; margin-left: 3px; }
+.filter-empty { border: 1px dashed var(--border); border-radius: 12px; margin-top: 4px; }
+.tab-tip { font-size: 13px; color: var(--text-muted); margin: -4px 0 16px; }
 .learn-toggle {
   position: absolute; top: 16px; right: 16px; width: 24px; height: 24px; border-radius: 50%;
   border: 2px solid var(--border); background: transparent; cursor: pointer;
@@ -295,26 +315,6 @@ body.light .q-how { color: #1d4ed8; }
 .review-btn.on { background: var(--good); color: white; border-color: var(--good); }
 
 /* ============================================
-   Flashcards
-   ============================================ */
-.fc-stage { display: flex; justify-content: center; align-items: center; min-height: 330px; perspective: 1200px; margin-bottom: 20px; }
-.flashcard { width: min(560px, 100%); height: 310px; position: relative; transform-style: preserve-3d; transition: transform 0.6s; cursor: pointer; }
-.flashcard.flipped { transform: rotateY(180deg); }
-.fc-face {
-  position: absolute; inset: 0; backface-visibility: hidden; background: var(--bg-2);
-  border: 1px solid var(--border); border-radius: 16px; padding: 28px; display: flex; flex-direction: column;
-  justify-content: center; align-items: center; text-align: center; overflow-y: auto;
-}
-.fc-front { background: linear-gradient(135deg, var(--bg-2), var(--bg-3)); border-color: var(--accent); }
-.fc-back { transform: rotateY(180deg); background: linear-gradient(135deg, var(--bg-2), rgba(56,189,248,0.08)); border-color: var(--accent-2); justify-content: flex-start; }
-.fc-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); margin-bottom: 10px; }
-.fc-front .fc-content { font-size: 20px; font-weight: 600; }
-.fc-back .fc-content { font-size: 14.5px; text-align: left; line-height: 1.65; }
-.fc-back .fc-content ul, .fc-back .fc-content ol { margin-left: 20px; margin-top: 6px; }
-.fc-nav { display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
-.fc-counter { color: var(--text-muted); font-size: 14px; min-width: 60px; text-align: center; }
-
-/* ============================================
    Dashboard
    ============================================ */
 .dash-hero {
@@ -349,6 +349,46 @@ body.light .q-how { color: #1d4ed8; }
 .takeaways { background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin-bottom: 28px; }
 .takeaways ol { margin-left: 20px; font-size: 14px; }
 .takeaways li { margin-bottom: 7px; }
+.continue-card {
+  display: flex; align-items: center; gap: 16px; background: var(--bg-2); border: 1px solid var(--accent);
+  border-radius: 12px; padding: 16px 20px; margin-bottom: 26px; color: inherit; text-decoration: none; cursor: pointer;
+  transition: transform 0.2s;
+}
+.continue-card:hover { transform: translateY(-2px); }
+.continue-card[hidden] { display: none; }
+.continue-body { flex: 1; min-width: 0; }
+.continue-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); font-weight: 700; }
+.continue-title { font-size: 16px; font-weight: 600; margin: 2px 0; }
+.continue-meta { font-size: 12.5px; color: var(--text-muted); }
+.continue-go { font-size: 22px; color: var(--accent); }
+.reference-links { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 26px; }
+a.iconbtn { text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+
+/* ============================================
+   Glossary and the all-chapters cheatsheet
+   ============================================ */
+.ref-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; font-size: 13px; color: var(--text-muted); }
+.letter-bar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; position: sticky; top: 61px; z-index: 5; background: var(--bg); padding: 6px 0; }
+.letter-bar a, .chapter-jump a {
+  min-width: 28px; padding: 4px 8px; text-align: center; border-radius: 6px; background: var(--bg-3); color: var(--text);
+  font-size: 12px; font-weight: 600; text-decoration: none;
+}
+.letter-bar a:hover, .chapter-jump a:hover { background: var(--accent); color: white; }
+.letter-bar a.off { opacity: 0.3; pointer-events: none; }
+.gl-group { margin-bottom: 22px; scroll-margin-top: 110px; }
+.cs-chapter { scroll-margin-top: 80px; }
+.gl-letter { font-size: 20px; font-weight: 700; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 8px; }
+.gl-item { display: block; padding: 10px 12px; border-radius: 8px; color: inherit; text-decoration: none; cursor: pointer; }
+.gl-item:hover { background: var(--bg-2); }
+.gl-term { display: flex; align-items: baseline; gap: 8px; font-weight: 600; color: var(--accent-2); }
+.gl-ch { font-size: 11px; font-weight: 600; color: var(--text-muted); background: var(--bg-3); border-radius: 999px; padding: 1px 8px; }
+.gl-done { color: var(--good); font-size: 13px; }
+.gl-def { font-size: 13.5px; color: var(--text-muted); margin-top: 2px; }
+.chapter-jump { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 24px; }
+.cs-chapter { margin-bottom: 30px; }
+.cs-chapter h2 { display: flex; align-items: center; gap: 10px; font-size: 20px; margin-bottom: 14px; }
+.cs-chapter h2 a { margin-left: auto; font-size: 12.5px; font-weight: 500; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.cheatsheet-actions { display: flex; justify-content: flex-end; margin-bottom: 14px; }
 
 /* ============================================
    Search
@@ -360,7 +400,11 @@ body.light .q-how { color: #1d4ed8; }
 }
 .search-results.open { display: block; }
 .sr-item { padding: 11px 14px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
-.sr-item:hover { background: var(--bg-3); }
+.sr-item:hover, .sr-item.active { background: var(--bg-3); }
+.sr-item.active { box-shadow: inset 3px 0 0 var(--accent); }
+.sr-item mark { background: rgba(245,158,11,0.3); color: inherit; border-radius: 2px; padding: 0 1px; }
+.sr-head { padding: 8px 14px; font-size: 11.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+.sr-empty { padding: 14px; font-size: 13px; color: var(--text-muted); }
 .sr-label { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
 .sr-title { font-weight: 600; }
 .sr-snippet { color: var(--text-muted); margin-top: 3px; font-size: 12px; }
@@ -697,11 +741,13 @@ body.light .lab-panel { background: #fbfcfe; }
 @media (max-width: 1000px) {
   .lab-grid, .lab-grid.even, .lab-grid.three { grid-template-columns: 1fr; }
 }
+/* Keep two columns until the sidebar becomes a drawer at 768px, or it stacks above the content. */
 @media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; }
+  .layout { grid-template-columns: 220px 1fr; }
   .main { padding: 24px 20px; }
 }
 @media (max-width: 768px) {
+  .layout { grid-template-columns: 1fr; }
   .topbar { flex-wrap: wrap; padding: 10px 14px; gap: 8px; row-gap: 10px; }
   .menu-toggle, .more-toggle { display: inline-flex; }
   .brand { font-size: 15px; flex: 1; min-width: 0; }
@@ -723,9 +769,34 @@ body.light .lab-panel { background: #fbfcfe; }
   .concepts-grid { grid-template-columns: 1fr; }
   .chapter-footer { flex-direction: column; }
   .nav-btn { max-width: 100%; }
-  .flashcard { height: 380px; }
-  .fc-stage { min-height: 400px; }
   .lab-card { padding: 16px 14px; }
+  .letter-bar { position: static; }
+  .tool-filter { width: 100%; }
+}
+
+/* Print: only the content, in black on white (used by the all-chapters cheatsheet) */
+@media print {
+  :root, body.light {
+    --bg: #fff; --bg-2: #fff; --bg-3: #f1f5f9; --border: #cbd5e1; --text: #111; --text-muted: #444;
+    --accent: #0f766e; --accent-2: #075985; --accent-3: #92400e;
+  }
+  body { background: #fff; color: #111; font-size: 10pt; }
+  .topbar, .sidebar, .backdrop, .toast, .tabs, .chapter-footer, .chapter-jump, .ref-tools, .cheatsheet-actions,
+  .cs-chapter h2 a, .letter-bar { display: none !important; }
+  .layout { display: block; }
+  .main { padding: 0; max-width: none; }
+  .chapter-header { margin-bottom: 10pt; padding-bottom: 6pt; border-bottom: 1.5pt solid #000; }
+  .chapter-header h1 { font-size: 18pt; margin: 2pt 0; }
+  .cs-chapter { margin-bottom: 12pt; }
+  .cs-chapter h2 { font-size: 13pt; margin-bottom: 4pt; break-after: avoid; }
+  .cheatsheet-block { border: 0; border-radius: 0; padding: 0; margin-bottom: 8pt; overflow: visible; break-inside: auto; }
+  .cheatsheet-block h3 { font-size: 10pt; margin-bottom: 3pt; break-after: avoid; }
+  .cheatsheet-block table { font-size: 8.5pt; }
+  .cheatsheet-block thead { display: table-header-group; }
+  .cheatsheet-block tr { break-inside: avoid; }
+  .cheatsheet-block th, .cheatsheet-block td { padding: 2pt 4pt; border: 0.5pt solid #bbb; }
+  .cheatsheet-block ul { font-size: 9pt; }
+  .gl-item { padding: 3pt 0; break-inside: avoid; }
 }
 
 .home-btn { text-decoration: none; display: inline-flex; align-items: center; gap: 2px; font-size: 14px; line-height: 1.1; }

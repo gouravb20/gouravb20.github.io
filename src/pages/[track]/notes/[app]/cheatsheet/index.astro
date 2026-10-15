@@ -1,0 +1,66 @@
+---
+import { getCollection } from "astro:content";
+import NotesLayout from "../../../../../layouts/NotesLayout.astro";
+import { SITE_NAME, TRACKS, appPath, chapterPath, plain, url, type Notes } from "../../../../../lib/site";
+
+export async function getStaticPaths() {
+  const all = await getCollection("notes");
+  return all.map(e => ({ params: { track: e.data.track, app: e.data.slug }, props: { notes: e.data } }));
+}
+
+const { notes } = Astro.props as { notes: Notes };
+const { book } = notes;
+const chapters = notes.chapters.filter(ch => ch.cheatsheet.length);
+
+const path = `${appPath(notes)}cheatsheet/`;
+const bookTitle = plain(book.title);
+const title = `Every cheatsheet · ${book.shortTitle ?? bookTitle}`;
+const description = `All ${chapters.length} chapter cheatsheets from ${bookTitle} on one printable page: trade-off tables and quick-reference lists.`;
+const site = Astro.site!;
+const abs = (p: string) => new URL(url(p), site).href;
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: SITE_NAME, item: abs("") },
+      { "@type": "ListItem", position: 2, name: TRACKS[notes.track] ?? notes.track, item: abs(`${notes.track}/`) },
+      { "@type": "ListItem", position: 3, name: bookTitle, item: abs(appPath(notes)) },
+      { "@type": "ListItem", position: 4, name: "Every cheatsheet", item: abs(path) },
+    ],
+  },
+];
+---
+<NotesLayout notes={notes} view="cheatsheet" title={title} description={description} path={path} structuredData={structuredData}>
+  <div class="chapter-header">
+    <div class="chapter-label">Reference</div>
+    <h1>Every cheatsheet</h1>
+    <div class="overview-text">All {chapters.length} chapters' cheatsheets on one page. Printing it (or saving it as a PDF) gives a compact black-on-white version.</div>
+    <div class="ref-tools" hidden><button class="iconbtn" id="printBtn">&#9113; Print / save as PDF</button></div>
+  </div>
+
+  <nav class="chapter-jump" aria-label="Jump to chapter">
+    {chapters.map(ch => <a href={`#cs-${ch.id}`} title={plain(ch.title)}>Ch {ch.number}</a>)}
+  </nav>
+
+  {chapters.map(ch => (
+    <section class="cs-chapter" id={`cs-${ch.id}`}>
+      <h2><span class="chapter-num">{ch.number}</span><span set:html={ch.title} /><a href={`${url(chapterPath(notes, ch))}#cheatsheet`}>Open chapter &rarr;</a></h2>
+      {ch.cheatsheet.map(cs => (
+        <div class="cheatsheet-block">
+          <h3 set:html={cs.title} />
+          {cs.type === "table" && (
+            <table>
+              <thead><tr>{cs.headers.map(h => <th set:html={h} />)}</tr></thead>
+              <tbody>{cs.rows.map(r => <tr>{r.map(c => <td set:html={String(c)} />)}</tr>)}</tbody>
+            </table>
+          )}
+          {cs.type === "list" && <ul>{cs.items.map(it => <li set:html={it} />)}</ul>}
+          {cs.type === "code" && <pre><code>{cs.body}</code></pre>}
+          {cs.note && <div class="cs-note" set:html={cs.note} />}
+        </div>
+      ))}
+    </section>
+  ))}
+  {chapters.length === 0 && <div class="empty-tab">No cheatsheets yet.</div>}
+</NotesLayout>

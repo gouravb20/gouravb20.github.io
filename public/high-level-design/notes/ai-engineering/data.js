@@ -2,7 +2,7 @@
 window.DATA = {
   book: {
     title: `AI Engineering`,
-    subtitle: `Chapter-wise interactive notes on Chip Huyen's <em>AI Engineering: Building Applications with Foundation Models</em>. Every chapter has core concepts, hands-on labs that let you poke at the ideas (sampling, perplexity, Elo, RAG, KV cache, batching...), a cheatsheet, interview Q&amp;A and flashcards.`,
+    subtitle: `Chapter-wise interactive notes on Chip Huyen's <em>AI Engineering: Building Applications with Foundation Models</em>. Every chapter has core concepts, hands-on labs that let you poke at the ideas (sampling, perplexity, Elo, RAG, KV cache, batching...), a cheatsheet and interview Q&amp;A.`,
     storageKey: `ai_engineering_notes_v1`,
     appId: `ai-engineering-notes`,
     exportPrefix: `ai-engineering-progress`,
