@@ -19,10 +19,41 @@ function publicPages(dir = "public", out = []) {
   return out;
 }
 
+// GitHub Pages (and `astro preview`) serve public/<dir>/index.html for "<dir>/"; the dev server only serves
+// public files by exact path. Match the host in dev.
+// By the time Vite middleware runs, Astro has stripped the base from req.url (req.originalUrl keeps it) and
+// already answered requests outside the base, so "/" itself still 404s in dev: open /system-design/.
+function publicDirectoryIndex() {
+  return {
+    name: "public-directory-index",
+    apply: "serve",
+    enforce: "pre",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const [full, query] = (req.originalUrl ?? req.url ?? "").split("?");
+        const search = query ? `?${query}` : "";
+        if (full === base) {
+          res.writeHead(302, { Location: `${base}/${search}` });
+          return res.end();
+        }
+        if (!full.startsWith(`${base}/`)) return next();
+        if (!fs.existsSync(path.join("public", decodeURIComponent(full.slice(base.length)), "index.html"))) return next();
+        if (!full.endsWith("/")) {
+          res.writeHead(301, { Location: `${full}/${search}` });
+          return res.end();
+        }
+        req.url = `${(req.url ?? "").split("?")[0]}index.html${search}`;
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
   site,
   base,
   trailingSlash: "ignore",
   build: { format: "directory" },
   integrations: [sitemap({ customPages: publicPages() })],
+  vite: { plugins: [publicDirectoryIndex()] },
 });
