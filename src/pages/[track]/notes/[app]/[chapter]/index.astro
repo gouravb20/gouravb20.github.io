@@ -1,0 +1,150 @@
+---
+import { getCollection } from "astro:content";
+import NotesLayout from "../../../../../layouts/NotesLayout.astro";
+import { SITE_NAME, TRACKS, appPath, chapterPath, plain, summary, url, type Chapter, type Notes } from "../../../../../lib/site";
+
+export async function getStaticPaths() {
+  const all = await getCollection("notes");
+  return all.flatMap(e =>
+    e.data.chapters.map((ch, i) => ({
+      params: { track: e.data.track, app: e.data.slug, chapter: ch.id },
+      props: { notes: e.data, index: i },
+    })),
+  );
+}
+
+const { notes, index } = Astro.props as { notes: Notes; index: number };
+const { book, chapters, parts } = notes;
+const ch: Chapter = chapters[index];
+const prev = chapters[index - 1];
+const next = chapters[index + 1];
+const chUrl = (c: Chapter) => url(chapterPath(notes, c));
+const labOwner = (id: string) => chapters.find(c => c.labs.includes(id)) ?? ch;
+const diffClass = (d?: string) => (d === "easy" ? "diff-easy" : d === "hard" ? "diff-hard" : "diff-med");
+
+const path = chapterPath(notes, ch);
+const bookTitle = plain(book.title);
+const title = `${plain(ch.title)} · ${book.shortTitle ?? bookTitle}`;
+const description = summary(ch.overview);
+const site = Astro.site!;
+const abs = (p: string) => new URL(url(p), site).href;
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "LearningResource",
+    name: plain(ch.title),
+    headline: plain(ch.title),
+    description: summary(ch.overview, 300),
+    url: abs(path),
+    learningResourceType: "Study notes",
+    educationalLevel: "Professional",
+    teaches: ch.concepts.map(c => plain(c.term)),
+    isPartOf: { "@type": "Course", name: bookTitle, url: abs(appPath(notes)) },
+    position: index + 1,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: SITE_NAME, item: abs("") },
+      { "@type": "ListItem", position: 2, name: TRACKS[notes.track] ?? notes.track, item: abs(`${notes.track}/`) },
+      { "@type": "ListItem", position: 3, name: bookTitle, item: abs(appPath(notes)) },
+      { "@type": "ListItem", position: 4, name: plain(ch.title), item: abs(path) },
+    ],
+  },
+];
+---
+<NotesLayout notes={notes} chapter={ch.id} title={title} description={description} path={path} structuredData={structuredData} labs={ch.labs.length > 0}>
+  <div class="chapter-header">
+    <div class="chapter-label" set:html={`Chapter ${ch.number} &middot; ${parts[ch.part]}`} />
+    <h1 set:html={ch.title} />
+    <div class="overview-text" set:html={ch.overview} />
+  </div>
+
+  <nav class="tabs" aria-label="Chapter sections">
+    <a class="tab active" href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
+    <a class="tab labs-tab" href="#labs" data-tab="labs">&#9654; Interactive Labs <span class="tab-count">{ch.labs.length}</span></a>
+    <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>
+    <a class="tab" href="#interview" data-tab="interview">Interview Q&amp;A <span class="tab-count" data-tab-count="interview">0/{ch.interview.length}</span></a>
+    <a class="tab" href="#flashcards" data-tab="flashcards">Flashcards <span class="tab-count">{ch.concepts.length + ch.interview.length}</span></a>
+  </nav>
+
+  <section id="concepts" data-panel="concepts">
+    <h2 class="sr-only">Core concepts</h2>
+    <div class="concepts-grid">
+      {ch.concepts.map((c, i) => {
+        const lab = c.demo ? notes.labInfo[c.demo] : undefined;
+        return (
+          <div class="concept-card">
+            <button class="learn-toggle" data-idx={i} title="Mark as learned" aria-label="Mark as learned" aria-pressed="false"></button>
+            <div class="concept-term" set:html={c.term} />
+            <div class="concept-def" set:html={c.def} />
+            {c.why && <div class="concept-why" set:html={c.why} />}
+            {c.ex && <div class="concept-example" set:html={c.ex} />}
+            {lab && c.demo && <a class="concept-demo-link" href={`${chUrl(labOwner(c.demo))}#lab-${c.demo}`}>&#9654; See it live: <Fragment set:html={lab.title} /></a>}
+          </div>
+        );
+      })}
+    </div>
+  </section>
+
+  <section id="labs" data-panel="labs">
+    <h2 class="sr-only">Interactive labs</h2>
+    {ch.labs.length === 0 ? (
+      <div class="empty-tab">No labs for this chapter.</div>
+    ) : (
+      <>
+        <div class="labs-intro" set:html={book.labsIntro} />
+        {ch.labs.map(id => (
+          <section class="lab-card" id={`lab-${id}`}>
+            <div class="lab-head"><span class="lab-tag">Lab</span><h3 set:html={notes.labInfo[id].title} /></div>
+            <div class="lab-blurb" set:html={notes.labInfo[id].blurb} />
+            <div class="lab-body" data-lab={id}><noscript><div class="lab-note">This lab needs JavaScript.</div></noscript></div>
+          </section>
+        ))}
+      </>
+    )}
+  </section>
+
+  <section id="cheatsheet" data-panel="cheatsheet">
+    <h2 class="sr-only">Cheatsheet</h2>
+    {ch.cheatsheet.map(cs => (
+      <div class="cheatsheet-block">
+        <h3 set:html={cs.title} />
+        {cs.type === "table" && (
+          <table>
+            <thead><tr>{cs.headers.map(h => <th set:html={h} />)}</tr></thead>
+            <tbody>{cs.rows.map(r => <tr>{r.map(c => <td set:html={String(c)} />)}</tr>)}</tbody>
+          </table>
+        )}
+        {cs.type === "list" && <ul>{cs.items.map(it => <li set:html={it} />)}</ul>}
+        {cs.type === "code" && <pre><code>{cs.body}</code></pre>}
+        {cs.note && <div class="cs-note" set:html={cs.note} />}
+      </div>
+    ))}
+  </section>
+
+  <section id="interview" data-panel="interview">
+    <h2 class="sr-only">Interview questions and answers</h2>
+    {ch.interview.map((qa, i) => (
+      <div class="qa-item">
+        <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+          <span class={`diff-badge ${diffClass(qa.diff)}`}>{qa.diff ?? "med"}</span>
+          <h3 class="qa-q" set:html={qa.q} />
+          <span class="qa-chevron">&#9662;</span>
+        </div>
+        <div class="qa-body">
+          <div class="qa-body-inner" set:html={qa.a} />
+          <div class="qa-footer"><button class="review-btn" data-idx={i}>Mark reviewed</button></div>
+        </div>
+      </div>
+    ))}
+  </section>
+
+  <section id="flashcards" data-panel="flashcards" hidden></section>
+
+  <nav class="chapter-footer" aria-label="Chapters">
+    {prev ? <a class="nav-btn" href={chUrl(prev)} rel="prev"><div class="nav-btn-label">&larr; Previous</div>Ch {prev.number}: <Fragment set:html={prev.title} /></a> : <div></div>}
+    {next ? <a class="nav-btn right" href={chUrl(next)} rel="next"><div class="nav-btn-label">Next &rarr;</div>Ch {next.number}: <Fragment set:html={next.title} /></a> : <div></div>}
+  </nav>
+</NotesLayout>
