@@ -1,14 +1,8 @@
 // Interactive book notes - app shell (shared by every notes site)
 // Depends on DATA (data*.js) and DEMOS (demos*.js); book-specific strings live in DATA.book
+// The data contract is typed in shared/notes.d.ts and enforced by scripts/check-site.mjs.
 
-const BOOK = Object.assign({
-  storageKey: "streaming_systems_notes_v1",
-  appId: "streaming-systems-notes",
-  exportPrefix: "streaming-systems-progress",
-  pillarsTitle: "The four questions (the book's backbone)",
-  takeawaysTitle: "Ten takeaways to remember",
-  labsIntro: "Each lab is a small simulator built on the book's own example data. Change the knobs and watch how results, watermarks and panes respond. Labs reset when you leave the tab."
-}, DATA.book);
+const BOOK = DATA.book;
 const STORAGE_KEY = BOOK.storageKey;
 const MOBILE_BREAKPOINT = 768;
 const TABS = ["concepts", "labs", "cheatsheet", "interview", "flashcards"];

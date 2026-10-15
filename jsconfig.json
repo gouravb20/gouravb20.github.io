@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["shared/notes.d.ts", "*/notes/*/data*.js"]
+}

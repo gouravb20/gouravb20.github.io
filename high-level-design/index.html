@@ -139,10 +139,10 @@
       <p class="lede">Chapter-wise notes with hands-on labs, cheatsheets, interview Q&amp;A and flashcards for the system design core concepts, the advanced topics and the books behind modern data and AI systems, plus a visual guide to how databases differ.</p>
       <div class="totals">
         <div class="total"><b>5</b><span>books</span></div>
-        <div class="total"><b>81</b><span>chapters</span></div>
-        <div class="total"><b>142</b><span>interactive labs</span></div>
-        <div class="total"><b>580</b><span>interview Q&amp;A</span></div>
-        <div class="total"><b>20</b><span>slides</span></div>
+        <div class="total"><b data-count="chapters" data-src=".">81</b><span>chapters</span></div>
+        <div class="total"><b data-count="labs" data-src=".">142</b><span>interactive labs</span></div>
+        <div class="total"><b data-count="qa" data-src=".">580</b><span>interview Q&amp;A</span></div>
+        <div class="total"><b data-count="slides" data-src=".">20</b><span>slides</span></div>
       </div>
     </section>
 
@@ -155,7 +155,7 @@
         </div>
         <p>The ideas that come up in almost every system design interview, from how a request crosses the network to sizing a system with back-of-the-envelope math. Labs cover retry storms, rate limiters, cache stampedes, hash rings, quorums, geohash lookups and more.</p>
         <div class="chips"><span class="chip">Networking</span><span class="chip">API design</span><span class="chip">Caching</span><span class="chip">Sharding</span><span class="chip">CAP</span></div>
-        <div class="meta"><span><b>18</b> chapters</span><span><b>224</b> concepts</span><span><b>31</b> labs</span><span><b>115</b> Q&amp;A</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="notes/core-concepts">18</b> chapters</span><span><b data-count="concepts" data-src="notes/core-concepts">224</b> concepts</span><span><b data-count="labs" data-src="notes/core-concepts">31</b> labs</span><span><b data-count="qa" data-src="notes/core-concepts">115</b> Q&amp;A</span></div>
         <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
         <span class="open">Open notes &rarr;</span>
       </div>
@@ -184,7 +184,7 @@
         </div>
         <p>The deep dives that come up once the core concepts are solid: proximity search, probabilistic data structures for big data (Bloom filters, Count-Min Sketch, HyperLogLog and the Morris counter), vector databases, time series databases and change data capture. Labs cover quadtrees, geohash cells, HyperLogLog registers, Morris counters, HNSW graph search, Gorilla compression, CDC ordering and more.</p>
         <div class="chips"><span class="chip">Geospatial</span><span class="chip">Sketches</span><span class="chip">Morris counter</span><span class="chip">Vectors</span><span class="chip">Time series</span><span class="chip">CDC</span></div>
-        <div class="meta"><span><b>10</b> chapters</span><span><b>125</b> concepts</span><span><b>20</b> labs</span><span><b>54</b> Q&amp;A</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="notes/advanced-topics">10</b> chapters</span><span><b data-count="concepts" data-src="notes/advanced-topics">125</b> concepts</span><span><b data-count="labs" data-src="notes/advanced-topics">20</b> labs</span><span><b data-count="qa" data-src="notes/advanced-topics">54</b> Q&amp;A</span></div>
         <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
         <span class="open">Open notes &rarr;</span>
       </div>
@@ -209,7 +209,7 @@
         </div>
         <p>One interview problem per part, from requirements and back-of-the-envelope numbers to a first working design and the deep dives that make it scale. Starts with YouTube Top K: tumbling vs sliding windows, serving from a precomputed cache, partitioning counters, pre-aggregating in the stream, per-window totals and a Count-Min sketch with a heap.</p>
         <div class="chips"><span class="chip">Top K</span><span class="chip">Windows</span><span class="chip">Stream aggregation</span><span class="chip">Count-Min</span></div>
-        <div class="meta"><span><b>5</b> chapters</span><span><b>50</b> concepts</span><span><b>8</b> labs</span><span><b>26</b> Q&amp;A</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="notes/problem-breakdowns">5</b> chapters</span><span><b data-count="concepts" data-src="notes/problem-breakdowns">50</b> concepts</span><span><b data-count="labs" data-src="notes/problem-breakdowns">8</b> labs</span><span><b data-count="qa" data-src="notes/problem-breakdowns">26</b> Q&amp;A</span></div>
         <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
         <span class="open">Open notes &rarr;</span>
       </div>
@@ -230,7 +230,7 @@
         </div>
         <p>The foundations of data systems: reliability and scalability, data models and storage engines, encoding, replication, partitioning, transactions, consistency and consensus, batch and stream processing.</p>
         <div class="chips"><span class="chip">Replication</span><span class="chip">Partitioning</span><span class="chip">Transactions</span><span class="chip">Consensus</span></div>
-        <div class="meta"><span><b>12</b> chapters</span><span><b>181</b> concepts</span><span><b>100</b> Q&amp;A</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="notes/ddia">12</b> chapters</span><span><b data-count="concepts" data-src="notes/ddia">181</b> concepts</span><span><b data-count="qa" data-src="notes/ddia">100</b> Q&amp;A</span></div>
         <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
         <span class="open">Open notes &rarr;</span>
       </a>
@@ -242,7 +242,7 @@
         </div>
         <p>The Beam model: event time vs processing time, windowing, watermarks, triggers and accumulation, exactly-once processing, and the theory of streams and tables.</p>
         <div class="chips"><span class="chip">Watermarks</span><span class="chip">Triggers</span><span class="chip">Exactly-once</span><span class="chip">Streams &amp; tables</span></div>
-        <div class="meta"><span><b>10</b> chapters</span><span><b>118</b> concepts</span><span><b>22</b> labs</span><span><b>82</b> Q&amp;A</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="notes/streaming-systems">10</b> chapters</span><span><b data-count="concepts" data-src="notes/streaming-systems">118</b> concepts</span><span><b data-count="labs" data-src="notes/streaming-systems">22</b> labs</span><span><b data-count="qa" data-src="notes/streaming-systems">82</b> Q&amp;A</span></div>
         <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
         <span class="open">Open notes &rarr;</span>
       </a>
@@ -254,7 +254,7 @@
         </div>
         <p>Building on foundation models: sampling, evaluation, prompt engineering, RAG and agents, finetuning, dataset engineering and inference optimization.</p>
         <div class="chips"><span class="chip">Evaluation</span><span class="chip">RAG &amp; agents</span><span class="chip">Finetuning</span><span class="chip">Inference</span></div>
-        <div class="meta"><span><b>10</b> chapters</span><span><b>119</b> concepts</span><span><b>22</b> labs</span><span><b>78</b> Q&amp;A</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="notes/ai-engineering">10</b> chapters</span><span><b data-count="concepts" data-src="notes/ai-engineering">119</b> concepts</span><span><b data-count="labs" data-src="notes/ai-engineering">22</b> labs</span><span><b data-count="qa" data-src="notes/ai-engineering">78</b> Q&amp;A</span></div>
         <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
         <span class="open">Open notes &rarr;</span>
       </a>
@@ -266,7 +266,7 @@
         </div>
         <p>Knowledge-graph-enhanced RAG: hybrid search, advanced retrieval, text2cypher, agentic RAG, building graphs with LLMs, Microsoft GraphRAG and RAG evaluation.</p>
         <div class="chips"><span class="chip">Hybrid search</span><span class="chip">text2cypher</span><span class="chip">Agentic RAG</span><span class="chip">MS GraphRAG</span></div>
-        <div class="meta"><span><b>9</b> chapters</span><span><b>97</b> concepts</span><span><b>16</b> labs</span><span><b>67</b> Q&amp;A</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="notes/graphrag">9</b> chapters</span><span><b data-count="concepts" data-src="notes/graphrag">97</b> concepts</span><span><b data-count="labs" data-src="notes/graphrag">16</b> labs</span><span><b data-count="qa" data-src="notes/graphrag">67</b> Q&amp;A</span></div>
         <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
         <span class="open">Open notes &rarr;</span>
       </a>
@@ -278,7 +278,7 @@
         </div>
         <p>How storage engines work: B-Trees and their file formats, page layouts and splits, buffer management, WAL and ARIES recovery, concurrency control, B-Tree variants and LSM Trees.</p>
         <div class="chips"><span class="chip">B-Trees</span><span class="chip">Slotted pages</span><span class="chip">WAL &amp; recovery</span><span class="chip">LSM Trees</span></div>
-        <div class="meta"><span><b>7</b> chapters</span><span><b>107</b> concepts</span><span><b>23</b> labs</span><span><b>58</b> Q&amp;A</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="notes/database-internals">7</b> chapters</span><span><b data-count="concepts" data-src="notes/database-internals">107</b> concepts</span><span><b data-count="labs" data-src="notes/database-internals">23</b> labs</span><span><b data-count="qa" data-src="notes/database-internals">58</b> Q&amp;A</span></div>
         <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
         <span class="open">Open notes &rarr;</span>
       </a>
@@ -289,7 +289,7 @@
       <div class="body">
         <div class="card-head">
           <div class="mono">DB</div>
-          <div><h3>A Field Guide to Databases</h3><div class="by">Slide deck &middot; 20 slides</div></div>
+          <div><h3>A Field Guide to Databases</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="slides/database-guide">20</span> slides</div></div>
         </div>
         <p>How databases differ and why: OLTP vs OLAP, four independent design axes, data models, B-Tree vs LSM-Tree (with an animated LSM-Tree), separating compute from storage, and distributed SQL.</p>
         <div class="chips"><span class="chip">OLTP vs OLAP</span><span class="chip">B-Tree vs LSM</span><span class="chip">Distributed SQL</span><span class="chip">NewSQL</span></div>
@@ -311,7 +311,7 @@
       <div class="body">
         <div class="card-head">
           <div class="mono">PDF</div>
-          <div><h3>Read the books</h3><div class="by">In-browser PDF viewer &middot; 7 books</div></div>
+          <div><h3>Read the books</h3><div class="by">In-browser PDF viewer &middot; <span data-count="books" data-src="books">7</span> books</div></div>
         </div>
         <p>The source books behind these notes, readable right in the browser. Switch between books from the viewer, jump to each book's notes, or download the PDF.</p>
         <span class="open">Open library &rarr;</span>

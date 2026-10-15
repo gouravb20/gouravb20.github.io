@@ -5,7 +5,7 @@ Interactive system design study notes in two tracks:
 - [`high-level-design/`](high-level-design/index.html): chapter-wise notes for the system design core concepts, the advanced topics, worked problem breakdowns and the books behind modern data and AI systems, plus a slide deck on how databases differ and an in-browser library of the source books.
 - [`low-level-design/`](low-level-design/index.html): chapter-wise notes for the languages and building blocks behind well-designed programs, starting with *Mastering Go*, plus an in-browser library of the source books.
 
-It is a plain static site (HTML, CSS and JavaScript, no build step and no dependencies). Open the root `index.html` in a browser to pick a track, or serve the folder with any static host such as GitHub Pages.
+It is a plain static site (HTML, CSS and JavaScript, no build step and no dependencies; a Node script checks it in CI). Open the root `index.html` in a browser to pick a track, or serve the folder with any static host such as GitHub Pages.
 
 ## High-level design
 
@@ -61,13 +61,15 @@ python -m http.server
 
 ```
 index.html                     landing page: pick high-level or low-level design
+shared/                        used by every notes app in both tracks
+  app.js                       app shell: routing, tabs, search, progress, export/import
+  styles.css                   styles, including every book's lab visuals
+  labkit.js                    helpers for labs (controls, sliders, SVG charts, formatting)
+  notes.d.ts                   types for DATA and DEMOS
 high-level-design/
   index.html                   hub page linking every book, the slides and the library
   notes/<book>/
-    index.html                 app shell (top bar, sidebar, main area)
-    app.js                     shared app: routing, tabs, search, progress, export/import
-    styles.css                 shared styles plus any book-specific lab visuals
-    labkit.js                  helpers for labs (controls, sliders, SVG charts, formatting)
+    index.html                 page markup (top bar, sidebar, main area) and script tags
     data.js, data-part2.js     the book's content (core-concepts also has data-part3.js)
     demos.js, demos-part2.js   the book's labs (core-concepts also has demos-part3.js)
   slides/database-guide/       slide deck
@@ -76,23 +78,41 @@ low-level-design/
   index.html                   hub page linking every book and the library
   notes/<book>/                same app layout as above (mastering-go has data-part1..5.js and demos-part1..5.js)
   books/                       source PDFs and the library / viewer page
+scripts/check-site.mjs         checks data, labs, counts and links (see below)
+jsconfig.json                  type-checks every data*.js file against shared/notes.d.ts
 ```
 
-`app.js`, `labkit.js` and the base of `styles.css` are identical in every notes folder. Fix a bug in one and copy it to the others.
+## Checking the site
+
+```sh
+node scripts/check-site.mjs          # report problems, exit 1 if any
+node scripts/check-site.mjs --fix    # also rewrite stale counts on the hubs and in this README
+npx -p typescript@5 tsc -p jsconfig.json   # type-check the notes data
+```
+
+The check script loads every notes app the way the browser does and reports:
+
+- labs listed in a chapter, or linked from a concept, that no demos file defines;
+- duplicate chapter ids, unknown parts, missing `DATA.book` fields, and `storageKey`s used by two apps;
+- hub cards whose `data-key` doesn't match the app's `storageKey`, or whose `data-total` is stale;
+- stale counts: any element with `data-count="chapters|concepts|labs|qa|slides|books"` and a `data-src` folder, plus README table rows that link a notes app;
+- relative links (including the library's PDF paths) that don't resolve, matching case exactly as GitHub Pages does.
+
+Both checks run in CI on every push and pull request (`.github/workflows/check.yml`). Editors that read `jsconfig.json`, such as VS Code and Cursor, flag data typos as you type.
 
 ## Adding a book
 
-1. Copy an existing `notes/<book>` folder into the right track (`high-level-design/notes/` or `low-level-design/notes/`). Its Home button links to `../../index.html`, the hub of that track.
-2. Rewrite `data.js` (and `data-part2.js` if needed). It sets `window.DATA`:
+1. Copy an existing `notes/<book>` folder into the right track (`high-level-design/notes/` or `low-level-design/notes/`). Its Home button links to `../../index.html`, the hub of that track, and its script tags load `../../../shared/`.
+2. Rewrite `data.js` (and `data-part2.js` if needed). It sets `window.DATA`, typed in `shared/notes.d.ts`:
    - `book`: title, subtitle, `storageKey` (unique per book), `appId`, `exportPrefix`, section titles and the labs intro.
    - `parts`: part number to part name.
    - `fourQuestions`: the four "big idea" cards on the dashboard (`cls`, `q`, `text`, `answer`).
    - `takeaways`: a list of HTML strings.
-   - `chapters`: each has `id`, `part`, `number`, `title`, `overview`, `concepts[{term, def, why, ex?, demo?}]`, `cheatsheet[{title, type: table|list|code, ...}]`, `interview[{q, a, diff: easy|medium|hard}]` and `labs[]`.
+   - `chapters`: each has `id`, `part`, `number`, `title`, `overview`, `concepts[{term, def, why, ex?, demo?}]`, `cheatsheet[{title, type: table|list|code, ...}]`, `interview[{q, a, diff: easy|med|hard}]` and `labs[]`.
 
    Text is raw HTML, so escape `<` as `&lt;`. Only `code` cheatsheet bodies are escaped automatically.
 3. Write labs in `demos.js` as `window.DEMOS[id] = { title, blurb, mount(el, ctx) }` and list their ids in each chapter's `labs`.
-4. Update the brand and script tags in `index.html`, then add a card to the track's hub `index.html` with `data-key` set to the book's `storageKey` and `data-total` set to its concepts plus Q&A.
+4. Update the brand and script tags in `index.html`, then add a card to the track's hub `index.html` with `data-key` set to the book's `storageKey`. Copy the `data-count` markup from an existing card, add a README table row, and run `node scripts/check-site.mjs --fix` to fill in `data-total` and every count.
 
 ## Credits
 

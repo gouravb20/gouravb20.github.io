@@ -1,0 +1,19 @@
+name: Check site
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Data, labs, hub numbers and links
+        run: node scripts/check-site.mjs
+      - name: Types of the notes data
+        run: npx --yes --package typescript@5 tsc -p jsconfig.json
