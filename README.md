@@ -11,7 +11,7 @@ The site is built with [Astro](https://astro.build) as plain static HTML. Most p
 
 | Book | Notes | Chapters | Concepts | Labs | Q&A |
 |---|---|---|---|---|---|
-| System Design Core Concepts (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials)) | [`notes/core-concepts`](public/high-level-design/notes/core-concepts/index.html) | 18 | 224 | 31 | 115 |
+| System Design Core Concepts (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials)) | [`notes/core-concepts`](public/high-level-design/notes/core-concepts/index.html) | 18 | 228 | 31 | 116 |
 | System Design Advanced Topics (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search) and [Arpit Bhayani](https://arpitbhayani.me/blogs/morris-counter/)) | [`notes/advanced-topics`](public/high-level-design/notes/advanced-topics/index.html) | 10 | 125 | 20 | 54 |
 | System Design Problem Breakdowns: YouTube Top K (inspired by [Hello Interview](https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k)) | [`notes/problem-breakdowns`](public/high-level-design/notes/problem-breakdowns/) | 5 | 50 | 8 | 26 |
 | Designing Data-Intensive Applications (Kleppmann) | [`notes/ddia`](public/high-level-design/notes/ddia/index.html) | 12 | 181 | - | 100 |

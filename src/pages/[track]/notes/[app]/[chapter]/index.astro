@@ -40,6 +40,7 @@ const structuredData = [
     educationalLevel: "Professional",
     teaches: ch.concepts.map(c => plain(c.term)),
     isPartOf: { "@type": "Course", name: bookTitle, url: abs(appPath(notes)) },
+    ...(ch.source && { isBasedOn: ch.source.url }),
     position: index + 1,
   },
   {
@@ -59,6 +60,7 @@ const structuredData = [
     <div class="chapter-label" set:html={`Chapter ${ch.number} &middot; ${parts[ch.part]}`} />
     <h1 set:html={ch.title} />
     <div class="overview-text" set:html={ch.overview} />
+    {ch.source && <div class="chapter-source">Reference: <a href={ch.source.url} target="_blank" rel="noopener" set:html={ch.source.title} /> &#8599;</div>}
   </div>
 
   <nav class="tabs" aria-label="Chapter sections">

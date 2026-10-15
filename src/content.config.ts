@@ -27,6 +27,7 @@ const chapter = z.strictObject({
   number: z.union([z.number(), z.string()]),
   title: text,
   overview: text,
+  source: z.strictObject({ title: text, url: z.url() }).optional(),
   concepts: z.array(concept),
   labs: z.array(z.string()),
   cheatsheet: z.array(cheatsheet),

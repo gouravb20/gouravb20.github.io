@@ -55,6 +55,7 @@ window.DATA = {
     // ------------------------------------------------------------------
     {
       id: `ch1`, part: 1, number: 1,
+      source: { title: `Hello Interview: Networking Essentials`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials` },
       title: `Networking 101: layers and the life of a request`,
       overview: `Networks are built in layers so that each layer can ignore the details below it. For system design you mostly need three: the <strong>network layer</strong> (IP), the <strong>transport layer</strong> (TCP, UDP, QUIC) and the <strong>application layer</strong> (HTTP, DNS, WebSockets, gRPC, WebRTC). Following a single web request through DNS, the TCP handshake, TLS, the HTTP exchange and teardown shows where latency comes from and why connections are state that both ends must keep.`,
       concepts: [
@@ -107,6 +108,7 @@ window.DATA = {
     // ------------------------------------------------------------------
     {
       id: `ch2`, part: 1, number: 2,
+      source: { title: `Hello Interview: Networking Essentials`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials` },
       title: `Transport: TCP, UDP and QUIC`,
       overview: `The transport layer turns IP's loose packets into something applications can use. <strong>TCP</strong> gives a reliable, ordered byte stream with flow and congestion control, at the cost of a handshake, acknowledgements and head-of-line blocking. <strong>UDP</strong> just sends datagrams: no setup, no guarantees, very low overhead. <strong>QUIC</strong> rebuilds TCP-like reliability on UDP with built-in encryption and independent streams. In interviews TCP is the assumed default; the skill is recognising when UDP is genuinely better and handling the consequences.`,
       concepts: [
@@ -160,6 +162,7 @@ window.DATA = {
     // ------------------------------------------------------------------
     {
       id: `ch3`, part: 1, number: 3,
+      source: { title: `Hello Interview: Networking Essentials`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials` },
       title: `HTTP and API styles: REST, GraphQL, gRPC`,
       overview: `HTTP is the request/response protocol most systems speak: a method, a path, headers and an optional body in; a status code, headers and a body out. It is <strong>stateless</strong>, which makes servers easy to scale. On top of it sit three API styles. <strong>REST</strong> models resources and is the safe default. <strong>GraphQL</strong> lets clients ask for exactly the data a screen needs, fixing under- and over-fetching. <strong>gRPC</strong> uses HTTP/2 and Protocol Buffers for compact, typed, fast service-to-service calls.`,
       concepts: [
@@ -221,6 +224,7 @@ window.DATA = {
     // ------------------------------------------------------------------
     {
       id: `ch4`, part: 1, number: 4,
+      source: { title: `Hello Interview: Networking Essentials`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials` },
       title: `Real-time push: polling, SSE, WebSockets, WebRTC`,
       overview: `Request/response can't tell a client that something changed. The options, from simplest to most powerful: <strong>polling</strong> on a timer, <strong>long polling</strong> (the server holds the request until there is news), <strong>Server-Sent Events</strong> (one long HTTP response streaming many events), <strong>WebSockets</strong> (a persistent full-duplex channel) and <strong>WebRTC</strong> (direct peer-to-peer media and data over UDP). Each step up buys lower latency or two-way traffic at the cost of more persistent state and more demanding infrastructure.`,
       concepts: [
@@ -274,6 +278,7 @@ window.DATA = {
     // ------------------------------------------------------------------
     {
       id: `ch5`, part: 1, number: 5,
+      source: { title: `Hello Interview: Networking Essentials`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials` },
       title: `Load balancing`,
       overview: `You can scale <strong>vertically</strong> (bigger machines) or <strong>horizontally</strong> (more machines). Modern hardware makes vertical scaling go further than people expect, but interview designs usually scale out, and then something must decide which server handles each request. <strong>Client-side load balancing</strong> lets clients pick from a list they keep updated. <strong>Dedicated load balancers</strong> sit in the path, at <strong>Layer 4</strong> (connections) or <strong>Layer 7</strong> (HTTP requests), run health checks and apply an algorithm such as round robin or least connections.`,
       concepts: [
@@ -327,6 +332,7 @@ window.DATA = {
     // ------------------------------------------------------------------
     {
       id: `ch6`, part: 1, number: 6,
+      source: { title: `Hello Interview: Networking Essentials`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials` },
       title: `Latency, regions and failure handling`,
       overview: `Two practical realities come up in most deep dives. First, <strong>distance</strong>: light in fiber covers about 200 km per millisecond, so users far from your servers always pay tens of milliseconds per round trip. The fixes are <strong>data locality</strong>: CDNs at the edge, regional deployments and regional partitioning. Second, <strong>failure</strong>: networks drop and delay messages and dependencies go down. Timeouts, retries with exponential backoff and jitter, idempotency keys and circuit breakers keep one failure from becoming an outage.`,
       concepts: [

@@ -3,6 +3,7 @@ window.DATA.chapters.push(
   // ------------------------------------------------------------------
   {
     id: `ch7`, part: 2, number: 7,
+    source: { title: `Hello Interview: API Design`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/api-design` },
     title: `API styles and REST resource design`,
     overview: `The API step of an interview takes about five minutes: pick a protocol, name your resources, and say how data goes in and comes out. <strong>REST</strong> is the default and covers most products. <strong>GraphQL</strong> earns its place when many different clients need different slices of the same data. <strong>RPC</strong> (gRPC) fits internal service-to-service calls where speed and typed contracts matter. Interviewers want a reasonable, consistent API, not a perfect one, so get it right quickly and move on.`,
     concepts: [
@@ -56,6 +57,7 @@ DELETE /bookings/{bookingId}` }
   // ------------------------------------------------------------------
   {
     id: `ch8`, part: 2, number: 8,
+    source: { title: `Hello Interview: API Design`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/api-design` },
     title: `API principles and patterns: pagination, idempotency, versioning, security`,
     overview: `Interviewers judge an API against a few principles even if they never name them: resources not actions, consistency, least surprise, statelessness, safe retries, pagination, secure by default, evolution without breaking clients, and actionable errors. Those principles show up as concrete patterns: <strong>offset or cursor pagination</strong>, filtering and sorting conventions, <strong>idempotency keys</strong>, a consistent error envelope, <strong>versioning</strong>, authentication with <strong>JWTs or API keys</strong>, role-based access control and <strong>rate limiting</strong>.`,
     concepts: [
@@ -116,6 +118,7 @@ COMMIT;` }
   // ------------------------------------------------------------------
   {
     id: `ch9`, part: 3, number: 9,
+    source: { title: `Hello Interview: Data Modeling`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/data-modeling` },
     title: `Data modeling: database choice and schema design`,
     overview: `Data modeling decides what entities exist, how they're identified and how they relate. In an interview it happens twice: listing <strong>core entities</strong> during requirements, then sketching a schema next to the database in the high-level design, with keys, relationships, indexes and the shard key. The bar is "clear and good enough". Default to a <strong>relational database</strong>; let <strong>access patterns</strong>, data volume and consistency needs drive every schema choice; normalize first and denormalize only for a reason.`,
     concepts: [
@@ -172,6 +175,7 @@ follows  (follower_id FK, followee_id FK, PRIMARY KEY (follower_id, followee_id)
   // ------------------------------------------------------------------
   {
     id: `ch10`, part: 4, number: 10,
+    source: { title: `Hello Interview: Database Indexing`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/db-indexing` },
     title: `How indexes work: B-trees, LSM trees and hash indexes`,
     overview: `Without an index, finding one row means scanning every page of the table. An <strong>index</strong> is a separate structure that leads straight to the right pages, at the cost of extra storage and extra work on every write. <strong>B-trees</strong> are the default: shallow, sorted, good for both equality and range queries. <strong>LSM trees</strong> turn random writes into sequential ones for write-heavy systems, paying with compaction and read amplification. <strong>Hash indexes</strong> answer exact-match lookups in one step but can't do ranges.`,
     concepts: [
@@ -222,6 +226,7 @@ depth 4: 500^4 = 62,500,000,000
   // ------------------------------------------------------------------
   {
     id: `ch11`, part: 4, number: 11,
+    source: { title: `Hello Interview: Database Indexing`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/db-indexing` },
     title: `Specialized indexes and index tuning: geospatial, inverted, composite, covering`,
     overview: `Some queries don't fit a plain one-column B-tree. "Restaurants within 2 km" needs a <strong>geospatial index</strong>: geohashes, quadtrees or R-trees. "Posts containing these words" needs an <strong>inverted index</strong>. Multi-column filters need <strong>composite indexes</strong> with the right column order, and the fastest queries are answered from a <strong>covering index</strong> without touching the table. Knowing which to name, and why, is what interviewers listen for.`,
     concepts: [

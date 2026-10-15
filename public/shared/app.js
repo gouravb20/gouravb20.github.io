@@ -180,6 +180,7 @@ function renderMain() {
       <div class="chapter-label">Chapter ${ch.number} &middot; ${DATA.parts[ch.part]}</div>
       <h1>${ch.title}</h1>
       <div class="overview-text">${ch.overview}</div>
+      ${ch.source ? `<div class="chapter-source">Reference: <a href="${ch.source.url}" target="_blank" rel="noopener">${ch.source.title}</a> &#8599;</div>` : ""}
     </div>
     <div class="tabs">
       ${tabBtn("concepts", "Core Concepts", `${doneC}/${ch.concepts.length}`)}

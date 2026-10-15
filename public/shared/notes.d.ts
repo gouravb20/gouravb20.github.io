@@ -38,6 +38,8 @@ interface Chapter {
   number: number | string;
   title: string;
   overview: string;
+  /** The page this chapter is based on, shown under the overview as "Reference: <title>". */
+  source?: { title: string; url: string };
   concepts: Concept[];
   /** Keys into DEMOS. */
   labs: string[];

@@ -203,6 +203,9 @@ body.light .q-how { color: #1d4ed8; }
 .overview-text { color: var(--text-muted); font-size: 15.5px; line-height: 1.7; }
 .overview-text p { margin-bottom: 10px; }
 .overview-text strong { color: var(--text); }
+.chapter-source { margin-top: 12px; font-size: 13px; color: var(--text-muted); }
+.chapter-source a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.chapter-source a:hover { text-decoration: underline; }
 
 .tabs {
   display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 28px;

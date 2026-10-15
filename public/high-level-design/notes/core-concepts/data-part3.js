@@ -3,6 +3,7 @@ window.DATA.chapters.push(
   // ------------------------------------------------------------------
   {
     id: `ch12`, part: 5, number: 12,
+    source: { title: `Hello Interview: Caching`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/caching` },
     title: `Caching: where to cache and how reads and writes flow`,
     overview: `A cache keeps hot data in memory so most reads skip the database: a Redis read takes about a millisecond where a database query might take tens. Caches live at several layers: the client, a <strong>CDN</strong>, <strong>in-process</strong> memory, and most importantly an <strong>external cache</strong> like Redis shared by all servers. How data flows through it is the pattern: <strong>cache-aside</strong> is the default; <strong>write-through</strong>, <strong>write-behind</strong> and <strong>read-through</strong> trade write latency, freshness and durability differently.`,
     concepts: [
@@ -58,6 +59,7 @@ def update_user(user_id, fields):
   // ------------------------------------------------------------------
   {
     id: `ch13`, part: 5, number: 13,
+    source: { title: `Hello Interview: Caching`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/caching` },
     title: `Cache eviction and failure modes: stampedes, staleness, hot keys`,
     overview: `Caches are small, so they must decide what to evict: <strong>LRU</strong> is the safe default, <strong>LFU</strong> suits steadily popular keys, FIFO is rarely right, and <strong>TTL</strong> bounds staleness on top of any policy. Caching also brings new ways to fail: a <strong>stampede</strong> when a hot entry expires, <strong>stale data</strong> after writes, <strong>hot keys</strong> that overload one node, and the database being crushed when the cache itself goes down. Naming one or two of these and how you'd handle them is what interviewers want.`,
     concepts: [
@@ -115,6 +117,7 @@ def update_user(user_id, fields):
   // ------------------------------------------------------------------
   {
     id: `ch14`, part: 6, number: 14,
+    source: { title: `Hello Interview: Sharding`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/sharding` },
     title: `Partitioning, sharding and choosing a shard key`,
     overview: `When one database can no longer hold the data or keep up with writes, split it. <strong>Partitioning</strong> splits a big table into pieces inside one database; <strong>sharding</strong> spreads rows across many independent machines. Two decisions matter: the <strong>shard key</strong> (high cardinality, even distribution, aligned with the main query) and the <strong>distribution strategy</strong> (range, hash or directory). Hash-based is the default. And most importantly: don't shard until the numbers say you must.`,
     concepts: [
@@ -126,7 +129,7 @@ def update_user(user_id, fields):
       { term: `Range-based sharding`, def: `Contiguous key ranges per shard: user IDs 1-1M on shard 1, 1M-2M on shard 2.`, why: `Simple and efficient for range scans, but traffic is rarely spread evenly over ranges (recent data is hot). Fits multi-tenant systems where each tenant owns a range.`, demo: `shardKey` },
       { term: `Hash-based sharding (default)`, def: `shard = hash(key) mod N, or better, consistent hashing. The hash scrambles keys so data and load spread evenly.`, why: `The default interviewers assume. Plain modulo moves almost every key when N changes, so pair it with consistent hashing or many fixed virtual partitions.`, demo: `shardKey` },
       { term: `Directory-based sharding`, def: `A lookup table or service maps each key (or key range) to a shard.`, why: `Maximum flexibility (move one heavy tenant to its own shard), but every request pays a lookup and the directory is a critical dependency. Rarely the interview answer.`, demo: `shardKey` },
-      { term: `Fixed logical partitions`, def: `Create many more partitions than machines (e.g. 1,024 slots) and assign slots to nodes; rebalancing moves whole slots.`, why: `Redis Cluster (16,384 slots), Elasticsearch shards and many databases work this way. Keys never change partition, only partitions change machines.` },
+      { term: `Fixed logical partitions`, def: `Create many more partitions than machines (e.g. 1,024 slots) and assign slots to nodes; rebalancing moves whole slots.`, why: `Redis Cluster (16,384 slots), Aerospike (4,096 partitions), Couchbase (1,024 vBuckets) and Elasticsearch shards work this way. Keys never change partition, only partitions change machines. Chapter 16 compares this with consistent hashing.` },
       { term: `Sharding is usually built in`, def: `Cassandra (token ring with virtual nodes), DynamoDB (hash partitions that split automatically), MongoDB (range chunks with a balancer), Vitess and Citus for MySQL and PostgreSQL, Spanner and Aurora for distributed SQL.`, why: `In an interview, "DynamoDB with user_id as the partition key" is enough unless you're asked about internals.` },
       { term: `When to propose sharding`, def: `When an estimate exceeds one machine: storage beyond a few to tens of TB, sustained writes beyond what one primary handles (tens of thousands per second), or reads beyond what replicas and caches absorb.`, why: `The formula: identify the bottleneck, show why one database won't do, then propose the shard key, strategy, trade-offs and growth plan.`, demo: `estimator` }
     ],
@@ -163,6 +166,7 @@ def update_user(user_id, fields):
   // ------------------------------------------------------------------
   {
     id: `ch15`, part: 6, number: 15,
+    source: { title: `Hello Interview: Sharding`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/sharding` },
     title: `Sharding challenges: hot spots, cross-shard queries and transactions`,
     overview: `Sharding solves capacity and creates three new problems. <strong>Hot spots</strong>: some keys (a celebrity) or ranges (today) get far more traffic than others. <strong>Cross-shard operations</strong>: queries that don't include the shard key must fan out to every shard and are only as fast as the slowest one. <strong>Consistency</strong>: a transaction touching two shards can't use one database transaction, so you avoid it by design, use a <strong>saga</strong> with compensating steps, or accept eventual consistency.`,
     concepts: [
@@ -208,6 +212,7 @@ p = 0.1%: N = 100 -> 9.5%` },
   // ------------------------------------------------------------------
   {
     id: `ch16`, part: 7, number: 16,
+    source: { title: `Hello Interview: Consistent Hashing`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/consistent-hashing` },
     title: `Consistent hashing`,
     overview: `With <code>hash(key) mod N</code>, adding or removing one server changes N and remaps almost every key, triggering a storm of data movement. <strong>Consistent hashing</strong> puts both servers and keys on a ring and assigns each key to the next server clockwise, so a membership change moves only the keys in one arc: about 1/N of the data. <strong>Virtual nodes</strong> (many positions per server) even out the load and spread a failed node's keys over all survivors. It balances keys, not traffic, so hot keys still need replication.`,
     concepts: [
@@ -218,7 +223,11 @@ p = 0.1%: N = 100 -> 9.5%` },
       { term: `Virtual nodes`, def: `Each physical server gets many ring positions (hash("db1-vn1"), hash("db1-vn2"), ...), interleaved with other servers' positions.`, why: `Arcs average out, so each server's share is close to 1/N; a failed server's keys spread across all survivors; a new server takes a little from everyone. More virtual nodes means more even load. Servers with more capacity can get more virtual nodes.`, demo: `hashRing` },
       { term: `Hot spots are about traffic`, def: `Consistent hashing evens out the number of keys per node, not requests per key. One viral key still lands on one node.`, why: `Virtual nodes fix structural imbalance; replication, key salting (taylor-swift-0..9) and adaptive rebalancing fix workload imbalance.` },
       { term: `Replication on the ring`, def: `Store each key on the next R distinct servers clockwise (Cassandra, Dynamo).`, why: `When a node fails, replicas already hold its data, so nothing has to move immediately. Data moves only for planned membership changes, and then only a bounded fraction.` },
-      { term: `Fixed hash slots`, def: `Redis Cluster divides keys into 16,384 slots with CRC16(key) mod 16384 and assigns slot ranges to nodes.`, why: `Simpler to reason about; rebalancing moves slots between nodes with more coordination. A valid alternative to discuss.` },
+      { term: `Fixed hash slots`, def: `The main alternative to a ring. Fix a slot count S up front, far larger than the number of nodes, and compute <code>slot = hash(key) mod S</code>. A small slot map records which node owns each slot. A new node takes whole slots from the others; a departing node hands its slots out.`, why: `The modulus is S, which never changes, so a key never changes slot: only the slot-to-node map does. That avoids the mod N reshuffle just as well as a ring (about 1/N of the data moves when a node joins), but ownership is an explicit table you can inspect, plan and throttle, instead of whatever arcs random ring positions happen to produce. Lookup is an array index rather than a binary search.` },
+      { term: `Who uses fixed slots`, def: `<strong>Redis Cluster</strong>: 16,384 hash slots, CRC16(key) mod 16384. <strong>Aerospike</strong>: 4,096 partitions per namespace, chosen by 12 bits of the key's RIPEMD-160 digest. <strong>Couchbase</strong>: a fixed number of vBuckets per bucket (1,024 on Linux and Windows), chosen by CRC32 of the key. <strong>Hazelcast</strong>: 271 partitions by default. <strong>Elasticsearch</strong>: a fixed number of primary shards per index, shard = hash(_routing) mod shard count.`, why: `Many production databases chose fixed slots over maintaining a hash ring; the Redis documentation says plainly that Redis Cluster "does not use consistent hashing". Cassandra is the best-known ring user: nodes own tokens on a hash ring, with virtual nodes.` },
+      { term: `Moving a slot`, def: `Rebalancing migrates one slot at a time while the cluster keeps serving. In Redis Cluster the source marks the slot MIGRATING and the target IMPORTING; keys copy across, a client asking for a key that already moved gets an ASK redirect, and once the slot is reassigned every client gets MOVED and updates its map. Aerospike migrates partitions and Couchbase migrates vBuckets the same way, then publish a new partition or vBucket map.`, why: `Smart clients cache the slot map and send each request straight to the owner in one hop. A whole slot is the unit of movement, so migrations are easy to track, pause and rate-limit.` },
+      { term: `Choosing the slot count`, def: `Pick it once and pick it big. The slot count caps how many nodes can share the data (Redis Cluster allows at most 16,384 masters and suggests staying around 1,000 nodes), and changing it later remaps every key, which is the mod N problem all over again. Elasticsearch needs a split, shrink or reindex to change an index's primary shard count.`, why: `Too few slots limits growth and makes balance lumpy (64 slots over 10 nodes is 6 or 7 each); too many costs metadata, for example Redis nodes include a 16,384-bit (2 KB) slot bitmap in every heartbeat.` },
+      { term: `Hash tags: keeping keys together`, def: `Redis Cluster hashes only the part of a key inside braces, so <code>{user1000}.following</code> and <code>{user1000}.followers</code> land in the same slot.`, why: `Multi-key commands and transactions work only within one slot, so related keys are grouped on purpose. Over-using one tag recreates a hot slot.` },
       { term: `Where it's used`, def: `Cassandra and Dynamo-style stores, DynamoDB partition placement, distributed caches (memcached clients), CDNs choosing which edge caches an object, load balancers needing key affinity.`, why: `Anywhere data or requests must be spread over a changing set of servers.` },
       { term: `When to go deep`, def: `In product designs, "the database (Cassandra, DynamoDB) handles partitioning with consistent hashing" is enough. In infrastructure designs (distributed cache, database, message broker), explain the ring, virtual nodes, failures, hot spots and replication.`, why: `Recognize which kind of interview you're in.` }
     ],
@@ -229,6 +238,21 @@ p = 0.1%: N = 100 -> 9.5%` },
         [`Balance`, `Even`, `Uneven arcs`, `Close to even`],
         [`Lookup`, `O(1)`, `O(log V) binary search`, `O(log V)`]
       ] },
+      { title: `Hash ring vs fixed hash slots`, type: `table`, headers: [``, `Ring + virtual nodes`, `Fixed hash slots`], rows: [
+        [`Key to owner`, `hash(key), then the next position clockwise`, `hash(key) mod S gives the slot; the slot map gives the node`],
+        [`Ownership`, `Implied by random ring positions`, `An explicit table, one owner per slot`],
+        [`Adding a node`, `Takes small arcs from everyone (~1/N of keys)`, `Takes whole slots from everyone (~1/N of keys)`],
+        [`Lookup`, `Binary search, O(log V)`, `Array index, O(1)`],
+        [`Limits`, `Balance depends on the number of virtual nodes`, `At most S nodes; S is fixed for the life of the data`],
+        [`Used by`, `Cassandra, Dynamo-style stores, memcached clients`, `Redis Cluster, Aerospike, Couchbase, Hazelcast, Elasticsearch`]
+      ] },
+      { title: `Fixed slots in production`, type: `table`, headers: [`System`, `Slots`, `Key to slot`], rows: [
+        [`Redis Cluster`, `16,384 hash slots`, `CRC16(key) mod 16384; hash tags group keys`],
+        [`Aerospike`, `4,096 partitions per namespace`, `12 bits of the RIPEMD-160 digest of the key`],
+        [`Couchbase`, `1,024 vBuckets per bucket (Linux, Windows)`, `CRC32(key)`],
+        [`Hazelcast`, `271 partitions (default)`, `hash(serialized key) mod partition count`],
+        [`Elasticsearch`, `Primary shards, set when the index is created`, `hash(_routing) mod number of primary shards`]
+      ], note: `From each system's own documentation. Couchbase also offers 128 vBuckets with the Magma engine, and uses 64 on macOS.` },
       { title: `Ring lookup`, type: `code`, body: `ring = sorted([(hash(f"{node}-vn{i}"), node) for node in nodes for i in range(V)])
 
 def owner(key):
@@ -243,7 +267,8 @@ def replicas(key, r=3):                  # next r distinct physical nodes clockw
         `Ring: walk clockwise to the first node.`,
         `Virtual nodes for balance and graceful failure.`,
         `Hot keys need replication or salting, not just hashing.`,
-        `Replication makes failures cheap; data moves only on planned changes.`
+        `Replication makes failures cheap; data moves only on planned changes.`,
+        `Know the alternative: fixed hash slots (Redis Cluster, Aerospike, Couchbase) and when you'd pick them.`
       ] }
     ],
     interview: [
@@ -251,13 +276,15 @@ def replicas(key, r=3):                  # next r distinct physical nodes clockw
       { q: `Why use virtual nodes?`, a: `With one position per server, arcs are uneven by chance, so some servers own much more than others, and when a server fails its whole arc goes to one neighbour, doubling that neighbour's load. With many virtual positions per server, each server's share averages out close to 1/N, a failed server's keys spread across all survivors, a new server takes a little from everyone, and bigger machines can be given more positions.`, diff: `medium` },
       { q: `Does consistent hashing fix hot keys?`, a: `No. It spreads keys evenly, but one extremely popular key still maps to one node. Hot keys need replication of that key across nodes with reads load-balanced, key salting into several sub-keys, local caching, or adaptive rebalancing. Virtual nodes fix structural imbalance; those fix traffic imbalance.`, diff: `medium` },
       { q: `Design the partitioning for a distributed cache.`, a: `Clients (or a routing proxy) hash keys onto a ring of cache nodes with a hundred or so virtual nodes each, and look up the owner with a binary search over sorted positions. Adding a node moves about 1/N of keys, so the miss storm is small and spread out. For availability, replicate each key to the next distinct node or accept misses on failure, since a cache can refill from the database. Hot keys get replicated or locally cached. Membership comes from a config service or gossip.`, diff: `hard` },
-      { q: `Consistent hashing vs Redis Cluster's hash slots?`, a: `Redis Cluster hashes keys into 16,384 fixed slots and assigns slot ranges to nodes; rebalancing moves slots, and keys never change slot. It's like consistent hashing with many fixed virtual partitions: easy to reason about and inspect, with explicit coordination when moving slots. A ring with random virtual node positions needs less central assignment but is harder to reason about precisely.`, diff: `hard` }
+      { q: `Consistent hashing vs fixed hash slots: which would you pick?`, a: `Both move only about 1/N of the data when a node joins, because neither uses <code>mod N</code>. A ring places nodes at many random positions and a key belongs to the next position clockwise, so ownership is implied and needs little central coordination: Cassandra works this way. Fixed hash slots hash every key into a fixed number of slots (16,384 in Redis Cluster, 4,096 partitions per namespace in Aerospike, 1,024 vBuckets in Couchbase) and keep an explicit slot-to-node map, so ownership is easy to inspect, rebalancing moves whole slots that can be tracked and throttled, and clients route in one hop from a cached map. The costs are choosing the slot count up front, since it caps the cluster size and can't change without remapping every key, and needing something to agree on the map. For a new system I'd default to fixed slots for that operational clarity, and mention the ring as the classic alternative.`, diff: `hard` },
+      { q: `Walk through adding a node to a cluster that uses fixed hash slots.`, a: `The new node joins with no slots. The cluster plans a new map that gives it about 1/(N+1) of the slots, taken evenly from the existing nodes. Then each slot moves one at a time: the source keeps serving the slot while its keys copy across (Redis marks the slot MIGRATING on the source and IMPORTING on the target, and redirects requests for keys that already moved with ASK). When a slot's copy finishes, ownership flips in the map and clients that ask the old owner are told where it went (Redis's MOVED), so they refresh their cached map. Migrations are rate-limited so they don't starve live traffic, and replicas follow the same plan. Keys never change slot, so nothing is rehashed.`, diff: `hard` }
     ],
     labs: [`modVsRing`, `hashRing`]
   },
   // ------------------------------------------------------------------
   {
     id: `ch17`, part: 8, number: 17,
+    source: { title: `Hello Interview: CAP Theorem`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/cap-theorem` },
     title: `CAP theorem and consistency models`,
     overview: `CAP says a distributed system can't guarantee all of <strong>consistency</strong> (every read sees the latest write), <strong>availability</strong> (every request to a working node gets a response) and <strong>partition tolerance</strong> (it keeps working when the network splits). Partitions happen whatever you do, so the real question is: <strong>during a partition, do you return possibly stale data or refuse?</strong> Ask it early, during non-functional requirements, and answer it per feature: bookings and payments choose consistency, profiles and feeds choose availability. Beyond that binary sits a spectrum of consistency models.`,
     concepts: [
@@ -309,6 +336,7 @@ Writes need W reachable replicas; reads need R: a partition can block either.` }
   // ------------------------------------------------------------------
   {
     id: `ch18`, part: 9, number: 18,
+    source: { title: `Hello Interview: Numbers to Know`, url: `https://www.hellointerview.com/learn/system-design/core-concepts/numbers-to-know` },
     title: `Numbers to know and back-of-the-envelope estimation`,
     overview: `Scale decisions (cache or not, shard or not, one region or many) depend on knowing what modern hardware can do. Numbers from older books underestimate it by orders of magnitude and lead to over-engineered designs. Know a few <strong>latencies</strong> (memory, SSD, network within and across regions), <strong>capacities</strong> (RAM and disk per machine) and <strong>throughputs</strong> (requests per second for app servers, caches, databases and queues), and practise turning daily active users into requests per second, storage and bandwidth.`,
     concepts: [
