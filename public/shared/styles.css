@@ -84,10 +84,15 @@ p, li, td, th, .concept-def, .concept-why, .concept-example,
 
 /* Question color tags */
 .q { font-weight: 700; padding: 0 4px; border-radius: 4px; white-space: nowrap; }
-.q-what { color: var(--what); background: rgba(239,68,68,0.12); }
+/* Label text uses lighter (dark theme) or darker (light theme) shades than --what...--how to reach 4.5:1 contrast. */
+.q-what { color: #f87171; background: rgba(239,68,68,0.12); }
 .q-where { color: var(--where); background: rgba(234,179,8,0.14); }
 .q-when { color: var(--when); background: rgba(34,197,94,0.12); }
-.q-how { color: var(--how); background: rgba(59,130,246,0.14); }
+.q-how { color: #60a5fa; background: rgba(59,130,246,0.14); }
+body.light .q-what { color: #b91c1c; }
+body.light .q-where { color: #854d0e; }
+body.light .q-when { color: #166534; }
+body.light .q-how { color: #1d4ed8; }
 
 /* ============================================
    Top bar

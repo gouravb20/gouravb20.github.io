@@ -13,7 +13,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Data, labs, hub numbers and links
+          cache: npm
+      - run: npm ci
+      - name: Types (Astro pages, client script and every notes data file)
+        run: npx astro check
+      - name: Build
+        run: npm run build
+      - name: Data, labs, counts and links
         run: node scripts/check-site.mjs
-      - name: Types of the notes data
-        run: npx --yes --package typescript@5 tsc -p jsconfig.json
+      - name: Upload a preview of the built site (without the book PDFs)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-preview
+          path: |
+            dist
+            !dist/**/*.pdf
+          retention-days: 7

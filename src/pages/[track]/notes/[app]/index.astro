@@ -42,9 +42,13 @@ const structuredData = [
   <script slot="head" is:inline data-app-url={url(path)} data-chapters={chapters.map(c => c.id).join(" ")}>
     // Old single-page links (#/ch2/labs/someLab) now live on per-chapter pages.
     (function (d) {
-      var m = location.hash.match(/^#\/([\w-]+)(?:\/(\w+))?(?:\/([\w-]+))?/);
-      if (d && d.appUrl && d.chapters && m && d.chapters.split(" ").indexOf(m[1]) >= 0)
-        location.replace(d.appUrl + m[1] + "/" + (m[3] ? "#lab-" + m[3] : m[2] && m[2] !== "concepts" ? "#" + m[2] : ""));
+      function follow() {
+        var m = location.hash.match(/^#\/([\w-]+)(?:\/(\w+))?(?:\/([\w-]+))?/);
+        if (d && d.appUrl && d.chapters && m && d.chapters.split(" ").indexOf(m[1]) >= 0)
+          location.replace(d.appUrl + m[1] + "/" + (m[3] ? "#lab-" + m[3] : m[2] && m[2] !== "concepts" ? "#" + m[2] : ""));
+      }
+      follow();
+      window.addEventListener("hashchange", follow);
     })(document.currentScript && document.currentScript.dataset);
   </script>
 

@@ -1,12 +1,16 @@
 #!/usr/bin/env node
-// Checks the static site: every notes app's data and labs, the counts shown on the hubs and in README tables,
-// and every relative link. `node scripts/check-site.mjs` reports problems and exits 1; `--fix` rewrites stale counts.
+// Checks the site: every notes app's data and labs, the counts shown on the hubs and in README tables, and
+// every link in the built site. Run after `npm run build`.
+// `node scripts/check-site.mjs` reports problems and exits 1; `--fix` rewrites stale counts in the sources.
 import fs from "node:fs";
 import path from "node:path";
-import vm from "node:vm";
 import { fileURLToPath } from "node:url";
+import { findApps, loadApp } from "../src/lib/notes-source.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const PUBLIC = path.join(ROOT, "public");
+const DIST = path.join(ROOT, "dist");
+const BASE = "/system-design/";
 const FIX = process.argv.includes("--fix");
 const problems = [];
 const warnings = [];
@@ -20,28 +24,19 @@ function walk(dir, out = []) {
   }
   return out;
 }
-const FILES = walk(ROOT);
+const SOURCES = walk(PUBLIC);
 
 // ---------------------------------------------------------------- notes apps
 
 const BOOK_FIELDS = ["title", "subtitle", "storageKey", "appId", "exportPrefix", "pillarsTitle", "takeawaysTitle", "labsIntro"];
+/** App folder in public/ -> what the hubs need to know about it. */
 const apps = new Map();
 
-function loadApp(indexFile) {
-  const dir = path.dirname(indexFile);
-  const name = rel(dir);
-  const html = fs.readFileSync(indexFile, "utf8");
-  const scripts = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => path.resolve(dir, m[1]));
-  const ctx = vm.createContext({ console });
-  ctx.window = ctx;
-  for (const s of scripts) {
-    if (path.basename(s) === "app.js") continue;
-    if (!fs.existsSync(s)) continue;
-    try { vm.runInContext(fs.readFileSync(s, "utf8"), ctx, { filename: rel(s) }); }
-    catch (e) { problems.push(`${rel(s)}: throws while loading: ${e.message}`); }
-  }
-  const D = ctx.DATA, DEMOS = ctx.DEMOS || {};
-  if (!D || !Array.isArray(D.chapters)) { problems.push(`${name}: window.DATA.chapters is missing`); return; }
+for (const app of findApps(PUBLIC)) {
+  const name = rel(app.dir);
+  const { DATA: D, DEMOS, errors } = loadApp(app);
+  problems.push(...errors.map(e => `${name}: ${e}`));
+  if (!D || !Array.isArray(D.chapters)) { problems.push(`${name}: window.DATA.chapters is missing`); continue; }
 
   for (const f of BOOK_FIELDS) if (typeof D.book?.[f] !== "string" || !D.book[f]) problems.push(`${name}: DATA.book.${f} is missing`);
   for (const [id, d] of Object.entries(DEMOS)) {
@@ -66,10 +61,8 @@ function loadApp(indexFile) {
   }
   const unused = Object.keys(DEMOS).filter(id => !used.has(id));
   if (unused.length) warnings.push(`${name}: labs not listed in any chapter: ${unused.join(", ")}`);
-  apps.set(dir, { name, storageKey: D.book?.storageKey, counts });
+  apps.set(app.dir, { name, legacy: app.legacy, storageKey: D.book?.storageKey, counts });
 }
-
-for (const f of FILES) if (/[\\/]notes[\\/][^\\/]+[\\/]index\.html$/.test(f)) loadApp(f);
 
 const byKey = new Map();
 for (const a of apps.values()) {
@@ -78,7 +71,10 @@ for (const a of apps.values()) {
   byKey.set(a.storageKey, a.name);
 }
 
-// ---------------------------------------------------------------- hub numbers
+/** A link to an app may name its folder or the folder's index.html. */
+const appAt = target => apps.get(target.endsWith("index.html") ? path.dirname(target) : target.replace(/[\\/]$/, ""));
+
+// ---------------------------------------------------------------- counts on the hubs and in README tables
 
 const within = (dir, p) => p === dir || p.startsWith(dir + path.sep);
 const slideCount = file => (fs.readFileSync(file, "utf8").match(/<section[^>]*class="[^"]*\bslide\b/g) || []).length;
@@ -86,7 +82,7 @@ const bookCount = file => (fs.readFileSync(file, "utf8").match(/^\s*\{\s*id:\s*"
 
 function metric(name, dir) {
   if (name === "slides") {
-    return FILES.filter(f => within(dir, f) && /[\\/]slides[\\/][^\\/]+[\\/]index\.html$/.test(f)).reduce((s, f) => s + slideCount(f), 0);
+    return SOURCES.filter(f => within(dir, f) && /[\\/]slides[\\/][^\\/]+[\\/]index\.html$/.test(f)).reduce((s, f) => s + slideCount(f), 0);
   }
   if (name === "books") return bookCount(path.join(dir, "index.html"));
   if (name === "total") return metric("concepts", dir) + metric("qa", dir);
@@ -96,7 +92,7 @@ function metric(name, dir) {
 }
 
 let fixed = 0;
-for (const file of FILES.filter(f => f.endsWith(".html") && !apps.has(path.dirname(f)))) {
+for (const file of SOURCES.filter(f => f.endsWith(".html") && !apps.has(path.dirname(f)))) {
   const dir = path.dirname(file);
   const src = fs.readFileSync(file, "utf8");
   const line = i => src.slice(0, i).split("\n").length;
@@ -119,7 +115,7 @@ for (const file of FILES.filter(f => f.endsWith(".html") && !apps.has(path.dirna
     const key = (tag.match(/\bdata-key="([^"]+)"/) || [])[1];
     const total = (tag.match(/\bdata-total="(\d+)"/) || [])[1];
     if (!href || (!key && !total)) return tag;
-    const app = apps.get(path.dirname(path.resolve(dir, href)));
+    const app = appAt(path.resolve(dir, href));
     if (!app) { problems.push(`${rel(file)}:${line(i)}: card with data-key/data-total links to ${href}, which is not a notes app`); return tag; }
     if (key !== app.storageKey) problems.push(`${rel(file)}:${line(i)}: data-key="${key}" but ${app.name} saves progress under "${app.storageKey}"`);
     const want = check(i, `data-total for ${app.name}`, total, app.counts.concepts + app.counts.qa);
@@ -131,12 +127,13 @@ for (const file of FILES.filter(f => f.endsWith(".html") && !apps.has(path.dirna
 }
 
 // Markdown table rows that link a notes app end with: | chapters | concepts | labs | Q&A |, "-" for zero.
-for (const file of FILES.filter(f => f.endsWith(".md"))) {
+const MARKDOWN = fs.readdirSync(ROOT).filter(f => f.endsWith(".md")).map(f => path.join(ROOT, f));
+for (const file of MARKDOWN) {
   const src = fs.readFileSync(file, "utf8");
   const stale = [];
   const out = src.split("\n").map((row, n) => {
-    const link = row.match(/^\|.*\]\(([^)]*\/notes\/[^/)]+)\/index\.html\)/);
-    const app = link && apps.get(path.resolve(path.dirname(file), link[1]));
+    const link = row.match(/^\|.*\]\(([^)]*\/notes\/[^/)]+(?:\/index\.html|\/)?)\)/);
+    const app = link && appAt(path.resolve(path.dirname(file), link[1]));
     if (!app) return row;
     const cells = row.replace(/\r$/, "").split("|");
     const tail = cells.length - 5;
@@ -169,35 +166,47 @@ function existsExact(p) {
 }
 
 let linkCount = 0;
-function checkRef(file, ref, i, src) {
+/** `siteRoot` is where BASE-absolute links ("/system-design/...") resolve; null for files outside the site. */
+function checkRef(file, ref, i, src, siteRoot) {
   if (/^(?:[a-z]+:|\/\/|#)/i.test(ref) || ref.includes("${")) return;
   let target = ref.split("#")[0].split("?")[0];
   if (!target) return;
   try { target = decodeURIComponent(target); } catch { /* leave as written */ }
   linkCount++;
-  const full = path.resolve(path.dirname(file), target);
-  const ok = existsExact(full) || (target.endsWith("/") && existsExact(path.join(full, "index.html")));
-  if (!ok) problems.push(`${rel(file)}:${src.slice(0, i).split("\n").length}: broken link ${ref}`);
+  const where = `${rel(file)}:${src.slice(0, i).split("\n").length}`;
+  let full;
+  if (target.startsWith("/")) {
+    if (!siteRoot || !(target + "/").startsWith(BASE)) { problems.push(`${where}: link ${ref} is outside ${BASE}`); return; }
+    full = path.join(siteRoot, target.slice(BASE.length));
+  } else {
+    full = path.resolve(path.dirname(file), target);
+  }
+  const ok = existsExact(full) || ((target.endsWith("/") || !path.extname(target)) && existsExact(path.join(full, "index.html")));
+  if (!ok) problems.push(`${where}: broken link ${ref}`);
 }
 
-for (const file of FILES.filter(f => /\.(html|md)$/.test(f))) {
-  const src = fs.readFileSync(file, "utf8");
-  if (file.endsWith(".html")) {
-    for (const m of src.matchAll(/\b(?:href|src)="([^"]+)"/g)) checkRef(file, m[1], m.index, src);
+if (!fs.existsSync(path.join(DIST, "index.html"))) {
+  problems.push("dist/ is missing: run `npm run build` first so links in the built site can be checked");
+} else {
+  for (const file of walk(DIST).filter(f => f.endsWith(".html"))) {
+    const src = fs.readFileSync(file, "utf8");
+    for (const m of src.matchAll(/\b(?:href|src)="([^"]+)"/g)) checkRef(file, m[1], m.index, src, DIST);
     // Book library entries: { file: "ddia/....pdf", notes: "../notes/ddia/index.html" }
-    for (const m of src.matchAll(/\b(?:file|notes):\s*"([^"]+)"/g)) checkRef(file, m[1], m.index, src);
-  } else if (file.endsWith(".md")) {
-    for (const m of src.matchAll(/\]\(([^)\s]+)\)/g)) checkRef(file, m[1], m.index, src);
+    for (const m of src.matchAll(/\b(?:file|notes):\s*"([^"]+)"/g)) checkRef(file, m[1], m.index, src, DIST);
   }
+}
+for (const file of MARKDOWN) {
+  const src = fs.readFileSync(file, "utf8");
+  for (const m of src.matchAll(/\]\(([^)\s]+)\)/g)) checkRef(file, m[1], m.index, src, null);
 }
 
 // ---------------------------------------------------------------- report
 
 for (const a of apps.values()) {
   const c = a.counts;
-  console.log(`${a.name.padEnd(42)} ${String(c.chapters).padStart(3)} chapters ${String(c.concepts).padStart(4)} concepts ${String(c.labs).padStart(3)} labs ${String(c.qa).padStart(4)} Q&A`);
+  console.log(`${a.name.padEnd(49)} ${String(c.chapters).padStart(3)} chapters ${String(c.concepts).padStart(4)} concepts ${String(c.labs).padStart(3)} labs ${String(c.qa).padStart(4)} Q&A  ${a.legacy ? "single-page app" : "Astro pages"}`);
 }
-  console.log(`\n${apps.size} notes apps, ${linkCount} relative links checked${fixed ? `, ${fixed} count(s) fixed` : ""}.`);
+console.log(`\n${apps.size} notes apps, ${linkCount} links checked${fixed ? `, ${fixed} count(s) fixed` : ""}.`);
 for (const w of warnings) console.log(`warning: ${w}`);
 if (problems.length) {
   console.error(`\n${problems.length} problem(s):\n  ${problems.join("\n  ")}`);

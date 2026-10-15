@@ -2,11 +2,14 @@
   "name": "system-design",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro build && node scripts/check-site.mjs && tsc -p jsconfig.json"
+    "check": "astro check && astro build && node scripts/check-site.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.4",
