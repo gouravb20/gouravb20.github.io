@@ -1,7 +1,6 @@
 # Builds the Astro site and publishes it to GitHub Pages.
-# Requires Settings > Pages > Source = "GitHub Actions". While Pages still deploys from the main branch,
-# the deploy job fails and the branch build (which has no index.html at the repo root) would replace the site,
-# so switch the source before merging this workflow into main.
+# Requires Settings > Pages > Source = "GitHub Actions": publishing the branch itself would serve the repository
+# root, and the site lives in public/ and src/.
 name: Deploy to GitHub Pages
 
 on:
@@ -22,15 +21,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build
       - run: node scripts/check-site.mjs
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -42,4 +41,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

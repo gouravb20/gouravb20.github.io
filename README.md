@@ -131,7 +131,7 @@ All of it runs in CI on pull requests and pushes to `main` (`.github/workflows/c
 
 ## Deploying
 
-Pages is published by `.github/workflows/deploy.yml` on every push to `main`. It needs **Settings → Pages → Build and deployment → Source** set to **GitHub Actions** (or `gh api -X PUT repos/gouravb20/system-design/pages -f build_type=workflow`). Switch it before merging a branch that contains this workflow: while Pages still deploys straight from `main`, it would publish the repository as-is, and the site now lives in `public/`.
+Pages is published by `.github/workflows/deploy.yml` on every push to `main` (or run it by hand from the Actions tab). It relies on **Settings → Pages → Build and deployment → Source** being **GitHub Actions**; publishing the branch directly would serve the repository root, while the site lives in `public/` and `src/`.
 
 Search engines read `robots.txt` only at the domain root, so it lives in the [gouravb20.github.io](https://github.com/gouravb20/gouravb20.github.io) repository. It keeps crawlers off the book PDFs (`Disallow: /system-design/*.pdf$`).
 
