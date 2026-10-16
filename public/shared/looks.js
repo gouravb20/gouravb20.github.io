@@ -9,12 +9,13 @@
     brutalist: "https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,100,400;0,100,600;0,100,700;0,100,800;0,125,800;1,100,400&family=IBM+Plex+Mono:wght@400;500;700&display=swap",
     terminal: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700;800&display=swap",
   };
+  const DEFAULT_SKIN = "editorial";
   const SKINS = [
-    { id: "classic", name: "Classic", note: "Teal & slate (default)", sw: ["#0a0f1c", "#e2e8f0", "#14b8a6"] },
-    { id: "editorial", name: "Editorial", note: "Paper & ink textbook", sw: ["#f7f3ea", "#24211c", "#c2371d"] },
-    { id: "blueprint", name: "Blueprint", note: "Engineer's drafting sheet", sw: ["#0d2c56", "#e8f1fc", "#7fdcff"] },
+    { id: "editorial", name: "Editorial", note: "Paper and ink", sw: ["#f7f3ea", "#24211c", "#c2371d"] },
+    { id: "blueprint", name: "Blueprint", note: "Drafting sheet", sw: ["#0d2c56", "#e8f1fc", "#7fdcff"] },
     { id: "brutalist", name: "Swiss", note: "Bold poster type", sw: ["#f4f1e8", "#111111", "#ffd60a"] },
-    { id: "terminal", name: "Ops console", note: "tmux meets Grafana", sw: ["#0b0d0c", "#d3dbd5", "#4be38a"] },
+    { id: "terminal", name: "Ops console", note: "tmux and Grafana", sw: ["#0b0d0c", "#d3dbd5", "#4be38a"] },
+    { id: "classic", name: "Classic", note: "Teal and slate", sw: ["#0a0f1c", "#e2e8f0", "#14b8a6"] },
   ];
   const THEMES = [
     { id: "dark", name: "Dark", label: "☾ Dark" },
@@ -40,8 +41,8 @@
   // The site check evaluates this file in Node, which has no DOM.
   if (typeof document === "undefined") return;
 
-  let activeSkin = document.documentElement.getAttribute("data-skin") || read(SKIN_KEY, "classic");
-  if (!SKINS.some(s => s.id === activeSkin)) activeSkin = "classic";
+  let activeSkin = document.documentElement.getAttribute("data-skin") || read(SKIN_KEY, DEFAULT_SKIN);
+  if (!SKINS.some(s => s.id === activeSkin)) activeSkin = DEFAULT_SKIN;
   let themePref = read(THEME_KEY, "");
 
   function resolvedTheme() {
@@ -127,24 +128,35 @@
     applyTheme(order[(order.indexOf(cur) + 1) % order.length]);
   }
 
-  function optionsHtml() {
-    return SKINS.map(x => `
+  const APPEARANCE_ICON = `<svg class="look-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 2.8a9.2 9.2 0 0 0 0 18.4h1.15a2.15 2.15 0 0 0 1.55-3.66 2.15 2.15 0 0 1 1.55-3.66H18.2a1.9 1.9 0 0 0 1.9-1.9A9.2 9.2 0 0 0 12 2.8ZM7.15 11.2a1.35 1.35 0 1 1 0-2.7 1.35 1.35 0 0 1 0 2.7Zm3.15-3.35a1.35 1.35 0 1 1 0-2.7 1.35 1.35 0 0 1 0 2.7Zm4.15.15a1.35 1.35 0 1 1 0-2.7 1.35 1.35 0 0 1 0 2.7Zm1.55 3.35a1.35 1.35 0 1 1 0-2.7 1.35 1.35 0 0 1 0 2.7Z"/></svg>`;
+
+  function menuHtml() {
+    const pref = themePref || "auto";
+    const themes = THEMES.map(t => `
+      <button type="button" class="look-opt${t.id === pref ? " is-active" : ""}" data-theme="${t.id}" role="menuitemradio" aria-checked="${t.id === pref}">
+        <span class="look-txt"><b>${t.name}</b></span>
+        <span class="look-check" aria-hidden="true">✓</span>
+      </button>`).join("");
+    const looks = SKINS.map(x => `
       <button type="button" class="look-opt${x.id === activeSkin ? " is-active" : ""}" data-skin="${x.id}" role="menuitemradio" aria-checked="${x.id === activeSkin}">
         <span class="look-sw" aria-hidden="true">${x.sw.map(c => `<i style="background:${c}"></i>`).join("")}</span>
         <span class="look-txt"><b>${x.name}</b><small>${x.note}</small></span>
         <span class="look-check" aria-hidden="true">✓</span>
       </button>`).join("");
+    return `<div class="look-title">Mode</div>${themes}<div class="look-title look-split">Look</div>${looks}`;
   }
 
   function renderMenus() {
+    const html = menuHtml();
     const menu = document.getElementById("lookMenu");
     const list = document.getElementById("lookMenuMobile");
-    if (menu) menu.innerHTML = `<div class="look-title">Look</div>${optionsHtml()}<div class="look-foot">Dark, Light and Auto work in every look.</div>`;
-    if (list) list.innerHTML = optionsHtml();
+    if (menu) menu.innerHTML = html;
+    if (list) list.innerHTML = html;
     document.querySelectorAll(".look-opt").forEach(b => b.addEventListener("click", e => {
       e.stopPropagation();
       closeMenu();
-      applySkin(b.dataset.skin);
+      if (b.dataset.theme) applyTheme(b.dataset.theme);
+      else if (b.dataset.skin) applySkin(b.dataset.skin);
     }));
   }
 
@@ -180,6 +192,9 @@
       .look-txt small{font-size:12px;color:var(--text-muted,#94a3b8)}
       .look-check{color:var(--accent,#14b8a6);font-weight:800;visibility:hidden}
       .look-opt.is-active .look-check{visibility:visible}
+      .look-split{border-top:1px solid var(--border,#26324f);margin-top:4px;padding-top:8px}
+      .look-icon{display:block}
+      #themeToggle, #moreMenu [data-action="theme"]{display:none!important}
       .more-menu .look-list{display:grid;gap:2px}
       .more-sep{border-top:1px solid var(--border,#26324f);margin-top:4px;padding-top:10px}
     `;
@@ -197,12 +212,13 @@
     const btnClass = themeBtn.className || "iconbtn";
     themeBtn.insertAdjacentHTML("afterend", `
       <div class="look-wrap" id="lookWrap">
-        <button type="button" class="${btnClass}" id="lookToggle" aria-haspopup="true" aria-expanded="false" aria-controls="lookMenu" title="Change the look">◐ Look</button>
+        <button type="button" class="${btnClass}" id="lookToggle" aria-haspopup="true" aria-expanded="false" aria-controls="lookMenu" title="Appearance">${APPEARANCE_ICON}<span class="sr-only"> Appearance</span></button>
         <div class="look-menu" id="lookMenu" role="menu" aria-label="Look"></div>
       </div>`);
     const more = document.getElementById("moreMenu");
+    themeBtn.hidden = true;
     if (more && !document.getElementById("lookMenuMobile")) {
-      more.insertAdjacentHTML("beforeend", `<div class="more-sep">Look</div><div class="look-list" id="lookMenuMobile" role="group" aria-label="Look"></div>`);
+      more.insertAdjacentHTML("beforeend", `<div class="more-sep">Appearance</div><div class="look-list" id="lookMenuMobile" role="group" aria-label="Appearance"></div>`);
     }
     document.getElementById("lookToggle")?.addEventListener("click", e => {
       e.stopPropagation();
@@ -216,7 +232,7 @@
       themeBtn.dataset.sdLooksBound = "1";
       themeBtn.addEventListener("click", e => {
         // Notes apps bind their own handler; hubs rely on this.
-        if (themeBtn.closest(".topbar") && document.getElementById("exportBtn")) return;
+        if (themeBtn.closest(".topbar") && document.getElementById("resetBtn")) return;
         e.preventDefault();
         cycleTheme();
       });
@@ -226,20 +242,25 @@
 
   /** Early boot: set data-skin before paint when possible; call again after DOM for theme. */
   function boot() {
+    ensureLookStyles();
     const q = (location.search.match(/[?&]skin=([a-z0-9-]+)/) || [])[1];
-    const skin = q && SKINS.some(s => s.id === q) ? q : activeSkin;
-    if (skin && skin !== "classic") {
-      document.documentElement.setAttribute("data-skin", skin);
-      if (!document.getElementById("skinCss") && document.head) {
+    const saved = read(SKIN_KEY, DEFAULT_SKIN);
+    const skin = q && SKINS.some(s => s.id === q) ? q : (SKINS.some(s => s.id === saved) ? saved : DEFAULT_SKIN);
+    if (skin === "classic") document.documentElement.removeAttribute("data-skin");
+    else document.documentElement.setAttribute("data-skin", skin);
+    if (skin !== "classic" && !document.getElementById("skinCss") && document.head) {
+      const href = `${looksBase()}skins/${skin}.css`;
+      if (document.readyState === "loading") document.write(`<link rel="stylesheet" id="skinCss" href="${href}">`);
+      else {
         const link = document.createElement("link");
         link.rel = "stylesheet";
         link.id = "skinCss";
-        link.href = `${looksBase()}skins/${skin}.css`;
+        link.href = href;
         document.head.appendChild(link);
-        setFonts(skin);
       }
+      setFonts(skin);
     }
-    activeSkin = skin || "classic";
+    activeSkin = skin;
     if (!themePref) {
       // Prefer per-book theme from notes storage when present (back-compat).
       try {

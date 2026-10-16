@@ -19,7 +19,7 @@ interface SDLooksApi {
 }
 declare global { interface Window { DEMOS?: Record<string, Lab>; SDLooks?: SDLooksApi } }
 
-const TABS = ["learn", "concepts", "labs", "cheatsheet", "interview"] as const;
+const TABS = ["concepts", "learn", "labs", "interview", "cheatsheet"] as const;
 type Tab = (typeof TABS)[number];
 const isTab = (s: string): s is Tab => (TABS as readonly string[]).includes(s);
 
@@ -478,59 +478,10 @@ const toggleTheme = () => {
   applyTheme();
 };
 
-let toastTimer: number | undefined;
-function showToast(msg: string, isError = false) {
-  const t = byId("toast");
-  t.textContent = msg;
-  t.style.borderColor = isError ? "var(--bad)" : "var(--accent)";
-  t.style.opacity = "1";
-  clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => { t.style.opacity = "0"; }, 4500);
-}
-
-function doExport() {
-  const payload = { app: cfg.appId, version: 1, exportedAt: new Date().toISOString(), progress: state.progress, theme: state.theme };
-  const href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
-  const a = Object.assign(document.createElement("a"), { href, download: `${cfg.exportPrefix}-${new Date().toISOString().slice(0, 10)}.json` });
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(href);
-  showToast("Progress exported. Use Import on your other device.");
-}
-const pickImport = () => byId("importFile").click();
 function doReset() {
   if (!confirm("Reset all progress? This cannot be undone.")) return;
   state.progress = {}; save(); location.reload();
 }
-function handleImport(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-  file.text().then(text => {
-    try {
-      const data = JSON.parse(text);
-      if (!data || typeof data !== "object" || !data.progress) throw new Error("File doesn't look like a progress export.");
-      if (confirm("Import progress:\n\nOK = MERGE with current progress\nCancel = REPLACE current progress")) {
-        for (const [id, inc] of Object.entries<Partial<ChapterProgress>>(data.progress)) {
-          const cur = state.progress[id] || { conceptsLearned: {}, qaReviewed: {} };
-          cur.conceptsLearned = { ...cur.conceptsLearned, ...inc?.conceptsLearned };
-          cur.qaReviewed = { ...cur.qaReviewed, ...inc?.qaReviewed };
-          cur.sectionsRead = { ...cur.sectionsRead, ...inc?.sectionsRead };
-          state.progress[id] = cur;
-        }
-      } else {
-        state.progress = data.progress;
-      }
-      if (data.theme === "light" || data.theme === "dark") state.theme = data.theme;
-      save();
-      location.reload();
-    } catch (err) {
-      showToast(`Import failed: ${err instanceof Error ? err.message : err}`, true);
-    } finally {
-      input.value = "";
-    }
-  });
-}
-
 // ------------------------------------------------------------------ chrome: drawer, menus, keys
 
 const sidebar = byId("sidebar"), backdrop = byId("backdrop"), moreMenu = byId("moreMenu");
@@ -542,13 +493,10 @@ const closeMoreMenu = () => moreMenu.classList.remove("open");
 function initChrome() {
   byId("themeToggle").addEventListener("click", toggleTheme);
   byId("resetBtn").addEventListener("click", doReset);
-  byId("exportBtn").addEventListener("click", doExport);
-  byId("importBtn").addEventListener("click", pickImport);
-  byId("importFile").addEventListener("change", handleImport);
   byId("menuToggle").addEventListener("click", e => { e.stopPropagation(); sidebar.classList.contains("open") ? closeDrawer() : openDrawer(); });
   backdrop.addEventListener("click", closeDrawer);
   byId("moreToggle").addEventListener("click", e => { e.stopPropagation(); moreMenu.classList.toggle("open"); });
-  const actions: Record<string, () => void> = { export: doExport, import: pickImport, theme: toggleTheme, reset: doReset };
+  const actions: Record<string, () => void> = { theme: toggleTheme, reset: doReset };
   for (const b of $$("#moreMenu [data-action]")) b.addEventListener("click", e => { e.stopPropagation(); closeMoreMenu(); actions[b.dataset.action!]?.(); });
 
   const box = byId<HTMLInputElement>("searchBox"), results = byId("searchResults");

@@ -49,7 +49,7 @@ Every book gets the same app:
 - **All cheatsheets on one page**, with a print stylesheet for a compact black-on-white copy (or a PDF).
 - A **Continue** card on the dashboard that opens the first unfinished chapter, starting from the one you read last.
 - Full-text search (press `/`; every word must match, title hits rank first, <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd> pick a result), <kbd>j</kbd> / <kbd>k</kbd> for the next / previous chapter, light and dark themes, and a mobile layout.
-- Progress is saved in `localStorage`, separately for each book. **Export** and **Import** move it between devices. The hub page shows progress for every book.
+- Progress is saved in `localStorage`, separately for each book. The hub page shows progress for every book.
 - Bookmarkable chapters, tabs and labs. Astro-rendered apps use real URLs (`problem-breakdowns/ch2/#lab-servingStrategy`, `problem-breakdowns/glossary/`); single-page apps use hash routes (`#/ch3/labs/btree`, `#/glossary`, `#/cheatsheet`). When an app moves to Astro, its old hash links redirect to the new pages and saved progress carries over.
 - Astro-rendered apps also get per-page titles, descriptions, canonical URLs, Open Graph tags, structured data (Course, LearningResource, BreadcrumbList) and a sitemap. Their content is in the HTML, so it reads fine without JavaScript; only labs and progress tracking need it.
 

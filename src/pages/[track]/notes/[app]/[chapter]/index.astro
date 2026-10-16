@@ -33,7 +33,7 @@ const deepHtml = deep
   ? deepRenderer(path.join(process.cwd(), "public")).render(deep, { sectionHref: (id: string) => `#learn-${id}`, labInfo: (id: string) => notes.labInfo[id] })
   : "";
 const deepLabs = deep ? deep.sections.some(s => s.blocks.some(b => b.type === "lab")) : false;
-const firstTab = deep ? "learn" : "concepts";
+const firstTab = "concepts";
 
 const pagePath = chapterPath(notes, ch);
 const bookTitle = plain(book.title);
@@ -77,18 +77,12 @@ const structuredData = [
   </div>
 
   <nav class="tabs" aria-label="Chapter sections" data-first-tab={firstTab}>
-    {deep && <a class="tab learn-tab active" href="#learn" data-tab="learn">Deep Dive <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
-    <a class={`tab${deep ? "" : " active"}`} href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
+    <a class="tab active" href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
+    {deep && <a class="tab learn-tab" href="#learn" data-tab="learn">Deep Dive <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
     <a class="tab labs-tab" href="#labs" data-tab="labs">&#9654; Interactive Labs <span class="tab-count">{ch.labs.length}</span></a>
-    <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>
     <a class="tab" href="#interview" data-tab="interview">Interview Q&amp;A <span class="tab-count" data-tab-count="interview">0/{ch.interview.length}</span></a>
+    <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>
   </nav>
-
-  {deep && (
-    <section id="learn" data-panel="learn">
-      <Fragment set:html={deepHtml} />
-    </section>
-  )}
 
   <section id="concepts" data-panel="concepts">
     <h2 class="sr-only">Core concepts</h2>
@@ -121,6 +115,12 @@ const structuredData = [
     <div class="empty-tab filter-empty" id="conceptEmpty" hidden></div>
   </section>
 
+  {deep && (
+    <section id="learn" data-panel="learn">
+      <Fragment set:html={deepHtml} />
+    </section>
+  )}
+
   <section id="labs" data-panel="labs">
     <h2 class="sr-only">Interactive labs</h2>
     {ch.labs.length === 0 ? (
@@ -137,25 +137,6 @@ const structuredData = [
         ))}
       </>
     )}
-  </section>
-
-  <section id="cheatsheet" data-panel="cheatsheet">
-    <h2 class="sr-only">Cheatsheet</h2>
-    <div class="cheatsheet-actions"><a class="iconbtn" href={url(`${appPath(notes)}cheatsheet/`)}>&#8801; All chapters, printable</a></div>
-    {ch.cheatsheet.map(cs => (
-      <div class="cheatsheet-block">
-        <h3 set:html={cs.title} />
-        {cs.type === "table" && (
-          <table>
-            <thead><tr>{cs.headers.map(h => <th set:html={h} />)}</tr></thead>
-            <tbody>{cs.rows.map(r => <tr>{r.map(c => <td set:html={String(c)} />)}</tr>)}</tbody>
-          </table>
-        )}
-        {cs.type === "list" && <ul>{cs.items.map(it => <li set:html={it} />)}</ul>}
-        {cs.type === "code" && <pre><code>{cs.body}</code></pre>}
-        {cs.note && <div class="cs-note" set:html={cs.note} />}
-      </div>
-    ))}
   </section>
 
   <section id="interview" data-panel="interview">
@@ -183,6 +164,25 @@ const structuredData = [
       </div>
     ))}
     <div class="empty-tab filter-empty" id="qaEmpty" hidden>No questions left with these filters.</div>
+  </section>
+
+  <section id="cheatsheet" data-panel="cheatsheet">
+    <h2 class="sr-only">Cheatsheet</h2>
+    <div class="cheatsheet-actions"><a class="iconbtn" href={url(`${appPath(notes)}cheatsheet/`)}>&#8801; All chapters, printable</a></div>
+    {ch.cheatsheet.map(cs => (
+      <div class="cheatsheet-block">
+        <h3 set:html={cs.title} />
+        {cs.type === "table" && (
+          <table>
+            <thead><tr>{cs.headers.map(h => <th set:html={h} />)}</tr></thead>
+            <tbody>{cs.rows.map(r => <tr>{r.map(c => <td set:html={String(c)} />)}</tr>)}</tbody>
+          </table>
+        )}
+        {cs.type === "list" && <ul>{cs.items.map(it => <li set:html={it} />)}</ul>}
+        {cs.type === "code" && <pre><code>{cs.body}</code></pre>}
+        {cs.note && <div class="cs-note" set:html={cs.note} />}
+      </div>
+    ))}
   </section>
 
   <nav class="chapter-footer" aria-label="Chapters">

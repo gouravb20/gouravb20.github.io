@@ -1,5 +1,5 @@
 ---
-import { SITE_NAME, TRACKS, appPath, chapterPath, jsonLd, plain, sortedParts, url, type Notes } from "../lib/site";
+import { SITE_NAME, appPath, chapterPath, jsonLd, plain, sortedParts, url, type Notes } from "../lib/site";
 
 interface Props {
   notes: Notes;
@@ -43,8 +43,12 @@ const ring = 2 * Math.PI * 8;
   <script is:inline>
     (function () {
       try {
+        var known = ["editorial", "blueprint", "brutalist", "terminal", "classic"];
         var s = localStorage.getItem("system_design_skin");
-        if (s && s !== "classic") document.documentElement.setAttribute("data-skin", s);
+        if (known.indexOf(s) < 0) s = "editorial";
+        if (s === "classic") return;
+        document.documentElement.setAttribute("data-skin", s);
+        document.write('<link rel="stylesheet" id="skinCss" href="' + {JSON.stringify(url("shared/skins/"))} + s + '.css">');
       } catch (e) {}
     })();
   </script>
@@ -55,7 +59,6 @@ const ring = 2 * Math.PI * 8;
 <body
   data-storage-key={book.storageKey}
   data-app-id={book.appId}
-  data-export-prefix={book.exportPrefix}
   data-search-url={url(`${appPath(notes)}search.json`)}
   data-chapter={chapter ?? ""}
 >
@@ -68,7 +71,7 @@ const ring = 2 * Math.PI * 8;
 
   <header class="topbar">
     <button class="menu-toggle" id="menuToggle" aria-label="Open chapters menu" title="Chapters">&#9776;</button>
-    <a class="iconbtn home-btn" href={url(`${notes.track}/index.html`)} title={`${TRACKS[notes.track] ?? "All"} notes (home)`} aria-label="Home">&#8962;<span> Home</span></a>
+    <a class="iconbtn home-btn" href={url("")} title="Home" aria-label="Home"><span class="site-mark" aria-hidden="true">L</span><span> Home</span></a>
 
     <a class="brand" href={url(appPath(notes))}>
       <div class="logo">{book.mono ?? brand.slice(0, 2).toUpperCase()}</div>
@@ -88,17 +91,12 @@ const ring = 2 * Math.PI * 8;
       <div class="search-results" id="searchResults"></div>
     </div>
 
-    <button class="iconbtn" id="exportBtn" title="Export your progress to a file">&#11015; Export</button>
-    <button class="iconbtn" id="importBtn" title="Import progress from a file">&#11014; Import</button>
-    <input type="file" id="importFile" accept="application/json,.json" style="display:none">
     <button class="iconbtn" id="themeToggle" title="Toggle theme">Light</button>
     <button class="iconbtn" id="resetBtn" title="Reset all progress">Reset</button>
 
     <div class="more-wrap">
       <button class="more-toggle" id="moreToggle" aria-label="More actions" title="More">&#8943;</button>
       <div class="more-menu" id="moreMenu">
-        <button class="iconbtn" data-action="export">&#11015; Export progress</button>
-        <button class="iconbtn" data-action="import">&#11014; Import progress</button>
         <button class="iconbtn" data-action="theme">&#9728; Toggle theme</button>
         <button class="iconbtn" data-action="reset">&#10227; Reset progress</button>
       </div>

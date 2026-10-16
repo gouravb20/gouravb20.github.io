@@ -57,7 +57,7 @@
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; white-space: nowrap; }
     .brand-mark {
       width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none;
-      background: linear-gradient(135deg, #38bdf8, #14b8a6 50%, #a78bfa); color: #0a0f1c; font-size: 13px; font-weight: 800;
+      background: #dc2626; color: #fff; font-size: 15px; font-weight: 800;
     }
     .spacer { flex: 1; }
     .reader-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 14px; }
@@ -114,8 +114,8 @@
 <link rel="icon" href="../../favicon.svg" type="image/svg+xml"></head>
 <body>
   <header class="topbar">
-    <a class="btn" href="../index.html" title="All books (home)" aria-label="Home">&#8962;<span class="hide-sm"> Home</span></a>
-    <a class="brand" href="#" id="libraryLink" title="Library"><div class="brand-mark">SD</div><span class="hide-sm">Library</span></a>
+    <a class="btn" href="../../index.html" title="Home" aria-label="Home"><span class="brand-mark" aria-hidden="true">L</span><span class="hide-sm"> Home</span></a>
+    <a class="brand" href="#" id="libraryLink" title="Library">Library</a>
     <span class="reader-title" id="readerTitle" hidden></span>
     <div class="spacer"></div>
     <select class="btn" id="bookSelect" aria-label="Choose a book" hidden></select>

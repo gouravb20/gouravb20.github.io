@@ -987,7 +987,14 @@ body.light .lab-panel { background: #fbfcfe; }
   .gl-item { padding: 3pt 0; break-inside: avoid; }
 }
 
-.home-btn { text-decoration: none; display: inline-flex; align-items: center; gap: 2px; font-size: 14px; line-height: 1.1; }
+.home-btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; line-height: 1.1; }
+.site-mark {
+  display: inline-grid; place-items: center; flex: none;
+  width: 22px; height: 22px; border-radius: 6px;
+  background: #dc2626; color: #fff;
+  font-weight: 800; font-size: 14px; line-height: 1;
+}
+.iconbtn:hover .site-mark { background: #dc2626; color: #fff; }
 @media (min-width: 769px) {
   .search-wrap { min-width: 0; flex: 0 1 300px; }
   .search-box { width: 100%; }

@@ -6,8 +6,8 @@
 const BOOK = DATA.book;
 const STORAGE_KEY = BOOK.storageKey;
 const MOBILE_BREAKPOINT = 768;
-const TABS = ["learn", "concepts", "labs", "cheatsheet", "interview"];
-const DEFAULT_TAB = "learn";
+const TABS = ["concepts", "learn", "labs", "interview", "cheatsheet"];
+const DEFAULT_TAB = "concepts";
 // Book-wide pages, routed as #/glossary and #/cheatsheet alongside the chapters
 const VIEWS = { glossary: "Glossary", cheatsheet: "All cheatsheets" };
 
@@ -221,11 +221,11 @@ function renderMain() {
       ${ch.source ? `<div class="chapter-source">Reference: <a href="${ch.source.url}" target="_blank" rel="noopener">${ch.source.title}</a> &#8599;</div>` : ""}
     </div>
     <div class="tabs">
-      ${tabBtn("learn", "Deep Dive", learnCount, "learn-tab")}
       ${tabBtn("concepts", "Core Concepts", `${doneC}/${ch.concepts.length}`)}
+      ${deep ? tabBtn("learn", "Deep Dive", learnCount, "learn-tab") : ""}
       ${tabBtn("labs", "&#9654; Interactive Labs", ch.labs.length, "labs-tab")}
-      ${tabBtn("cheatsheet", "Cheatsheet", ch.cheatsheet.length)}
       ${tabBtn("interview", "Interview Q&amp;A", `${doneQ}/${ch.interview.length}`)}
+      ${tabBtn("cheatsheet", "Cheatsheet", ch.cheatsheet.length)}
     </div>
     <div id="tabBody">${body}</div>
     <div class="chapter-footer">
@@ -599,9 +599,9 @@ function renderDashboard(m) {
     }).join("")}</div>
     <div class="chapter-footer" style="margin-top:30px;">
       <div style="color:var(--text-muted);font-size:13px;">
-        <strong>How to use:</strong> every chapter opens with a Deep Dive that explains the ideas step by step, with diagrams, real-world examples and quick self-checks. Then come Core Concepts, Interactive Labs, a Cheatsheet and Interview Q&amp;A. To test yourself, hide the definitions on the Concepts tab, or try each interview question before opening its answer.
+        <strong>How to use:</strong> every chapter opens on Core Concepts. Deep Dive explains the ideas step by step, with diagrams, real-world examples and quick self-checks, then come Interactive Labs, Interview Q&amp;A and a Cheatsheet. To test yourself, hide the definitions on the Concepts tab, or try each interview question before opening its answer.
         Concept cards with a <span style="color:var(--accent-3)">&#9654; See it live</span> button jump straight to the lab that demonstrates them.
-        Progress is saved in this browser; use <strong>Export</strong> and <strong>Import</strong> to move it between devices.
+        Progress is saved in this browser.
         Keys: <kbd>/</kbd> search (<kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Enter</kbd> to pick a result), <kbd>j</kbd> / <kbd>k</kbd> next / previous chapter.
       </div>
     </div>`;
@@ -810,20 +810,8 @@ function moveSearchSelection(delta) {
 }
 
 // ============================================================
-// Export / import / theme / reset
+// Theme / reset
 // ============================================================
-function doExport() {
-  const payload = { app: BOOK.appId, version: 1, exportedAt: new Date().toISOString(), progress: state.progress, theme: state.theme };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${BOOK.exportPrefix}-${new Date().toISOString().slice(0, 10)}.json`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast("Progress exported. Use Import on your other device.");
-}
-function doImportPick() { document.getElementById("importFile").click(); }
 function doToggleTheme() {
   if (window.SDLooks) {
     window.SDLooks.cycleTheme();
@@ -838,39 +826,6 @@ function doToggleTheme() {
 function doReset() {
   if (confirm("Reset all progress? This cannot be undone.")) { state.progress = {}; saveState(); render(); }
 }
-function handleImport(e) {
-  const file = e.target.files && e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      const data = JSON.parse(ev.target.result);
-      if (!data || typeof data !== "object" || !data.progress) throw new Error("File doesn't look like a progress export.");
-      const merge = confirm("Import progress:\n\nOK = MERGE with current progress\nCancel = REPLACE current progress");
-      if (merge) {
-        Object.keys(data.progress).forEach(chId => {
-          const cur = state.progress[chId] || { conceptsLearned: {}, qaReviewed: {} };
-          const inc = data.progress[chId] || {};
-          cur.conceptsLearned = Object.assign({}, cur.conceptsLearned, inc.conceptsLearned);
-          cur.qaReviewed = Object.assign({}, cur.qaReviewed, inc.qaReviewed);
-          cur.sectionsRead = Object.assign({}, cur.sectionsRead, inc.sectionsRead);
-          state.progress[chId] = cur;
-        });
-      } else {
-        state.progress = data.progress;
-      }
-      if (data.theme) { state.theme = data.theme; applyTheme(); }
-      saveState(); render();
-      showToast("Progress imported.");
-    } catch (err) {
-      showToast("Import failed: " + err.message, true);
-    } finally {
-      e.target.value = "";
-    }
-  };
-  reader.readAsText(file);
-}
-
 // ============================================================
 // Top level
 // ============================================================
@@ -893,9 +848,6 @@ function init() {
 
   document.getElementById("themeToggle").addEventListener("click", doToggleTheme);
   document.getElementById("resetBtn").addEventListener("click", doReset);
-  document.getElementById("exportBtn").addEventListener("click", doExport);
-  document.getElementById("importBtn").addEventListener("click", doImportPick);
-  document.getElementById("importFile").addEventListener("change", handleImport);
   document.getElementById("menuToggle").addEventListener("click", e => {
     e.stopPropagation();
     sidebarEl().classList.contains("open") ? closeDrawer() : openDrawer();
@@ -904,7 +856,7 @@ function init() {
   document.getElementById("moreToggle").addEventListener("click", e => { e.stopPropagation(); document.getElementById("moreMenu").classList.toggle("open"); });
   document.querySelectorAll("#moreMenu [data-action]").forEach(b => b.addEventListener("click", e => {
     e.stopPropagation(); closeMoreMenu();
-    ({ export: doExport, import: doImportPick, theme: doToggleTheme, reset: doReset })[b.dataset.action]();
+    ({ theme: doToggleTheme, reset: doReset })[b.dataset.action]();
   }));
 
   const sb = document.getElementById("searchBox");

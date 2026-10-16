@@ -150,6 +150,11 @@
   }
   .hud-btn:hover, #theme-toggle:hover, #home-link:hover { border-color: var(--accent); color: var(--accent); }
   #home-link { position: fixed; top: calc(14px + env(safe-area-inset-top,0px)); right: 62px; z-index: 50; text-decoration: none; font-size: 19px; }
+  #home-link .site-mark {
+    width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center;
+    background: #dc2626; color: #fff; font-weight: 800; font-size: 14px; line-height: 1;
+  }
+  #home-link:hover .site-mark { color: #fff; }
   #counter { font-family: var(--mono); font-size: .8rem; color: var(--muted);
     background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
     padding: 0 10px; height: 38px; display: grid; place-items: center; min-width: 58px; box-shadow: var(--shadow);}
@@ -281,7 +286,7 @@
 </style>
 
 <div id="progress"></div>
-<a id="home-link" href="../../index.html" aria-label="Home" title="All books (home)">&#8962;</a>
+<a id="home-link" href="../../../index.html" aria-label="Home" title="Home"><span class="site-mark">L</span></a>
 <button id="theme-toggle" aria-label="Toggle light / dark theme" title="Toggle theme">◐</button>
 
 <main id="deck">
