@@ -1,6 +1,6 @@
-# Builds the Astro site and publishes it to GitHub Pages.
-# Requires Settings > Pages > Source = "GitHub Actions": publishing the branch itself would serve the repository
-# root, and the site lives in public/ and src/.
+# Builds the user site and publishes it to GitHub Pages.
+# Requires Settings > Pages > Source = "GitHub Actions".
+# home/ is the portfolio at https://gouravb20.github.io/. The notes build is nested under /learn/.
 name: Deploy to GitHub Pages
 
 on:
@@ -29,9 +29,10 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: node scripts/check-site.mjs
+      - run: node scripts/assemble-site.mjs
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: dist
+          path: site
 
   deploy:
     needs: build

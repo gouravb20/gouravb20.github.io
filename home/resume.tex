@@ -1,0 +1,184 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[a4paper, left=1.3cm, right=1.3cm, top=1.0cm, bottom=1.0cm]{geometry}
+\usepackage[protrusion=true, expansion=true]{microtype}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\hypersetup{
+    pdftitle={Gourav Bansal - Resume},
+    pdfauthor={Gourav Bansal}
+}
+
+% ATS text layer (pdfLaTeX): map glyphs and ligatures to Unicode and emit real spaces between words
+\ifdefined\pdfgentounicode
+    \input{glyphtounicode}
+    \pdfgentounicode=1
+\fi
+\ifdefined\pdfinterwordspaceon
+    \pdfinterwordspaceon
+\fi
+
+% No hyphenation, so keywords are never split across lines
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+\emergencystretch=3em
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+
+% Sections formatting
+\titleformat{\section}{\large\scshape\raggedright}{}{0em}{}[\titlerule]
+\titlespacing*{\section}{0pt}{4pt}{3pt}
+
+
+%-------------------------
+% Custom commands
+
+\newcommand{\resumeExp}[4]{
+    \item
+    {\normalsize\textbf{#1}} \hfill #3 \\
+    \textit{#2} \hfill \textit{#4}
+}
+
+\newcommand{\resumeProject}[4]{\resumeExp{#1}{#2}{#3}{#4}}
+
+\newcommand{\resumeEdu}[4]{\resumeExp{#1}{#2}{#3}{#4}}
+
+\newcommand{\resumeAchievement}[1]{
+    \item[$\bullet$] #1
+}
+
+\newcommand{\resumeSkill}[2]{
+    \item \textbf{#1} #2
+}
+
+\newcommand{\resumeSectionStart}[1]{
+    \section{#1}
+}
+
+\newcommand{\resumeSectionEnd}{}
+
+\newcommand{\resumeSubSectionListStart}{\begin{itemize}[leftmargin=0pt, label={}, itemsep=1pt, topsep=0pt, parsep=0pt, partopsep=0pt]\small}
+\newcommand{\resumeSubSectionListEnd}{\end{itemize}}
+
+\newcommand{\resumeItemListStart}{\begin{itemize}[leftmargin=1.4em, labelsep=0.5em, itemsep=1pt, topsep=1pt, parsep=0pt, partopsep=0pt]\small}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{3pt}}
+
+
+\newcommand{\location}{Gurugram, India}
+\newcommand{\phone}{+91-7428536322}
+\newcommand{\gmail}{imgouravfr@gmail.com}
+\newcommand{\gmailLink}{mailto:\gmail}
+\newcommand{\githubLink}{https://github.com/gouravb20}
+\newcommand{\linkedinLink}{https://www.linkedin.com/in/gouravb20}
+\newcommand{\leetcodeLink}{https://leetcode.com/u/gouravb20}
+\newcommand{\qdrantPrLink}{https://github.com/qdrant/qdrant/pull/10862}
+
+% Visible link text, so parsers that ignore hyperlinks still read the URLs
+\newcommand{\githubText}{github.com/gouravb20}
+\newcommand{\linkedinText}{linkedin.com/in/gouravb20}
+\newcommand{\leetcodeText}{leetcode.com/u/gouravb20}
+
+
+%---- End of Packages and Functions ------
+
+%-------------------------------------------
+%%%%%%  CV STARTS HERE  %%%%%%%%%%%
+\begin{document}
+
+
+%----------HEADER-----------------
+\begin{center}
+    {\LARGE\textbf{Gourav Bansal}} \\[3pt]
+    \small
+    \location{} |
+    \phone{} |
+    \href{\gmailLink}{\gmail} \\
+    \href{\linkedinLink}{\linkedinText} |
+    \href{\githubLink}{\githubText} |
+    \href{\leetcodeLink}{\leetcodeText}
+\end{center}
+\vspace{-10pt}
+
+
+
+% ------------BODY---------------
+
+\resumeSectionStart{Work Experience}
+\resumeSubSectionListStart
+\resumeExp
+{Payoneer}
+{Software Engineer II}
+{May 2026 - Present}
+{Gurugram, India}
+\resumeItemListStart
+\item[$\bullet$] Built Apache Beam pipelines on Dataflow (GCP) that join, validate and transform data from multiple SQL Server CDC streams over Kafka and Parquet snapshots, with batch jobs processing \textbf{100M+ records} into unified datasets stored in Bigtable.
+\item[$\bullet$] Owned the \textbf{Bigtable} schema redesign, using row-key prefix scans to join related records and eliminating read-before-write operations. The design improved write throughput, untangled Beam pipelines, removed Pub/Sub from batch mode, and reduced batch runtimes from \textbf{2 days to 8 hours}.
+\item[$\bullet$] Developed ASP.NET REST APIs to deliver processed datasets to an external partner; modernized and validated two existing services by migrating them from \textbf{.NET Core 3.1 to .NET 10}.
+\item[$\bullet$] Deployed a new \textbf{Shadow Mode Comparator} service to Kubernetes using Helm charts and Argo CD, mirroring requests to new infrastructure and logging response differences against the legacy system through a custom comparison plugin. Managed secrets from Akeyless Vault using the External Secrets Operator.
+\resumeItemListEnd
+
+\resumeExp
+{MakeMyTrip}
+{Software Engineer II}
+{Jul 2025 - Apr 2026}
+{Gurugram, India}
+\resumeItemListStart
+\item[$\bullet$] Part of the team that built \textbf{Myra}, MakeMyTrip's AI agent chatbot; owned the design and development of its low-latency Hotel Search API (also powering the hotel search bar), combining vector similarity search and knowledge-graph traversal. Indexed hotel aspects in a vector store for semantic retrieval and modeled hotel--aspect relationships in a graph database, delivering \textbf{sub-100 ms} end-to-end latency.
+\item[$\bullet$] Reduced p99 latency through in-service embedding inference, parallelized Neo4j queries, and Aerospike caching that serves hotel highlights \textbf{under 20 ms}; improved startup and deployment with Java 21 (ZGC, virtual threads) and multi-stage Docker builds.
+\item[$\bullet$] Mentored junior developers on combining Elasticsearch with vector search to improve semantic retrieval, and on using embeddings and clustering to group related phrases into a taxonomy for the knowledge graph. Influenced the choice of embedding model by benchmarking small models to balance speed and accuracy.
+\resumeItemListEnd
+
+\resumeExp
+{MakeMyTrip}
+{Software Engineer}
+{Jan 2023 - Jun 2025}
+{Gurugram, India}
+\resumeItemListStart
+\item[$\bullet$] Owned end-to-end development of a Java/Spring Boot Pricing Analytics microservice ingesting millions of pricing events daily and serving latency-sensitive queries. Optimized schema design, partitioning, and sort keys on distributed ClickHouse to achieve \textbf{18 ms} query latency without any caching layer, enabling real-time price-drop insights that drove \textbf{8\% higher booking conversions}.
+\item[$\bullet$] Developed an event-driven cache invalidation service to keep pricing consistent with real-time inventory, with rate limiting and failure isolation to protect downstream caches under burst traffic.
+\item[$\bullet$] Designed an optimized 4-D dynamic programming Room Combination algorithm, resulting in \textbf{32\% growth} in 2+ room bookings.
+\item[$\bullet$] Contributed to re-architecture of Hotels-Pricing-System, migrating to gRPC APIs and reducing latency from \textbf{1 second to under 100 ms}; redesigned its integration testing framework, reducing feedback time from \textbf{40 minutes to 2 minutes}, adopted across teams.
+\resumeItemListEnd
+\resumeSubSectionListEnd
+\resumeSectionEnd
+
+
+\resumeSectionStart{Technical Skills}
+\resumeSubSectionListStart
+\resumeSkill{Programming Languages:}{Java, C\#, Python, JavaScript}
+\resumeSkill{Frameworks:}{Spring Boot, ASP.NET, gRPC, REST, Microservices, Apache Beam, Spark, Airflow}
+\resumeSkill{Databases:}{Bigtable, ClickHouse, Aerospike, Neo4j, Qdrant, SQL Server}
+\resumeSkill{Messaging \& Data Formats:}{Kafka, Pub/Sub, Parquet}
+\resumeSkill{Cloud \& Tooling:}{GCP (Dataflow), AWS, Docker, Kubernetes, Helm, Argo CD, Linux, Git}
+\resumeSubSectionListEnd
+\resumeSectionEnd
+
+
+\resumeSectionStart{Education}
+\resumeSubSectionListStart
+\resumeEdu
+{National Institute of Technology (NIT), Delhi}
+{B.Tech. Computer Science and Engineering | CGPA: 7.87}
+{Jul 2019 - Jun 2023}
+{}
+\resumeSubSectionListEnd
+\resumeSectionEnd
+
+
+\resumeSectionStart{Achievements}
+\resumeItemListStart
+\resumeAchievement{Open-source contributor to \textbf{Qdrant} (vector database): merged \href{\qdrantPrLink}{\underline{PR \#10862}} fixing silently empty full-text indexes via validation across REST and gRPC.}
+\resumeAchievement{Ranked in the \textbf{top 5\%} of LeetCode users globally (2000+ rating, Knight Badge), solving 800+ algorithmic problems.}
+\resumeAchievement{Achieved \textbf{AIR 10,300} in JEE-Mains among 1.2M+ candidates.}
+\resumeAchievement{Received \textbf{Super Tripper of the Month} and \textbf{Dream Team Award (Hotels-AI)} at MakeMyTrip.}
+\resumeItemListEnd
+\resumeSectionEnd
+
+
+\end{document}

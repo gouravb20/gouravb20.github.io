@@ -1,6 +1,6 @@
 # System Design · Interactive Notes
 
-Interactive system design study notes in four sections, published at [gouravb20.github.io/learn](https://gouravb20.github.io/learn/). A hamburger menu at the top left of every hub page opens a panel with all four:
+Interactive system design study notes in four sections, published at [gouravb20.github.io/learn](https://gouravb20.github.io/learn/). This repository is [gouravb20/gouravb20.github.io](https://github.com/gouravb20/gouravb20.github.io). It also publishes the portfolio at the domain root from [`home/`](home/) (homepage, résumé, and `robots.txt`). A hamburger menu at the top left of every hub page opens a panel with all four:
 
 - [`high-level-design/`](public/high-level-design/index.html): chapter-wise notes for the system design core concepts, the advanced topics and worked problem breakdowns.
 - [`low-level-design/`](public/low-level-design/index.html): notes on the building blocks of well-designed programs. Coming soon.
@@ -64,11 +64,11 @@ Requires Node.js 22.12 or later.
 ```sh
 npm install
 npm run dev        # http://localhost:4321/learn/ (rebuilds as you edit)
-npm run build      # writes the site to dist/
-npm run preview    # serves dist/ exactly as GitHub Pages will
+npm run build      # writes the notes to dist/; the deploy then nests them under /learn/
+npm run preview    # serves the notes at /learn/, as on GitHub Pages
 ```
 
-Every URL lives under `/learn/`, as on GitHub Pages, so the dev server's bare `http://localhost:4321/` is a 404.
+The dev server only mounts the notes, so `http://localhost:4321/` is a 404. Open `http://localhost:4321/learn/`. The portfolio pages in `home/` are copied to the site root when GitHub Pages builds.
 
 ## Project layout
 

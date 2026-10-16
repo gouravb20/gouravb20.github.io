@@ -1,0 +1,7 @@
+# Applies to every site under gouravb20.github.io, including project sites such as /learn/.
+# The book PDFs in the learn library are not to be crawled; everything else is.
+User-agent: *
+Disallow: /learn/*.pdf$
+
+# Bootstrap discovery without waiting for inbound links: crawlers read Sitemap from the domain-root robots.txt.
+Sitemap: https://gouravb20.github.io/learn/sitemap-index.xml
