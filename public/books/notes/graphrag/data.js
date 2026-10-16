@@ -8,7 +8,10 @@ window.DATA = {
     exportPrefix: `graphrag-progress`,
     pillarsTitle: `Four ideas that run through the whole book`,
     takeawaysTitle: `Twelve takeaways to remember`,
-    labsIntro: `Each lab is a small, self-contained simulator of an idea from the chapter, built on the book's own examples (the Einstein patents paper, the Movies graph, the CUAD contract, The Odyssey). Vectors and LLM outputs are toy-sized and scripted, but the algorithms and trade-offs are the book's. Labs reset when you leave the tab.`
+    labsIntro: `Each lab is a small, self-contained simulator of an idea from the chapter, built on the book's own examples (the Einstein patents paper, the Movies graph, the CUAD contract, The Odyssey). Vectors and LLM outputs are toy-sized and scripted, but the algorithms and trade-offs are the book's. Labs reset when you leave the tab.`,
+    mono: `G`,
+    shortTitle: `GraphRAG Notes`,
+    tagline: `Interactive interview prep`
   },
   parts: {
     1: `Foundations`,

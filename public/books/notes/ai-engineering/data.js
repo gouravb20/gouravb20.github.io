@@ -8,7 +8,10 @@ window.DATA = {
     exportPrefix: `ai-engineering-progress`,
     pillarsTitle: `Four ideas that run through the whole book`,
     takeawaysTitle: `Twelve takeaways to remember`,
-    labsIntro: `Each lab is a small, self-contained simulator of an idea from the chapter. The numbers are toy-sized but the formulas and trade-offs are the book's. Change the knobs and watch what moves. Labs reset when you leave the tab.`
+    labsIntro: `Each lab is a small, self-contained simulator of an idea from the chapter. The numbers are toy-sized but the formulas and trade-offs are the book's. Change the knobs and watch what moves. Labs reset when you leave the tab.`,
+    mono: `AI`,
+    shortTitle: `AI Engineering Notes`,
+    tagline: `Interactive interview prep`
   },
   parts: {
     1: `Foundations`,

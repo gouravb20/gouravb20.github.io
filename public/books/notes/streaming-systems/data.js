@@ -10,7 +10,10 @@ window.DATA = {
     exportPrefix: "streaming-systems-progress",
     pillarsTitle: "The four questions (the book's backbone)",
     takeawaysTitle: "Ten takeaways to remember",
-    labsIntro: "Each lab is a small simulator built on the book's own example data. Change the knobs and watch how results, watermarks and panes respond. Labs reset when you leave the tab."
+    labsIntro: "Each lab is a small simulator built on the book's own example data. Change the knobs and watch how results, watermarks and panes respond. Labs reset when you leave the tab.",
+    mono: "S",
+    shortTitle: "Streaming Systems Notes",
+    tagline: "Interactive interview prep"
   },
   parts: {
     1: "Part I · The Beam Model",

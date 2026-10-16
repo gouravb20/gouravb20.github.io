@@ -7,14 +7,14 @@ Interactive system design study notes in four sections, published at [gouravb20.
 - [`books/`](public/books/index.html): chapter-wise notes for the books behind modern data, AI and Go programs, plus a library that opens every source PDF in the browser.
 - [`slides/`](public/slides/index.html): slide decks and visual guides.
 
-The site is built with [Astro](https://astro.build) as plain static HTML. Most pages are still the original hand-written static site, served unchanged from `public/`. Notes apps are being moved, one at a time, from single-page apps to Astro-rendered pages (one real page per chapter, so search engines can index them); Problem Breakdowns is the first.
+The site is built with [Astro](https://astro.build) as plain static HTML. The hub pages are hand-written HTML served unchanged from `public/`. Every notes app is rendered by Astro, with one real page per chapter so search engines can index it.
 
 ## High-level design
 
 | Book | Notes | Chapters | Concepts | Labs | Q&A |
 |---|---|---|---|---|---|
-| System Design Core Concepts (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials)) | [`notes/core-concepts`](public/high-level-design/notes/core-concepts/index.html) | 18 | 228 | 31 | 116 |
-| System Design Advanced Topics (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search) and [Arpit Bhayani](https://arpitbhayani.me/blogs/morris-counter/)) | [`notes/advanced-topics`](public/high-level-design/notes/advanced-topics/index.html) | 10 | 125 | 20 | 54 |
+| System Design Core Concepts (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials)) | [`notes/core-concepts`](public/high-level-design/notes/core-concepts/) | 18 | 228 | 31 | 116 |
+| System Design Advanced Topics (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search) and [Arpit Bhayani](https://arpitbhayani.me/blogs/morris-counter/)) | [`notes/advanced-topics`](public/high-level-design/notes/advanced-topics/) | 10 | 125 | 20 | 54 |
 | System Design Problem Breakdowns: YouTube Top K and Flash Sale (inspired by [Hello Interview](https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k)) | [`notes/problem-breakdowns`](public/high-level-design/notes/problem-breakdowns/) | 10 | 100 | 15 | 51 |
 
 Paths in the table are relative to `public/high-level-design/`. Also included: [`isolation-anomalies.md`](public/high-level-design/isolation-anomalies.md), a one-page map of transaction isolation anomalies.
@@ -27,12 +27,12 @@ Coming soon. The *Mastering Go* notes that used to live here are now in Books.
 
 | Book | Notes | Chapters | Concepts | Labs | Q&A |
 |---|---|---|---|---|---|
-| Designing Data-Intensive Applications (Kleppmann) | [`notes/ddia`](public/books/notes/ddia/index.html) | 12 | 181 | - | 100 |
-| Streaming Systems (Akidau, Chernyak & Lax) | [`notes/streaming-systems`](public/books/notes/streaming-systems/index.html) | 10 | 118 | 22 | 82 |
-| AI Engineering (Huyen) | [`notes/ai-engineering`](public/books/notes/ai-engineering/index.html) | 10 | 119 | 22 | 78 |
-| Essential GraphRAG (Bratanič & Hane) | [`notes/graphrag`](public/books/notes/graphrag/index.html) | 9 | 97 | 16 | 67 |
-| Database Internals, Part I: Storage Engines (Petrov) | [`notes/database-internals`](public/books/notes/database-internals/index.html) | 7 | 107 | 23 | 58 |
-| Mastering Go, 4th edition (Tsoukalos) | [`notes/mastering-go`](public/books/notes/mastering-go/index.html) | 16 | 246 | 47 | 156 |
+| Designing Data-Intensive Applications (Kleppmann) | [`notes/ddia`](public/books/notes/ddia/) | 12 | 181 | - | 100 |
+| Streaming Systems (Akidau, Chernyak & Lax) | [`notes/streaming-systems`](public/books/notes/streaming-systems/) | 10 | 118 | 22 | 82 |
+| AI Engineering (Huyen) | [`notes/ai-engineering`](public/books/notes/ai-engineering/) | 10 | 119 | 22 | 78 |
+| Essential GraphRAG (Bratanič & Hane) | [`notes/graphrag`](public/books/notes/graphrag/) | 9 | 97 | 16 | 67 |
+| Database Internals, Part I: Storage Engines (Petrov) | [`notes/database-internals`](public/books/notes/database-internals/) | 7 | 107 | 23 | 58 |
+| Mastering Go, 4th edition (Tsoukalos) | [`notes/mastering-go`](public/books/notes/mastering-go/) | 16 | 246 | 47 | 156 |
 | Software Architecture: The Hard Parts (Ford, Richards, Sadalage & Dehghani) | [`notes/architecture-hard-parts`](public/books/notes/architecture-hard-parts/) | 15 | 135 | 14 | 75 |
 
 Paths in the table are relative to `public/books/`. The [Books page](public/books/index.html) lists these notes, then a library that opens each source PDF in the browser's built-in PDF viewer (`books/index.html#ddia`, `#mastering-go`, ...), with links to the notes and downloads. The library also holds Alex Xu's *System Design Interview* volumes 1 and 2 (`#sdi-vol1`, `#sdi-vol2`, linked to the core concepts notes), *Software Architecture: The Hard Parts*, *Learning SPARQL* and *Staff Engineer*.
@@ -54,7 +54,7 @@ Every book gets the same app:
 - A **Continue** card on the dashboard that opens the first unfinished chapter, starting from the one you read last.
 - Full-text search (press `/`; every word must match, title hits rank first, <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd> pick a result), <kbd>j</kbd> / <kbd>k</kbd> for the next / previous chapter, light and dark themes, and a mobile layout.
 - Progress is saved in `localStorage`, separately for each book. The hub pages show progress for every set of notes.
-- Bookmarkable chapters, tabs and labs. Astro-rendered apps use real URLs (`problem-breakdowns/ch2/#lab-servingStrategy`, `problem-breakdowns/glossary/`); single-page apps use hash routes (`#/ch3/labs/btree`, `#/glossary`, `#/cheatsheet`). When an app moves to Astro, its old hash links redirect to the new pages and saved progress carries over.
+- Bookmarkable chapters, tabs and labs with real URLs (`problem-breakdowns/ch2/#lab-servingStrategy`, `core-concepts/glossary/`). Old single-page hash links (`#/ch3/labs/btree`) redirect to the new pages, and saved progress carries over.
 - Astro-rendered apps also get per-page titles, descriptions, canonical URLs, Open Graph tags, structured data (Course, LearningResource, BreadcrumbList) and a sitemap. Their content is in the HTML, so it reads fine without JavaScript; only labs and progress tracking need it.
 
 ## Running locally

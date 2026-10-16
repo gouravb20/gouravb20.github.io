@@ -11,7 +11,10 @@ window.DATA = {
     exportPrefix: `advanced-topics-progress`,
     pillarsTitle: `Four instincts for the deep dives`,
     takeawaysTitle: `Ten things to remember`,
-    labsIntro: `Each lab is a small model of one idea. The numbers come from simple, stated assumptions rather than real measurements, so read them as shapes and ratios, not benchmarks. Labs reset when you leave the tab.`
+    labsIntro: `Each lab is a small model of one idea. The numbers come from simple, stated assumptions rather than real measurements, so read them as shapes and ratios, not benchmarks. Labs reset when you leave the tab.`,
+    mono: `AT`,
+    shortTitle: `Advanced Topics`,
+    tagline: `Interactive interview prep`
   },
   parts: {
     1: `Part I &middot; Proximity Search`,

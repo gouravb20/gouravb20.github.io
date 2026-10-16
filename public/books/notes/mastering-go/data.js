@@ -9,7 +9,10 @@ window.DATA = {
     exportPrefix: `mastering-go-progress`,
     pillarsTitle: `Four ideas that run through the whole book`,
     takeawaysTitle: `Twelve takeaways to remember`,
-    labsIntro: `Each lab is a small, self-contained simulator of an idea from the chapter, modelled on the book's own examples where it has them (the statistics application, which(1), the worker pool, the RESTful user server, the fuzzed string reverser). They mimic Go's behaviour in the browser, so sizes are toy-scale, but the rules are Go's. Labs reset when you leave the tab.`
+    labsIntro: `Each lab is a small, self-contained simulator of an idea from the chapter, modelled on the book's own examples where it has them (the statistics application, which(1), the worker pool, the RESTful user server, the fuzzed string reverser). They mimic Go's behaviour in the browser, so sizes are toy-scale, but the rules are Go's. Labs reset when you leave the tab.`,
+    mono: `Go`,
+    shortTitle: `Mastering Go Notes`,
+    tagline: `Interactive interview prep`
   },
   parts: {
     1: `Language foundations`,

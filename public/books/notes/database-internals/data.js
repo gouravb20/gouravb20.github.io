@@ -8,7 +8,10 @@ window.DATA = {
     exportPrefix: `database-internals-progress`,
     pillarsTitle: `Four ideas that shape every storage engine`,
     takeawaysTitle: `Twelve takeaways to remember`,
-    labsIntro: `Each lab is a small, self-contained simulator of an idea from the chapter, built on the book's own examples where it has them (the stock quotes table, Tom/Leslie/Ron in a slotted page, the A1/A2 write skew, the fractional cascading arrays, the merge-iteration iterators, the 16-bit Bloom filter). Sizes are toy-scale, but the algorithms and trade-offs are the book's. Labs reset when you leave the tab.`
+    labsIntro: `Each lab is a small, self-contained simulator of an idea from the chapter, built on the book's own examples where it has them (the stock quotes table, Tom/Leslie/Ron in a slotted page, the A1/A2 write skew, the fractional cascading arrays, the merge-iteration iterators, the 16-bit Bloom filter). Sizes are toy-scale, but the algorithms and trade-offs are the book's. Labs reset when you leave the tab.`,
+    mono: `DB`,
+    shortTitle: `Database Internals Notes`,
+    tagline: `Interactive interview prep`
   },
   parts: {
     1: `Foundations`,

@@ -10,7 +10,10 @@ window.DATA = {
     exportPrefix: `core-concepts-progress`,
     pillarsTitle: `Four instincts for every design`,
     takeawaysTitle: `Twenty things to remember`,
-    labsIntro: `Each lab is a small model of one idea. The numbers come from simple, stated assumptions rather than real measurements, so read them as shapes and ratios, not benchmarks. Labs reset when you leave the tab.`
+    labsIntro: `Each lab is a small model of one idea. The numbers come from simple, stated assumptions rather than real measurements, so read them as shapes and ratios, not benchmarks. Labs reset when you leave the tab.`,
+    mono: `CC`,
+    shortTitle: `Core Concepts`,
+    tagline: `Interactive interview prep`
   },
   parts: {
     1: `Part I &middot; Networking Essentials`,

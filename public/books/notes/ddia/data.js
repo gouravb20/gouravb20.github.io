@@ -9,7 +9,10 @@ window.DATA = {
     exportPrefix: `ddia-progress`,
     pillarsTitle: `The book's four big ideas`,
     takeawaysTitle: `Twelve takeaways, one per chapter`,
-    labsIntro: `Labs are small simulators of ideas from the chapter. Labs reset when you leave the tab.`
+    labsIntro: `Labs are small simulators of ideas from the chapter. Labs reset when you leave the tab.`,
+    mono: `D`,
+    shortTitle: `DDIA Notes`,
+    tagline: `Interactive interview prep`
   },
   parts: {
     1: `Part I &middot; Foundations of Data Systems`,
