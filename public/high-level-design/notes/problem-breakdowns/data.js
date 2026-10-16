@@ -4,7 +4,7 @@
 window.DATA = {
   book: {
     title: `System Design Problem Breakdowns`,
-    subtitle: `Classic system design interview problems, worked through from requirements to a final design, with labs that let you poke at each decision. First problem: <strong>YouTube Top K</strong>, the most-viewed videos for the last hour, day, month and all time at ~70 billion views a day. The problem follows Hello Interview's <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k" target="_blank" rel="noopener" style="color:var(--accent)">Top K breakdown</a>; these notes and labs are written independently, so read the original walkthrough there.`,
+    subtitle: `Classic system design interview problems, worked through from requirements to a final design, with labs that let you poke at each decision. Part I: <strong>YouTube Top K</strong>, the most-viewed videos for the last hour, day, month and all time at ~70 billion views a day. Part II: <strong>Flash Sale</strong>, 20,000 consoles for 10 million buyers without overselling. The problems follow Hello Interview's <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k" target="_blank" rel="noopener" style="color:var(--accent)">Top K</a> and <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/flash-sale" target="_blank" rel="noopener" style="color:var(--accent)">Flash Sale</a> breakdowns; these notes and labs are written independently, so read the original walkthroughs there.`,
     storageKey: `problem_breakdowns_notes_v1`,
     appId: `problem-breakdowns-notes`,
     exportPrefix: `problem-breakdowns-progress`,

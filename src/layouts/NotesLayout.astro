@@ -40,11 +40,13 @@ const ring = 2 * Math.PI * 8;
   <link rel="icon" href={url("favicon.svg")} type="image/svg+xml">
   <link rel="sitemap" href={url("sitemap-index.xml")}>
   <link rel="stylesheet" href={url("shared/styles.css")}>
-  <script is:inline define:vars={{ skinBase: url("shared/skins/") }}>
+  <script is:inline data-skin-base={url("shared/skins/")}>
     (function () {
       try {
+        var me = document.currentScript;
+        var skinBase = (me && me.getAttribute("data-skin-base")) || "";
         var known = ["editorial", "blueprint", "brutalist", "terminal", "classic"];
-        var s = localStorage.getItem("system_design_skin");
+        var s = localStorage.getItem("system_design_skin") || "editorial";
         if (known.indexOf(s) < 0) s = "editorial";
         if (s === "classic") return;
         document.documentElement.setAttribute("data-skin", s);
