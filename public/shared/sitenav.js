@@ -19,28 +19,28 @@
   const css = `
     .sn-btn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;flex:none;padding:0;
       border-radius:8px;border:1px solid var(--border,#24304f);background:var(--bg-3,#18213a);color:var(--text,#e6ebf5);cursor:pointer}
-    .sn-btn:hover{border-color:var(--muted,#94a3b8)}
+    .sn-btn:hover{border-color:var(--muted,var(--text-muted,#94a3b8))}
     .sn-btn:focus-visible,.sn-panel a:focus-visible,.sn-close:focus-visible{outline:2px solid #38bdf8;outline-offset:2px}
     .sn-btn.sn-fixed{position:fixed;top:max(12px,env(safe-area-inset-top,0px));left:12px;z-index:9998;box-shadow:0 4px 14px rgba(0,0,0,.25)}
     .sn-backdrop{position:fixed;inset:0;z-index:9999;background:rgba(5,8,18,.55);opacity:0;transition:opacity .18s ease}
     .sn-panel{position:fixed;top:0;bottom:0;left:0;z-index:10000;width:min(340px,88vw);display:flex;flex-direction:column;gap:6px;
       padding:16px 14px calc(16px + env(safe-area-inset-bottom,0px));overflow-y:auto;background:var(--bg-2,#10172a);color:var(--text,#e6ebf5);
       border-right:1px solid var(--border,#24304f);box-shadow:12px 0 40px rgba(0,0,0,.35);transform:translateX(-102%);transition:transform .2s ease;
-      font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,sans-serif}
+      font:15px/1.45 var(--font-sans,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,sans-serif)}
     .sn-open .sn-backdrop{opacity:1}
     .sn-open .sn-panel{transform:none}
     .sn-head{display:flex;align-items:center;gap:10px;padding:2px 4px 12px;border-bottom:1px solid var(--border,#24304f);margin-bottom:6px}
     .sn-home{display:flex;align-items:center;gap:10px;font-weight:700;color:inherit;text-decoration:none;flex:1;border-radius:8px}
     .sn-mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:#dc2626;color:#fff;font-size:15px;font-weight:800}
     .sn-close{width:32px;height:32px;border-radius:8px;border:1px solid var(--border,#24304f);background:transparent;color:inherit;font-size:18px;line-height:1;cursor:pointer}
-    .sn-label{color:var(--faint,#64748b);font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;padding:8px 6px 4px}
+    .sn-label{color:var(--faint,var(--text-muted,#64748b));font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;padding:8px 6px 4px}
     .sn-panel a.sn-item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;color:inherit;text-decoration:none;border:1px solid transparent}
     .sn-panel a.sn-item:hover{background:var(--bg-3,#18213a)}
     .sn-panel a.sn-item[aria-current]{background:color-mix(in srgb,var(--a) 12%,transparent);border-color:color-mix(in srgb,var(--a) 40%,transparent)}
     .sn-mono{flex:none;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:13px;color:var(--a);
       background:color-mix(in srgb,var(--a) 16%,transparent);border:1px solid color-mix(in srgb,var(--a) 40%,transparent)}
     .sn-item b{display:block;font-size:15px}
-    .sn-item small{display:block;color:var(--muted,#94a3b8);font-size:12.5px}
+    .sn-item small{display:block;color:var(--muted,var(--text-muted,#94a3b8));font-size:12.5px}
     html.sn-lock,html.sn-lock body{overflow:hidden}
     @media (prefers-reduced-motion:reduce){.sn-panel,.sn-backdrop{transition:none}}`;
 

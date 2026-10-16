@@ -23,7 +23,10 @@
     { id: "auto", name: "Auto", label: "◐ Auto" },
   ];
 
+  // Hubs have no styles.css link, so find skins/ next to this script.
+  const scriptSrc = typeof document !== "undefined" && document.currentScript ? document.currentScript.src : "";
   const looksBase = () => {
+    if (scriptSrc) return new URL("./", scriptSrc).href;
     const link = document.querySelector('link[href*="shared/styles.css"], link[href*="styles.css"]');
     if (!link) return "";
     const href = link.getAttribute("href") || "";
@@ -179,7 +182,7 @@
     s.textContent = `
       .look-wrap{position:relative}
       .look-menu{position:absolute;top:calc(100% + 8px);right:0;width:300px;z-index:210;display:none;background:var(--bg-2,#10172a);border:1px solid var(--border,#26324f);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.35);padding:6px;color:var(--text,#e2e8f0)}
-      .look-menu.open{display:block}
+      .look-menu.open{display:block;color:var(--text,#e2e8f0);font-weight:400}
       .look-title,.look-foot,.more-sep{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;font-weight:700;color:var(--text-muted,#94a3b8);padding:6px 10px 4px}
       .look-foot{font-size:12px;text-transform:none;letter-spacing:0;font-weight:500;border-top:1px solid var(--border,#26324f);margin-top:4px}
       .look-opt{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:7px 10px;text-align:left;background:transparent;color:inherit;border:1px solid transparent;border-radius:8px;font:inherit;cursor:pointer}
@@ -194,6 +197,7 @@
       .look-opt.is-active .look-check{visibility:visible}
       .look-split{border-top:1px solid var(--border,#26324f);margin-top:4px;padding-top:8px}
       .look-icon{display:block}
+      .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
       #themeToggle, #moreMenu [data-action="theme"]{display:none!important}
       .more-menu .look-list{display:grid;gap:2px}
       .more-sep{border-top:1px solid var(--border,#26324f);margin-top:4px;padding-top:10px}
