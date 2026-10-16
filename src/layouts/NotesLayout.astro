@@ -40,7 +40,7 @@ const ring = 2 * Math.PI * 8;
   <link rel="icon" href={url("favicon.svg")} type="image/svg+xml">
   <link rel="sitemap" href={url("sitemap-index.xml")}>
   <link rel="stylesheet" href={url("shared/styles.css")}>
-  <script is:inline>
+  <script is:inline define:vars={{ skinBase: url("shared/skins/") }}>
     (function () {
       try {
         var known = ["editorial", "blueprint", "brutalist", "terminal", "classic"];
@@ -48,7 +48,11 @@ const ring = 2 * Math.PI * 8;
         if (known.indexOf(s) < 0) s = "editorial";
         if (s === "classic") return;
         document.documentElement.setAttribute("data-skin", s);
-        document.write('<link rel="stylesheet" id="skinCss" href="' + {JSON.stringify(url("shared/skins/"))} + s + '.css">');
+        var link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.id = "skinCss";
+        link.href = skinBase + s + ".css";
+        document.write(link.outerHTML);
       } catch (e) {}
     })();
   </script>
