@@ -8,6 +8,7 @@ export const SITE_NAME = "System Design Notes";
 export const TRACKS: Record<string, string> = {
   "high-level-design": "High-level design",
   "low-level-design": "Low-level design",
+  books: "Books",
 };
 
 /** Site-absolute URL under the configured base, e.g. url("shared/styles.css") -> "/learn/shared/styles.css". */

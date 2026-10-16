@@ -4,8 +4,8 @@ const files = [
   "public/index.html",
   "public/high-level-design/index.html",
   "public/low-level-design/index.html",
-  "public/high-level-design/books/index.html",
-  "public/low-level-design/books/index.html",
+  "public/books/index.html",
+  "public/slides/index.html",
 ];
 
 const NEW_THEME = `

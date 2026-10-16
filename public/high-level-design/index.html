@@ -4,15 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1c">
-  <meta name="description" content="Interactive system design notes: Designing Data-Intensive Applications, Streaming Systems, AI Engineering, Essential GraphRAG, Database Internals and a field guide to databases.">
+  <meta name="description" content="Interactive high-level design notes: system design core concepts, advanced topics and worked problem breakdowns, with labs, cheatsheets and interview Q&amp;A.">
   <title>High-Level Design · System Design Notes</title>
   <script src="../shared/looks.js"></script>
+  <script src="../shared/sitenav.js" defer></script>
   <link rel="canonical" href="https://gouravb20.github.io/learn/high-level-design/">
   <link rel="sitemap" type="application/xml" title="Sitemap" href="https://gouravb20.github.io/learn/sitemap-index.xml">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="System Design Notes">
   <meta property="og:title" content="High-Level Design · System Design Notes">
-  <meta property="og:description" content="Interactive system design notes: core concepts, advanced topics, problem breakdowns, and chapter-wise notes for modern data and AI books.">
+  <meta property="og:description" content="Interactive high-level design notes: core concepts, advanced topics and problem breakdowns.">
   <meta property="og:url" content="https://gouravb20.github.io/learn/high-level-design/">
   <meta name="twitter:card" content="summary">
   <script type="application/ld+json">
@@ -21,7 +22,7 @@
     "@type": "CollectionPage",
     "name": "High-Level Design",
     "url": "https://gouravb20.github.io/learn/high-level-design/",
-    "description": "Interactive high-level design notes: distributed systems, data and AI books, core concepts, advanced topics and problem breakdowns.",
+    "description": "Interactive high-level design notes: core concepts, advanced topics and problem breakdowns.",
     "isPartOf": { "@type": "WebSite", "name": "System Design Notes", "url": "https://gouravb20.github.io/learn/" },
     "breadcrumb": {
       "@type": "BreadcrumbList",
@@ -153,22 +154,17 @@
     <header class="topbar">
       <a class="brand" href="../index.html" title="Home"><div class="brand-mark">L</div>System Design</a>
       <div class="spacer"></div>
-      <a class="btn" href="../index.html" title="High-level and low-level design">All tracks</a>
-      <a class="btn hide-sm" href="../low-level-design/index.html" title="Low-level design">Low-level design</a>
-      <a class="btn" href="books/index.html" title="Read the books as PDFs">Library</a>
       <button class="btn" id="themeToggle" title="Toggle theme">Light</button>
     </header>
 
     <section class="hero">
       <div class="eyebrow">High-level design &middot; interactive notes</div>
       <h1>System design, one book at a time</h1>
-      <p class="lede">Chapter-wise notes with hands-on labs, cheatsheets and interview Q&amp;A for the system design core concepts, the advanced topics and the books behind modern data and AI systems, plus a visual guide to how databases differ.</p>
+      <p class="lede">Chapter-wise notes with hands-on labs, cheatsheets and interview Q&amp;A for the system design core concepts, the advanced topics that build on them, and classic interview problems worked end to end. Notes on the books themselves live in the Books section.</p>
       <div class="totals">
-        <div class="total"><b>5</b><span>books</span></div>
-        <div class="total"><b data-count="chapters" data-src=".">81</b><span>chapters</span></div>
-        <div class="total"><b data-count="labs" data-src=".">142</b><span>interactive labs</span></div>
-        <div class="total"><b data-count="qa" data-src=".">581</b><span>interview Q&amp;A</span></div>
-        <div class="total"><b data-count="slides" data-src=".">20</b><span>slides</span></div>
+        <div class="total"><b data-count="chapters" data-src=".">33</b><span>chapters</span></div>
+        <div class="total"><b data-count="labs" data-src=".">59</b><span>interactive labs</span></div>
+        <div class="total"><b data-count="qa" data-src=".">196</b><span>interview Q&amp;A</span></div>
       </div>
     </section>
 
@@ -247,116 +243,8 @@
       </div>
     </a>
 
-    <h2>Book notes</h2>
-    <div class="grid">
-      <a class="card" href="notes/ddia/index.html" style="--accent:#f472b6" data-key="ddia_notes_v1" data-total="281">
-        <div class="card-head">
-          <div class="mono">D</div>
-          <div><h3>Designing Data-Intensive Applications</h3><div class="by">Martin Kleppmann</div></div>
-        </div>
-        <p>The foundations of data systems: reliability and scalability, data models and storage engines, encoding, replication, partitioning, transactions, consistency and consensus, batch and stream processing.</p>
-        <div class="chips"><span class="chip">Replication</span><span class="chip">Partitioning</span><span class="chip">Transactions</span><span class="chip">Consensus</span></div>
-        <div class="meta"><span><b data-count="chapters" data-src="notes/ddia">12</b> chapters</span><span><b data-count="concepts" data-src="notes/ddia">181</b> concepts</span><span><b data-count="qa" data-src="notes/ddia">100</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
-      </a>
-
-      <a class="card" href="notes/streaming-systems/index.html" style="--accent:#38bdf8" data-key="streaming_systems_notes_v1" data-total="200">
-        <div class="card-head">
-          <div class="mono">S</div>
-          <div><h3>Streaming Systems</h3><div class="by">Akidau, Chernyak &amp; Lax</div></div>
-        </div>
-        <p>The Beam model: event time vs processing time, windowing, watermarks, triggers and accumulation, exactly-once processing, and the theory of streams and tables.</p>
-        <div class="chips"><span class="chip">Watermarks</span><span class="chip">Triggers</span><span class="chip">Exactly-once</span><span class="chip">Streams &amp; tables</span></div>
-        <div class="meta"><span><b data-count="chapters" data-src="notes/streaming-systems">10</b> chapters</span><span><b data-count="concepts" data-src="notes/streaming-systems">118</b> concepts</span><span><b data-count="labs" data-src="notes/streaming-systems">22</b> labs</span><span><b data-count="qa" data-src="notes/streaming-systems">82</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
-      </a>
-
-      <a class="card" href="notes/ai-engineering/index.html" style="--accent:#14b8a6" data-key="ai_engineering_notes_v1" data-total="197">
-        <div class="card-head">
-          <div class="mono">AI</div>
-          <div><h3>AI Engineering</h3><div class="by">Chip Huyen</div></div>
-        </div>
-        <p>Building on foundation models: sampling, evaluation, prompt engineering, RAG and agents, finetuning, dataset engineering and inference optimization.</p>
-        <div class="chips"><span class="chip">Evaluation</span><span class="chip">RAG &amp; agents</span><span class="chip">Finetuning</span><span class="chip">Inference</span></div>
-        <div class="meta"><span><b data-count="chapters" data-src="notes/ai-engineering">10</b> chapters</span><span><b data-count="concepts" data-src="notes/ai-engineering">119</b> concepts</span><span><b data-count="labs" data-src="notes/ai-engineering">22</b> labs</span><span><b data-count="qa" data-src="notes/ai-engineering">78</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
-      </a>
-
-      <a class="card" href="notes/graphrag/index.html" style="--accent:#a78bfa" data-key="graphrag_notes_v1" data-total="164">
-        <div class="card-head">
-          <div class="mono">G</div>
-          <div><h3>Essential GraphRAG</h3><div class="by">Bratanič &amp; Hane</div></div>
-        </div>
-        <p>Knowledge-graph-enhanced RAG: hybrid search, advanced retrieval, text2cypher, agentic RAG, building graphs with LLMs, Microsoft GraphRAG and RAG evaluation.</p>
-        <div class="chips"><span class="chip">Hybrid search</span><span class="chip">text2cypher</span><span class="chip">Agentic RAG</span><span class="chip">MS GraphRAG</span></div>
-        <div class="meta"><span><b data-count="chapters" data-src="notes/graphrag">9</b> chapters</span><span><b data-count="concepts" data-src="notes/graphrag">97</b> concepts</span><span><b data-count="labs" data-src="notes/graphrag">16</b> labs</span><span><b data-count="qa" data-src="notes/graphrag">67</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
-      </a>
-
-      <a class="card" href="notes/database-internals/index.html" style="--accent:#4ade80" data-key="database_internals_notes_v1" data-total="165">
-        <div class="card-head">
-          <div class="mono">DI</div>
-          <div><h3>Database Internals</h3><div class="by">Alex Petrov &middot; Part I: Storage Engines</div></div>
-        </div>
-        <p>How storage engines work: B-Trees and their file formats, page layouts and splits, buffer management, WAL and ARIES recovery, concurrency control, B-Tree variants and LSM Trees.</p>
-        <div class="chips"><span class="chip">B-Trees</span><span class="chip">Slotted pages</span><span class="chip">WAL &amp; recovery</span><span class="chip">LSM Trees</span></div>
-        <div class="meta"><span><b data-count="chapters" data-src="notes/database-internals">7</b> chapters</span><span><b data-count="concepts" data-src="notes/database-internals">107</b> concepts</span><span><b data-count="labs" data-src="notes/database-internals">23</b> labs</span><span><b data-count="qa" data-src="notes/database-internals">58</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
-      </a>
-    </div>
-
-    <h2>Guides &amp; slides</h2>
-    <a class="card wide" href="slides/database-guide/index.html" style="--accent:#f59e0b">
-      <div class="body">
-        <div class="card-head">
-          <div class="mono">DB</div>
-          <div><h3>A Field Guide to Databases</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="slides/database-guide">20</span> slides</div></div>
-        </div>
-        <p>How databases differ and why: OLTP vs OLAP, four independent design axes, data models, B-Tree vs LSM-Tree (with an animated LSM-Tree), separating compute from storage, and distributed SQL.</p>
-        <div class="chips"><span class="chip">OLTP vs OLAP</span><span class="chip">B-Tree vs LSM</span><span class="chip">Distributed SQL</span><span class="chip">NewSQL</span></div>
-        <span class="open">Open slides &rarr;</span>
-      </div>
-      <div class="side">
-        <strong style="color:var(--text)">Covers</strong>
-        <ol>
-          <li>Key-value, SQL, document and wide-column stores</li>
-          <li>Single-node vs distributed</li>
-          <li>Case study: TiDB</li>
-          <li>The whole tour as a matrix</li>
-        </ol>
-      </div>
-    </a>
-
-    <h2>Library</h2>
-    <a class="card wide" href="books/index.html" style="--accent:#14b8a6">
-      <div class="body">
-        <div class="card-head">
-          <div class="mono">PDF</div>
-          <div><h3>Read the books</h3><div class="by">In-browser PDF viewer &middot; <span data-count="books" data-src="books">7</span> books</div></div>
-        </div>
-        <p>The source books behind these notes, readable right in the browser. Switch between books from the viewer, jump to each book's notes, or download the PDF.</p>
-        <span class="open">Open library &rarr;</span>
-      </div>
-      <div class="side">
-        <strong style="color:var(--text)">On the shelf</strong>
-        <ol>
-          <li>Designing Data-Intensive Applications</li>
-          <li>Streaming Systems</li>
-          <li>AI Engineering</li>
-          <li>Essential GraphRAG</li>
-          <li>Database Internals</li>
-          <li>System Design Interview, Vol. 1 &amp; 2</li>
-        </ol>
-      </div>
-    </a>
-
     <footer>
-      <span>Progress is saved in this browser, separately for each book.</span>
+      <span>Progress is saved in this browser, separately for each set of notes.</span>
       <a href="https://github.com/gouravb20/learn">Source on GitHub</a>
     </footer>
   </div>

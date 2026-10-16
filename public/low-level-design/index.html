@@ -4,15 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1c">
-  <meta name="description" content="Interactive low-level design notes: chapter-wise notes on Mastering Go with hands-on labs, cheatsheets and interview Q&A.">
+  <meta name="description" content="Low-level design notes: the design of classes, modules, interfaces and concurrency. Coming soon.">
   <title>Low-Level Design · Interactive Notes</title>
   <script src="../shared/looks.js"></script>
+  <script src="../shared/sitenav.js" defer></script>
   <link rel="canonical" href="https://gouravb20.github.io/learn/low-level-design/">
   <link rel="sitemap" type="application/xml" title="Sitemap" href="https://gouravb20.github.io/learn/sitemap-index.xml">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="System Design Notes">
   <meta property="og:title" content="Low-Level Design · Interactive Notes">
-  <meta property="og:description" content="Interactive low-level design notes: Mastering Go with labs, cheatsheets and interview Q&A.">
+  <meta property="og:description" content="Low-level design notes: coming soon.">
   <meta property="og:url" content="https://gouravb20.github.io/learn/low-level-design/">
   <meta name="twitter:card" content="summary">
   <script type="application/ld+json">
@@ -21,7 +22,7 @@
     "@type": "CollectionPage",
     "name": "Low-Level Design",
     "url": "https://gouravb20.github.io/learn/low-level-design/",
-    "description": "Interactive low-level design notes: languages and building blocks of well-designed programs, starting with Mastering Go.",
+    "description": "Low-level design notes: the building blocks of well-designed programs. Coming soon.",
     "isPartOf": { "@type": "WebSite", "name": "System Design Notes", "url": "https://gouravb20.github.io/learn/" },
     "breadcrumb": {
       "@type": "BreadcrumbList",
@@ -150,69 +151,35 @@
     <header class="topbar">
       <a class="brand" href="../index.html" title="Home"><div class="brand-mark">L</div>Low-Level Design</a>
       <div class="spacer"></div>
-      <a class="btn" href="../index.html" title="High-level and low-level design">All tracks</a>
-      <a class="btn hide-sm" href="../high-level-design/index.html" title="High-level design">High-level design</a>
-      <a class="btn" href="books/index.html" title="Read the books as PDFs">Library</a>
       <button class="btn" id="themeToggle" title="Toggle theme">Light</button>
     </header>
 
     <section class="hero">
-      <div class="eyebrow">Low-level design &middot; interactive notes</div>
-      <h1>Low-level design, one book at a time</h1>
-      <p class="lede">Chapter-wise notes with hands-on labs, cheatsheets and interview Q&amp;A for the languages and building blocks behind well-designed programs.</p>
-      <div class="totals">
-        <div class="total"><b>1</b><span>book</span></div>
-        <div class="total"><b data-count="chapters" data-src=".">16</b><span>chapters</span></div>
-        <div class="total"><b data-count="labs" data-src=".">47</b><span>interactive labs</span></div>
-        <div class="total"><b data-count="qa" data-src=".">156</b><span>interview Q&amp;A</span></div>
-      </div>
+      <div class="eyebrow">Low-level design</div>
+      <h1>Low-level design is coming soon</h1>
+      <p class="lede">This section is for what goes inside one box: the design of classes and modules, interfaces and patterns, concurrency, and code that stays easy to test and change. Notes for it are on the way.</p>
     </section>
 
-    <h2>Book notes</h2>
-    <a class="card wide" href="notes/mastering-go/index.html" style="--accent:#00add8" data-key="mastering_go_notes_v1" data-total="402">
+    <h2>In the meantime</h2>
+    <a class="card wide" href="../books/index.html" style="--accent:#14b8a6">
       <div class="body">
         <div class="card-head">
-          <div class="mono">Go</div>
-          <div><h3>Mastering Go</h3><div class="by">Mihalis Tsoukalos &middot; 4th edition (Go 1.21 / 1.22)</div></div>
+          <div class="mono">B</div>
+          <div><h3>Books</h3><div class="by">Book notes and the source PDFs</div></div>
         </div>
-        <p>Go from the basics to production: data types, slices and maps, generics, reflection and interfaces, packages and modules, systems programming, goroutines, channels and the scheduler, web services, TCP/IP and WebSocket, REST APIs, testing, profiling, fuzzing, observability, performance and the garbage collector.</p>
-        <div class="chips"><span class="chip">Slices &amp; maps</span><span class="chip">Generics</span><span class="chip">Interfaces</span><span class="chip">Concurrency</span><span class="chip">REST</span><span class="chip">Testing &amp; profiling</span><span class="chip">GC</span></div>
-        <div class="meta"><span><b data-count="chapters" data-src="notes/mastering-go">16</b> chapters</span><span><b data-count="concepts" data-src="notes/mastering-go">246</b> concepts</span><span><b data-count="labs" data-src="notes/mastering-go">47</b> labs</span><span><b data-count="qa" data-src="notes/mastering-go">156</b> Q&amp;A</span></div>
-        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
-        <span class="open">Open notes &rarr;</span>
+        <p>The chapter-wise notes on Mastering Go, with labs, cheatsheets and interview Q&amp;A, now live in the Books section alongside the notes for the other books and every source PDF.</p>
+        <span class="open">Open books &rarr;</span>
       </div>
       <div class="side">
-        <strong style="color:var(--text)">Five parts</strong>
+        <strong style="color:var(--text)">Moved to Books</strong>
         <ol>
-          <li>Language foundations</li>
-          <li>Types, abstractions and packages</li>
-          <li>Systems programming and concurrency</li>
-          <li>Networking and services</li>
-          <li>Quality, performance and the runtime</li>
+          <li>Mastering Go notes</li>
+          <li>Mastering Go PDF</li>
         </ol>
       </div>
     </a>
-
-    <h2>Library</h2>
-    <a class="card wide" href="books/index.html" style="--accent:#14b8a6">
-      <div class="body">
-        <div class="card-head">
-          <div class="mono">PDF</div>
-          <div><h3>Read the books</h3><div class="by">In-browser PDF viewer &middot; <span data-count="books" data-src="books">1</span> book</div></div>
-        </div>
-        <p>The source books behind these notes, readable right in the browser. Jump from the viewer to each book's notes, or download the PDF.</p>
-        <span class="open">Open library &rarr;</span>
-      </div>
-      <div class="side">
-        <strong style="color:var(--text)">On the shelf</strong>
-        <ol>
-          <li>Mastering Go, 4th edition</li>
-        </ol>
-      </div>
-    </a>
-
     <footer>
-      <span>Progress is saved in this browser, separately for each book.</span>
+      <span>Progress is saved in this browser, separately for each set of notes.</span>
       <a href="../high-level-design/index.html">High-level design notes</a>
       <a href="https://github.com/gouravb20/learn">Source on GitHub</a>
     </footer>

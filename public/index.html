@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1c">
   <meta name="google-site-verification" content="I1bzHccZRUwjisTuEZ0WQWZOor6eMjIi4WVfXSDPaPM">
-  <meta name="description" content="Interactive system design notes in two tracks: high-level design (distributed systems, data and AI books, core concepts) and low-level design (Mastering Go and the building blocks of well-designed programs).">
+  <meta name="description" content="Interactive system design notes: high-level design (core concepts, advanced topics, problem breakdowns), low-level design, book notes with the source PDFs, and slide decks.">
   <title>System Design · High-Level and Low-Level Design</title>
   <script src="shared/looks.js"></script>
+  <script src="shared/sitenav.js" defer></script>
   <link rel="canonical" href="https://gouravb20.github.io/learn/">
   <link rel="sitemap" type="application/xml" title="Sitemap" href="https://gouravb20.github.io/learn/sitemap-index.xml">
   <link rel="alternate" type="application/ld+json" title="Dataset" href="https://gouravb20.github.io/learn/dataset.jsonld">
@@ -40,7 +41,9 @@
         "creator": { "@type": "Person", "name": "Gourav Bansal", "url": "https://gouravb20.github.io/" },
         "hasPart": [
           { "@type": "CollectionPage", "name": "High-Level Design", "url": "https://gouravb20.github.io/learn/high-level-design/" },
-          { "@type": "CollectionPage", "name": "Low-Level Design", "url": "https://gouravb20.github.io/learn/low-level-design/" }
+          { "@type": "CollectionPage", "name": "Low-Level Design", "url": "https://gouravb20.github.io/learn/low-level-design/" },
+          { "@type": "CollectionPage", "name": "Books", "url": "https://gouravb20.github.io/learn/books/" },
+          { "@type": "CollectionPage", "name": "Slides", "url": "https://gouravb20.github.io/learn/slides/" }
         ]
       }
     ]
@@ -146,8 +149,8 @@
 
     <section class="hero">
       <div class="eyebrow">Interactive notes</div>
-      <h1>System design, in two tracks</h1>
-      <p class="lede">High-level design is about the boxes and arrows: how data moves between services, stores and regions. Low-level design is about what goes inside one box: the language, its types and interfaces, concurrency, and code that stays easy to test and change. Pick a track.</p>
+      <h1>System design, one section at a time</h1>
+      <p class="lede">High-level design is about the boxes and arrows: how data moves between services, stores and regions. Low-level design is about what goes inside one box. Books holds notes on the books behind it all along with the source PDFs, and Slides holds visual guides. Pick a section, or use the menu at the top left.</p>
     </section>
 
     <div class="tracks">
@@ -156,24 +159,44 @@
           <div class="mono">HLD</div>
           <div><h2>High-Level Design</h2><div class="by">Distributed systems, data and AI</div></div>
         </div>
-        <p>Core concepts and advanced topics, worked problem breakdowns, and chapter-wise notes for the books behind modern data and AI systems, plus a field guide to databases and an in-browser library of the source books.</p>
-        <div class="chips"><span class="chip">Core concepts</span><span class="chip">Advanced topics</span><span class="chip">Problem breakdowns</span><span class="chip">DDIA</span><span class="chip">Streaming</span><span class="chip">AI engineering</span></div>
-        <div class="meta"><span><b data-count="chapters" data-src="high-level-design">81</b> chapters</span><span><b data-count="labs" data-src="high-level-design">142</b> labs</span><span><b data-count="qa" data-src="high-level-design">581</b> Q&amp;A</span><span><b data-count="slides" data-src="high-level-design">20</b> slides</span></div>
+        <p>The system design core concepts, the advanced topics that build on them, and classic interview problems worked end to end, each with hands-on labs, cheatsheets and interview Q&amp;A.</p>
+        <div class="chips"><span class="chip">Core concepts</span><span class="chip">Advanced topics</span><span class="chip">Problem breakdowns</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="high-level-design">33</b> chapters</span><span><b data-count="labs" data-src="high-level-design">59</b> labs</span><span><b data-count="qa" data-src="high-level-design">196</b> Q&amp;A</span></div>
         <span class="open">Open high-level design &rarr;</span>
       </a>
 
       <a class="card" href="low-level-design/index.html" style="--accent:#00add8">
         <div class="card-head">
           <div class="mono">LLD</div>
-          <div><h2>Low-Level Design</h2><div class="by">Languages and building blocks of well-designed programs</div></div>
+          <div><h2>Low-Level Design</h2><div class="by">Building blocks of well-designed programs</div></div>
         </div>
-        <p>Chapter-wise notes for the books on writing the code inside one box, starting with Mastering Go: types, slices and maps, generics, interfaces, packages, goroutines and channels, web services, testing, profiling and the garbage collector. Plus an in-browser library of the source books.</p>
-        <div class="chips"><span class="chip">Mastering Go</span><span class="chip">Generics</span><span class="chip">Interfaces</span><span class="chip">Concurrency</span><span class="chip">Testing &amp; profiling</span><span class="chip">GC</span></div>
-        <div class="meta"><span><b data-count="chapters" data-src="low-level-design">16</b> chapters</span><span><b data-count="labs" data-src="low-level-design">47</b> labs</span><span><b data-count="qa" data-src="low-level-design">156</b> Q&amp;A</span></div>
+        <p>What goes inside one box: the design of classes and modules, interfaces and patterns, concurrency, and code that stays easy to test and change.</p>
+        <div class="chips"><span class="chip">Coming soon</span></div>
         <span class="open">Open low-level design &rarr;</span>
       </a>
-    </div>
 
+      <a class="card" href="books/index.html" style="--accent:#14b8a6">
+        <div class="card-head">
+          <div class="mono">B</div>
+          <div><h2>Books</h2><div class="by">Book notes and the source PDFs</div></div>
+        </div>
+        <p>Chapter-wise notes for the books behind modern data, AI and Go programs, plus every source book readable right in the browser or as a download.</p>
+        <div class="chips"><span class="chip">DDIA</span><span class="chip">Streaming</span><span class="chip">AI engineering</span><span class="chip">GraphRAG</span><span class="chip">Database internals</span><span class="chip">Mastering Go</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="books">64</b> chapters</span><span><b data-count="labs" data-src="books">130</b> labs</span><span><b data-count="qa" data-src="books">541</b> Q&amp;A</span><span><b data-count="books" data-src="books">11</b> PDFs</span></div>
+        <span class="open">Open books &rarr;</span>
+      </a>
+
+      <a class="card" href="slides/index.html" style="--accent:#f59e0b">
+        <div class="card-head">
+          <div class="mono">S</div>
+          <div><h2>Slides</h2><div class="by">Visual guides and slide decks</div></div>
+        </div>
+        <p>Topics walked through visually, with diagrams and animations, starting with a field guide to how databases differ: OLTP vs OLAP, data models, B-Tree vs LSM-Tree and distributed SQL.</p>
+        <div class="chips"><span class="chip">Databases</span><span class="chip">B-Tree vs LSM</span><span class="chip">Distributed SQL</span></div>
+        <div class="meta"><span><b data-count="slides" data-src="slides">20</b> slides</span></div>
+        <span class="open">Open slides &rarr;</span>
+      </a>
+    </div>
     <footer>
       <span>Progress is saved in this browser, separately for each set of notes.</span>
       <a href="https://github.com/gouravb20/learn">Source on GitHub</a>

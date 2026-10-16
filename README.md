@@ -1,9 +1,11 @@
 # System Design · Interactive Notes
 
-Interactive system design study notes in two tracks, published at [gouravb20.github.io/learn](https://gouravb20.github.io/learn/):
+Interactive system design study notes in four sections, published at [gouravb20.github.io/learn](https://gouravb20.github.io/learn/). A hamburger menu at the top left of every hub page opens a panel with all four:
 
-- [`high-level-design/`](public/high-level-design/index.html): chapter-wise notes for the system design core concepts, the advanced topics, worked problem breakdowns and the books behind modern data and AI systems, plus a slide deck on how databases differ and an in-browser library of the source books.
-- [`low-level-design/`](public/low-level-design/index.html): chapter-wise notes for the languages and building blocks behind well-designed programs, starting with *Mastering Go*, plus an in-browser library of the source books.
+- [`high-level-design/`](public/high-level-design/index.html): chapter-wise notes for the system design core concepts, the advanced topics and worked problem breakdowns.
+- [`low-level-design/`](public/low-level-design/index.html): notes on the building blocks of well-designed programs. Coming soon.
+- [`books/`](public/books/index.html): chapter-wise notes for the books behind modern data, AI and Go programs, plus a library that opens every source PDF in the browser.
+- [`slides/`](public/slides/index.html): slide decks and visual guides.
 
 The site is built with [Astro](https://astro.build) as plain static HTML. Most pages are still the original hand-written static site, served unchanged from `public/`. Notes apps are being moved, one at a time, from single-page apps to Astro-rendered pages (one real page per chapter, so search engines can index them); Problem Breakdowns is the first.
 
@@ -14,28 +16,29 @@ The site is built with [Astro](https://astro.build) as plain static HTML. Most p
 | System Design Core Concepts (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials)) | [`notes/core-concepts`](public/high-level-design/notes/core-concepts/index.html) | 18 | 228 | 31 | 116 |
 | System Design Advanced Topics (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search) and [Arpit Bhayani](https://arpitbhayani.me/blogs/morris-counter/)) | [`notes/advanced-topics`](public/high-level-design/notes/advanced-topics/index.html) | 10 | 125 | 20 | 54 |
 | System Design Problem Breakdowns: YouTube Top K (inspired by [Hello Interview](https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k)) | [`notes/problem-breakdowns`](public/high-level-design/notes/problem-breakdowns/) | 5 | 50 | 8 | 26 |
-| Designing Data-Intensive Applications (Kleppmann) | [`notes/ddia`](public/high-level-design/notes/ddia/index.html) | 12 | 181 | - | 100 |
-| Streaming Systems (Akidau, Chernyak & Lax) | [`notes/streaming-systems`](public/high-level-design/notes/streaming-systems/index.html) | 10 | 118 | 22 | 82 |
-| AI Engineering (Huyen) | [`notes/ai-engineering`](public/high-level-design/notes/ai-engineering/index.html) | 10 | 119 | 22 | 78 |
-| Essential GraphRAG (Bratanič & Hane) | [`notes/graphrag`](public/high-level-design/notes/graphrag/index.html) | 9 | 97 | 16 | 67 |
-| Database Internals, Part I: Storage Engines (Petrov) | [`notes/database-internals`](public/high-level-design/notes/database-internals/index.html) | 7 | 107 | 23 | 58 |
 
-Paths in the table are relative to `public/high-level-design/`. Also included:
-
-- [`slides/database-guide`](public/high-level-design/slides/database-guide/index.html): *A Field Guide to Databases*, a 20-slide deck on OLTP vs OLAP, data models, B-Tree vs LSM-Tree, compute/storage separation and distributed SQL.
-- [`books/`](public/high-level-design/books/index.html): a library page that opens each source PDF in the browser's built-in PDF viewer (`books/index.html#ddia`, `#database-internals`, ...), with links to the notes and downloads. It also holds Alex Xu's *System Design Interview* volumes 1 and 2 (`#sdi-vol1`, `#sdi-vol2`), linked to the core concepts notes.
-- [`isolation-anomalies.md`](public/high-level-design/isolation-anomalies.md): a one-page map of transaction isolation anomalies.
+Paths in the table are relative to `public/high-level-design/`. Also included: [`isolation-anomalies.md`](public/high-level-design/isolation-anomalies.md), a one-page map of transaction isolation anomalies.
 
 ## Low-level design
 
+Coming soon. The *Mastering Go* notes that used to live here are now in Books.
+
+## Books
+
 | Book | Notes | Chapters | Concepts | Labs | Q&A |
 |---|---|---|---|---|---|
-| Mastering Go, 4th edition (Tsoukalos) | [`notes/mastering-go`](public/low-level-design/notes/mastering-go/index.html) | 16 | 246 | 47 | 156 |
+| Designing Data-Intensive Applications (Kleppmann) | [`notes/ddia`](public/books/notes/ddia/index.html) | 12 | 181 | - | 100 |
+| Streaming Systems (Akidau, Chernyak & Lax) | [`notes/streaming-systems`](public/books/notes/streaming-systems/index.html) | 10 | 118 | 22 | 82 |
+| AI Engineering (Huyen) | [`notes/ai-engineering`](public/books/notes/ai-engineering/index.html) | 10 | 119 | 22 | 78 |
+| Essential GraphRAG (Bratanič & Hane) | [`notes/graphrag`](public/books/notes/graphrag/index.html) | 9 | 97 | 16 | 67 |
+| Database Internals, Part I: Storage Engines (Petrov) | [`notes/database-internals`](public/books/notes/database-internals/index.html) | 7 | 107 | 23 | 58 |
+| Mastering Go, 4th edition (Tsoukalos) | [`notes/mastering-go`](public/books/notes/mastering-go/index.html) | 16 | 246 | 47 | 156 |
 
-Paths in the table are relative to `public/low-level-design/`. Also included:
+Paths in the table are relative to `public/books/`. The [Books page](public/books/index.html) lists these notes, then a library that opens each source PDF in the browser's built-in PDF viewer (`books/index.html#ddia`, `#mastering-go`, ...), with links to the notes and downloads. The library also holds Alex Xu's *System Design Interview* volumes 1 and 2 (`#sdi-vol1`, `#sdi-vol2`, linked to the core concepts notes), *Software Architecture: The Hard Parts*, *Learning SPARQL* and *Staff Engineer*.
 
-- [`books/`](public/low-level-design/books/index.html): the same library viewer as the high-level design track, holding *Mastering Go* (`books/index.html#mastering-go`).
+## Slides
 
+- [`slides/database-guide`](public/slides/database-guide/index.html): *A Field Guide to Databases*, a 20-slide deck on OLTP vs OLAP, data models, B-Tree vs LSM-Tree, compute/storage separation and distributed SQL.
 ## Features of the notes sites
 
 Every book gets the same app:
@@ -49,7 +52,7 @@ Every book gets the same app:
 - **All cheatsheets on one page**, with a print stylesheet for a compact black-on-white copy (or a PDF).
 - A **Continue** card on the dashboard that opens the first unfinished chapter, starting from the one you read last.
 - Full-text search (press `/`; every word must match, title hits rank first, <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd> pick a result), <kbd>j</kbd> / <kbd>k</kbd> for the next / previous chapter, light and dark themes, and a mobile layout.
-- Progress is saved in `localStorage`, separately for each book. The hub page shows progress for every book.
+- Progress is saved in `localStorage`, separately for each book. The hub pages show progress for every set of notes.
 - Bookmarkable chapters, tabs and labs. Astro-rendered apps use real URLs (`problem-breakdowns/ch2/#lab-servingStrategy`, `problem-breakdowns/glossary/`); single-page apps use hash routes (`#/ch3/labs/btree`, `#/glossary`, `#/cheatsheet`). When an app moves to Astro, its old hash links redirect to the new pages and saved progress carries over.
 - Astro-rendered apps also get per-page titles, descriptions, canonical URLs, Open Graph tags, structured data (Course, LearningResource, BreadcrumbList) and a sitemap. Their content is in the HTML, so it reads fine without JavaScript; only labs and progress tracking need it.
 
@@ -70,21 +73,27 @@ Every URL lives under `/learn/`, as on GitHub Pages, so the dev server's bare `h
 
 ```
 public/                        served as-is under /learn/
-  index.html                   landing page: pick high-level or low-level design
-  shared/                      used by every notes app in both tracks
+  index.html                   landing page: pick a section
+  shared/                      used by every page
+    sitenav.js                 hamburger menu: a panel over the page linking the four sections
     app.js                     single-page app shell: routing, tabs, search, progress, export/import
     styles.css                 styles, including every book's lab visuals
     labkit.js                  helpers for labs (controls, sliders, SVG charts, formatting)
     notes.d.ts                 types for DATA and DEMOS
   high-level-design/
-    index.html                 hub page linking every book, the slides and the library
-    notes/<book>/
+    index.html                 hub page linking core concepts, advanced topics and problem breakdowns
+    notes/<app>/
       index.html               single-page apps only: page markup and script tags
-      data.js, data-part2.js   the book's content (core-concepts also has data-part3.js)
-      demos.js, demos-part2.js the book's labs (core-concepts also has demos-part3.js)
-    slides/database-guide/     slide deck
-    books/                     source PDFs and the library / viewer page
-  low-level-design/            same layout (mastering-go has data-part1..5.js and demos-part1..5.js)
+      data.js, data-part2.js   the app's content (core-concepts also has data-part3.js)
+      demos.js, demos-part2.js the app's labs (core-concepts also has demos-part3.js)
+  low-level-design/index.html  coming-soon page
+  books/
+    index.html                 book notes, then the library / PDF viewer
+    notes/<book>/              same layout as above (mastering-go has data-part1..5.js and demos-part1..5.js)
+    <topic>/*.pdf              source PDFs
+  slides/
+    index.html                 list of decks
+    database-guide/            slide deck
 src/
   content.config.ts            loads every Astro-rendered app's data*.js and demos*.js, validates them with Zod
   lib/notes-source.mjs         finds notes apps and runs their scripts; shared with scripts/check-site.mjs
@@ -115,7 +124,7 @@ All of it runs in CI on pull requests and pushes to `main` (`.github/workflows/c
 
 ## Adding a book
 
-1. Copy an existing `notes/<book>` folder into the right track (`public/high-level-design/notes/` or `public/low-level-design/notes/`). Copy one without an `index.html` (such as `problem-breakdowns`) to get Astro pages.
+1. Copy an existing `notes/<book>` folder into the right section (`public/high-level-design/notes/` for topic notes, `public/books/notes/` for a book's notes). Copy one without an `index.html` (such as `problem-breakdowns`) to get Astro pages.
 2. Rewrite `data.js` (and `data-part2.js` if needed). It sets `window.DATA`, typed in `public/shared/notes.d.ts`:
    - `book`: title, subtitle, `storageKey` (unique per book), `appId`, `exportPrefix`, section titles, the labs intro, and for Astro apps the top-bar brand (`mono`, `shortTitle`, `tagline`).
    - `parts`: part number to part name.

@@ -9,7 +9,7 @@
   "name": "System Design Notes",
   "alternateName": "Interactive system design study notes",
   "url": "https://gouravb20.github.io/learn/",
-  "description": "Interactive system design study notes in two tracks: high-level design (distributed systems, data and AI) and low-level design (languages and building blocks), with chapter pages, labs, glossaries and interview Q&A.",
+  "description": "Interactive system design study notes: high-level design (core concepts, advanced topics, problem breakdowns), low-level design, notes on the source books with in-browser PDFs, and slide decks, with chapter pages, labs, glossaries and interview Q&A.",
   "inLanguage": "en",
   "isAccessibleForFree": true,
   "license": "https://github.com/gouravb20/learn",
@@ -41,6 +41,16 @@
       "@type": "CollectionPage",
       "name": "Low-Level Design",
       "url": "https://gouravb20.github.io/learn/low-level-design/"
+    },
+    {
+      "@type": "CollectionPage",
+      "name": "Books",
+      "url": "https://gouravb20.github.io/learn/books/"
+    },
+    {
+      "@type": "CollectionPage",
+      "name": "Slides",
+      "url": "https://gouravb20.github.io/learn/slides/"
     }
   ],
   "dct:title": "System Design Notes",
