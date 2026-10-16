@@ -33,6 +33,7 @@ Coming soon. The *Mastering Go* notes that used to live here are now in Books.
 | Essential GraphRAG (Bratanič & Hane) | [`notes/graphrag`](public/books/notes/graphrag/index.html) | 9 | 97 | 16 | 67 |
 | Database Internals, Part I: Storage Engines (Petrov) | [`notes/database-internals`](public/books/notes/database-internals/index.html) | 7 | 107 | 23 | 58 |
 | Mastering Go, 4th edition (Tsoukalos) | [`notes/mastering-go`](public/books/notes/mastering-go/index.html) | 16 | 246 | 47 | 156 |
+| Software Architecture: The Hard Parts (Ford, Richards, Sadalage & Dehghani) | [`notes/architecture-hard-parts`](public/books/notes/architecture-hard-parts/) | 15 | 135 | 14 | 75 |
 
 Paths in the table are relative to `public/books/`. The [Books page](public/books/index.html) lists these notes, then a library that opens each source PDF in the browser's built-in PDF viewer (`books/index.html#ddia`, `#mastering-go`, ...), with links to the notes and downloads. The library also holds Alex Xu's *System Design Interview* volumes 1 and 2 (`#sdi-vol1`, `#sdi-vol2`, linked to the core concepts notes), *Software Architecture: The Hard Parts*, *Learning SPARQL* and *Staff Engineer*.
 
