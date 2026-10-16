@@ -83,8 +83,8 @@
     const reading = (deep.furtherReading || []).map(r =>
       `<li>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${r.title}</a> &#8599;` : `<strong>${r.title}</strong>`}${r.note ? ` <span class="muted">${r.note}</span>` : ""}</li>`).join("");
     return `<div class="deep">
-      <div class="deep-hook">${deep.hook}</div>
       <nav class="deep-toc" aria-label="Sections"><div class="deep-toc-title">In this deep dive <span class="deep-toc-count"></span></div><ol>${toc}</ol></nav>
+      <div class="deep-hook">${deep.hook}</div>
       ${sections}
       ${deep.takeaways.length ? `<div class="deep-takeaways"><h2>Key takeaways</h2><ol>${deep.takeaways.map(t => `<li>${t}</li>`).join("")}</ol></div>` : ""}
       ${reading ? `<div class="deep-reading"><h2>Further reading</h2><ul>${reading}</ul></div>` : ""}
