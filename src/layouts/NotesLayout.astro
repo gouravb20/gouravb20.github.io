@@ -59,7 +59,7 @@ const ring = 2 * Math.PI * 8;
     })();
   </script>
   <script src={url("shared/looks.js")} is:inline></script>
-  <script src={url("shared/sitenav.js")} is:inline defer></script>
+  <script src={url("shared/sitenav.js")} is:inline></script>
   {structuredData.map(d => <script type="application/ld+json" set:html={jsonLd(d)} />)}
   <slot name="head" />
 </head>

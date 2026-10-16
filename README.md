@@ -76,7 +76,7 @@ Every URL lives under `/learn/`, as on GitHub Pages, so the dev server's bare `h
 public/                        served as-is under /learn/
   index.html                   landing page: pick a section
   shared/                      used by every page
-    sitenav.js                 hamburger menu: a panel over the page linking the four sections
+    sitenav.js                 site sidebar: a collapsible tree of sections and notes apps (a drawer on small screens)
     app.js                     single-page app shell: routing, tabs, search, progress, export/import
     styles.css                 styles, including every book's lab visuals
     labkit.js                  helpers for labs (controls, sliders, SVG charts, formatting)
