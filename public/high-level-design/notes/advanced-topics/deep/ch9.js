@@ -1,30 +1,25 @@
 // Deep dive: Chapter 9, Time series databases: the read path, rollups and where they break. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch9 = {
-  hook: `<p>It is 3 a.m. and checkout is slow. The on-call engineer opens a dashboard: average CPU for production hosts in us-west over the last hour, then p99 latency over the last 30 days to see whether this is new. The first panel needs a handful of series out of millions. The second spans 30 days of 10-second data, about 259,000 points per series. Both should render in under a second.</p>
-<p>A week earlier, a well-meaning developer added a <code>user_id</code> label to the request-latency metric "for debugging". Overnight the metrics server's memory doubled, then it fell over. Both stories are about the read side of a time series database: the structures that make queries cheap, the rollups that make long ranges affordable, and the one assumption, low cardinality, that all of it depends on.</p>`,
+  hook: `<p>This chapter covers the read side of a time series database: the index that finds a few series among millions, the rollups that make long ranges affordable, what a rollup must store to stay correct, and the low-cardinality assumption everything depends on.</p>`,
   sections: [
     {
-      id: "anatomy-of-a-query",
-      title: "Anatomy of a query: from tags to blocks",
+      id: "read-path",
+      title: "The read path: from tags to blocks",
       kicker: "The read path",
       blocks: [
         {
-          type: "problem",
-          html: `<p>A monitoring TSDB may hold millions of series and billions of points. A typical query wants a few dozen series over a recent window. Scanning raw points and filtering them, the way a table scan would, reads thousands of times more data than the answer needs.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>The trick is that a TSDB never searches points. It searches <em>series</em>, through an index small enough to live in memory, and only then reads the compressed chunks of the series it found. That index is an <strong>inverted index</strong>, the same structure a search engine uses for words, applied to tag values: for every <code>key=value</code> pair, a sorted list (a <em>postings list</em>) of the IDs of series that have it.</p>`,
+          html: `<p>A TSDB never searches points. It searches <em>series</em> through an in-memory <strong>inverted index</strong>: for each <code>key=value</code> tag, a sorted <strong>postings list</strong> of series IDs. Then it reads only those series' compressed chunks.</p>`,
         },
         {
           type: "steps",
           title: "Answering \"average CPU for prod hosts in us-west, last hour\"",
           items: [
-            "<strong>Pick partitions.</strong> Only blocks whose time range overlaps the last hour are candidates; usually that is the in-memory head plus at most one recent block.",
-            "<strong>Resolve series.</strong> Look up <code>region=us-west</code> and <code>env=prod</code> (and the metric name) in the tag index and intersect the sorted postings lists.",
-            "<strong>Locate chunks.</strong> Each block's own index maps a series ID to the offsets of its chunks, so the engine seeks straight to them.",
-            "<strong>Decompress and aggregate while streaming.</strong> Decode just those chunks, drop points outside the hour, and fold values into a running sum and count. Raw points never pile up in memory.",
+            "<strong>Pick partitions</strong> overlapping the last hour: usually the in-memory head plus at most one block.",
+            "<strong>Resolve series</strong> by intersecting the postings lists for <code>region=us-west</code>, <code>env=prod</code> and the metric name (a linear merge).",
+            "<strong>Locate chunks</strong> through each block's series-to-offset index.",
+            "<strong>Decompress and aggregate while streaming</strong> into a running sum and count.",
           ],
         },
         {
@@ -71,32 +66,6 @@ DEEP.ch9 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<p>Intersecting sorted lists is a linear merge, and the lists are small compared with the data: a few million series IDs at most, often far fewer per tag value. With the series resolved, the query reads a few kilobytes of compressed chunks per series. Two kinds of locality do the work together: <strong>time locality</strong> (partitions) narrows which files to open, and <strong>series locality</strong> (per-series chunks) narrows which bytes inside them to read.</p>`,
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "Prometheus", title: "Postings in the block index", html: "Every block's index file stores the label names and values, a postings list of series IDs for each label pair, and per-series chunk references. PromQL label matchers are evaluated by intersecting (and for negative matchers, subtracting) postings lists." },
-            { org: "InfluxDB", title: "TSI", html: "InfluxDB originally kept its series index entirely in memory. The disk-backed Time Series Index (TSI) was added so that the number of series is no longer bounded by RAM, which helps with, but does not eliminate, high-cardinality pain." },
-          ],
-        },
-      ],
-    },
-    {
-      id: "skipping-work",
-      title: "Skipping work: block metadata and Bloom filters",
-      kicker: "Pruning",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>A query over the last month might overlap dozens of immutable files. Most of them cannot contribute anything: the series is not in them, or their time range or values are outside the filter. A TSDB layers cheap checks that rule files and blocks out before any data is decompressed.</p>
-<h3>Block metadata</h3>
-<p>Every block (and often every chunk within it) records its minimum and maximum timestamp, and some engines also keep the minimum and maximum value. A query for 14:00-15:00 skips any block whose range ends before 14:00 or starts after 15:00. A filter such as <code>value &gt; 90</code> can skip a chunk whose recorded maximum is 72 without decoding it. The check costs a couple of comparisons against metadata already in memory.</p>
-<h3>Bloom filters</h3>
-<p>A Bloom filter answers "might this file contain series X?" with either <em>definitely not</em> or <em>maybe</em>. It is a bit array; adding a key sets k bits chosen by k hash functions, and a lookup checks whether all k bits are set. False negatives are impossible, so a "no" safely skips the file. False positives cost an unnecessary read. The space needed for a target false-positive rate p is about <span class="formula">bits per key = &minus;ln p / (ln 2)<sup>2</sup></span>, so a 1% rate costs about <strong>9.6 bits per series</strong> with 7 hash functions. For a file holding a million series that is about 1.2 MB, a tiny price for skipping most files on point lookups.</p>`,
-        },
-        {
           type: "table",
           title: "The layers of pruning",
           headers: ["Layer", "Question it answers", "What it skips"],
@@ -108,20 +77,11 @@ DEEP.ch9 = {
           ],
         },
         {
-          type: "text",
-          html: `<p>Which of these layers a given engine uses varies. LSM-based stores such as Cassandra and RocksDB keep a Bloom filter per immutable file, which matters most when a lookup for one key could otherwise touch many files. Engines whose blocks each cover a distinct time range rely more on time metadata, since only a few blocks overlap a recent query anyway. Columnar stores such as ClickHouse use min/max indexes per granule of rows, the same idea applied to analytic columns.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "A file's Bloom filter says series X 'might be present'. What does the engine know?",
-          options: [
-            "Series X is definitely in the file",
-            "Series X is definitely not in the file",
-            "Series X is probably in the file, but the engine must read the index to be sure",
-            "Nothing; Bloom filters only work for time ranges",
+          type: "keypoints",
+          items: [
+            "A Bloom filter's \"no\" safely skips a file; \"maybe\" means check the real index. About 9.6 bits per series gives 1% false positives (1.2 MB per million series). LSM stores like Cassandra and RocksDB use one per file; ClickHouse uses min/max per granule.",
+            "Prometheus block indexes hold postings per label pair, evaluated by intersecting (and subtracting) lists. InfluxDB's disk-backed TSI removed the RAM bound on series count, easing but not eliminating cardinality pain.",
           ],
-          answer: 2,
-          explain: "A Bloom filter has no false negatives but does have false positives. 'Not present' lets the engine skip the file safely; 'might be present' means it must check the file's real index, which occasionally finds nothing.",
         },
       ],
     },
@@ -131,12 +91,8 @@ DEEP.ch9 = {
       kicker: "Long-range queries",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Raw 10-second data is 8,640 points per series per day. A 30-day panel over 500 series asks for about 130 million points, and a one-year capacity-planning chart for over 3 million points per series. The screen can show perhaps a thousand points across its width. Reading the rest is pure waste, and so is storing them forever.</p>`,
-        },
-        {
           type: "idea",
-          html: `<p><strong>Downsample</strong>: background jobs summarize older raw data into coarser buckets (1 minute, 5 minutes, 1 hour), and each resolution is kept for a different length of time. Long-range queries read the coarse rollups; recent, detailed queries read raw points.</p>`,
+          html: `<p>Raw 10-second data is 8,640 points per series per day, far more than a screen's thousand pixels can show. <strong>Downsample</strong> older data into coarser buckets, keep each resolution for a different time, and let long-range queries read rollups.</p>`,
         },
         {
           type: "table",
@@ -151,22 +107,17 @@ DEEP.ch9 = {
           note: "Each rollup bucket stores min, max, sum and count, not just an average.",
         },
         {
-          type: "text",
-          html: `<p>Work out the storage for one series over a year. Raw at 10 seconds: 8,640 &times; 365 &asymp; <strong>3.15 million points</strong>. Under the policy above: 8,640 raw + 6 days &times; 1,440 + 23 days &times; 288 + 335 days &times; 24 &asymp; <strong>32,000 points</strong>, about 99 times fewer. Rollup buckets are bigger than raw points because each holds four numbers, so the saving in bytes is smaller; with the lab's assumptions of about 1.5 bytes per compressed raw point and 6 bytes per bucket, a year shrinks from about 4.7 MB to about 0.15 MB per series, roughly 30x.</p>
-<p>Reads improve even more. The 30-day panel at 1-hour resolution reads 720 points per series instead of 259,200, a 360x reduction, and still has more points than pixels.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Storage:</strong> a year of raw data is about 3.15 million points per series; under this policy about 32,000, roughly 99x fewer points (about 30x fewer bytes, since buckets hold four numbers: ~4.7 MB to ~0.15 MB).",
+            "<strong>Reads:</strong> a 30-day panel at 1-hour resolution reads 720 points per series instead of 259,200.",
+            "TimescaleDB continuous aggregates refresh incrementally with their own retention; Prometheus doesn't downsample (recording rules precompute expressions) but Thanos downsamples to 5-minute and 1-hour during compaction; Druid can roll up at ingestion.",
+          ],
         },
         {
           type: "lab",
           id: "downsampling",
           caption: "Choose how long to keep raw points and each rollup, and see storage and points read for a dashboard query. The bottom chart shows a 30-second CPU spike inside an hour and what each rollup level reports for it.",
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "TimescaleDB", title: "Continuous aggregates", html: "A materialized view over <code>time_bucket()</code> groups that refreshes incrementally in the background as new data arrives. It can be configured to combine materialized buckets with not-yet-materialized raw data for up-to-date results, and given its own, longer retention than the raw table." },
-            { org: "Prometheus and Thanos", title: "Recording rules and compaction", html: "Prometheus itself does not downsample; recording rules precompute expensive expressions into new series. Thanos, which stores Prometheus blocks in object storage, can downsample old blocks to 5-minute and 1-hour resolutions during compaction." },
-            { org: "Apache Druid", title: "Rollup at ingestion", html: "Druid can roll up rows as it ingests them, combining events with the same dimensions in the same time bucket into one row of aggregates. Raw detail is gone from the start, in exchange for much smaller segments." },
-          ],
         },
         {
           type: "code",
@@ -188,26 +139,21 @@ SELECT add_continuous_aggregate_policy('metrics_1m',
         {
           type: "callout",
           tone: "tip",
-          title: "Rollups are a requirements negotiation",
-          html: `<p>When a requirement says "keep 10-second data for a year", do the multiplication out loud, then propose full resolution for a week and rollups after that, and ask whether that serves the actual use cases (alerting needs fresh detail; capacity planning needs hourly trends). Even if the interviewer insists on the original requirement, spotting the cost and offering an alternative is exactly the judgement being assessed.</p>`,
+          html: `<p>Rollups are a requirements negotiation. For "keep 10-second data for a year", do the multiplication out loud and propose full resolution for a week, then rollups, checking it serves alerting and capacity planning.</p>`,
         },
       ],
     },
     {
       id: "rollup-math",
-      title: "What a rollup must keep: min, max, sum, count and sketches",
+      title: "What a rollup must keep",
       kicker: "Getting the numbers right",
       blocks: [
         {
-          type: "problem",
-          html: `<p>The obvious rollup stores one number per bucket: the average. It is also wrong in two ways that matter in production. Averages cannot be combined correctly, and averages erase exactly the spikes that alerts and incident reviews care about.</p>`,
-        },
-        {
-          type: "text",
-          html: `<h3>Averages of averages lie</h3>
-<p>Suppose minute A served 10 requests averaging 100 ms and minute B served 990 requests averaging 10 ms. The average of the two averages is 55 ms. The true average over both minutes is (10 &times; 100 + 990 &times; 10) / 1,000 = <strong>10.9 ms</strong>. Combining 1-minute rollups into 5-minute or hourly ones repeats the error at every level. Store <strong>sum and count</strong> instead: sums add, counts add, and <span class="formula">average = &Sigma;sum / &Sigma;count</span> is exact at any resolution.</p>
-<h3>Averages hide spikes</h3>
-<p>A CPU idles at 20% and spikes to 100% for 30 seconds. Over a 5-minute bucket the average is (30 &times; 100 + 270 &times; 20) / 300 = <strong>28%</strong>. A dashboard built on averages shows a calm line, and an alert at 90% never fires. Keeping <strong>max</strong> (and min) per bucket preserves the extremes, and max of maxes is exact when you roll up further.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Averages of averages lie:</strong> 10 requests at 100 ms and 990 at 10 ms average to 55 ms by averaging averages, but the truth is <strong>10.9 ms</strong>. Store <strong>sum and count</strong>; <code>average = &Sigma;sum / &Sigma;count</code> is exact at any level.",
+            "<strong>Averages hide spikes:</strong> 20% CPU with a 30-second spike to 100% averages to <strong>28%</strong> over 5 minutes, so a 90% alert never fires. Keep <strong>min and max</strong>; max of maxes stays exact.",
+          ],
         },
         {
           type: "diagram",
@@ -234,29 +180,16 @@ SELECT add_continuous_aggregate_policy('metrics_1m',
         },
         {
           type: "text",
-          html: `<h3>Percentiles do not roll up at all</h3>
-<p>Latency objectives are usually stated as percentiles: p99 under 300 ms. There is no formula that combines the p99 of each minute into the p99 of the hour; you need the underlying distribution. Two mergeable representations solve this:</p>
-<ul>
-<li><strong>Histogram buckets.</strong> Count requests per latency range (under 10 ms, under 25 ms, under 50 ms...). Counts add across time and across hosts, and a percentile is estimated from the merged counts. Prometheus histograms work this way, with a cumulative bucket series per <code>le</code> (less-or-equal) boundary.</li>
-<li><strong>Sketches.</strong> Compact, mergeable summaries with accuracy guarantees, such as t-digest (accurate at the tails) and DDSketch (a bounded relative error, described by Datadog in 2019). Store one per bucket and merge them for any coarser window.</li>
-</ul>`,
+          html: `<p><strong>Percentiles don't roll up at all:</strong> no formula combines minute p99s into an hourly p99. Keep a mergeable distribution: <strong>histogram buckets</strong> (counts per latency range add across time and hosts; Prometheus uses cumulative <code>le</code> buckets) or <strong>sketches</strong> such as t-digest or DDSketch (Datadog, 2019).</p>`,
         },
         {
           type: "code",
           lang: "text",
-          title: "PromQL: p99 per region from mergeable histogram buckets",
+          title: "PromQL: merge bucket counts per region first, estimate p99 last",
           code: `histogram_quantile(
   0.99,
   sum by (region, le) (rate(http_request_duration_seconds_bucket[5m]))
 )`,
-          caption: "Bucket counts from every host are summed per region and boundary first; the percentile is estimated last, from the merged distribution.",
-        },
-        {
-          type: "compare",
-          items: [
-            { title: "Store only the average", tone: "bad", html: "Wrong when rolled up further (bucket counts differ), hides spikes, and cannot produce percentiles." },
-            { title: "Store min, max, sum, count (+ histogram or sketch)", tone: "ok", html: "Exact averages at any level from sum/count, exact extremes from min/max, and percentiles from merged histograms or sketches. A few more bytes per bucket." },
-          ],
         },
         {
           type: "quiz",
@@ -274,17 +207,12 @@ SELECT add_continuous_aggregate_policy('metrics_1m',
     },
     {
       id: "cardinality",
-      title: "Cardinality: the assumption everything rests on",
+      title: "Cardinality, and where TSDBs break",
       kicker: "Where it breaks",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Every structure in this chapter and the last is sized per <strong>series</strong>: an entry in the tag index, a postings ID in several lists, an open chunk and buffer in memory. A TSDB is efficient when there are few series with many points each. Flip that ratio and the design collapses.</p>`,
-        },
-        {
           type: "text",
-          html: `<p><strong>Cardinality</strong> is the number of distinct series. In the worst case it is the product of the distinct values of each tag: <span class="formula">series &le; |metric names| &times; |tag<sub>1</sub> values| &times; |tag<sub>2</sub> values| &times; ...</span>, limited in practice to combinations that actually occur. 1,000 hosts &times; 50 metrics is 50,000 series, which any TSDB handles comfortably.</p>
-<p>Now take one request metric labelled by method (4 values), endpoint (25) and status code (5) across 200 pods: 4 &times; 25 &times; 5 &times; 200 = <strong>100,000 series</strong>. Add <code>user_id</code> for a million active users. Even if each user touches only three method-endpoint-status combinations, that is several million new series, and each new user creates more. At the lab's assumption of about 3 KB of memory per active series, 100,000 series is 300 MB; 10 million is 30 GB. Ingestion slows as the index grows, queries that match a label touch huge postings lists, and eventually the process runs out of memory.</p>`,
+          html: `<p>Every structure is sized per <strong>series</strong> (index entry, postings IDs, open chunk in memory), and cardinality can reach the product of tag values. Method (4) &times; endpoint (25) &times; status (5) &times; 200 pods is <strong>100,000 series</strong>; add <code>user_id</code> for a million users and it's several million. At about 3 KB per active series, 10 million series is 30 GB, and the process slows then runs out of memory.</p>`,
         },
         {
           type: "lab",
@@ -303,13 +231,27 @@ SELECT add_continuous_aggregate_policy('metrics_1m',
           ],
         },
         {
-          type: "text",
-          html: `<p>Note the third row. A value does not need millions of distinct values at any moment to cause trouble; it only needs to keep producing new ones. Pod or container IDs that change on every deploy, or URL paths that include IDs (<code>/orders/98213</code>), create a steady stream of new short-lived series, called <strong>churn</strong>. Each one costs index space even after it stops receiving points, until its block ages out.</p>`,
-        },
-        {
           type: "callout",
           tone: "mistake",
-          html: `<p>"Let's add <code>user_id</code> as a label so we can debug per-user latency." The Prometheus documentation explicitly warns against labels with unbounded values such as user IDs or email addresses. Per-user questions belong in logs, traces or a column store, where high cardinality is cheap. Keep metric labels to things you would put on a dashboard's group-by menu.</p>`,
+          html: `<p>"Add <code>user_id</code> as a label to debug per-user latency." Prometheus docs warn against unbounded label values. Also watch <strong>churn</strong>: per-deploy container IDs or paths like <code>/orders/98213</code> keep creating short-lived series that cost index space until their blocks age out.</p>`,
+        },
+        {
+          type: "table",
+          title: "Matching workloads to tools",
+          headers: ["Workload", "Good fit", "Why"],
+          rows: [
+            ["Service CPU, latency, error rates", "Prometheus (plus long-term store)", "Low-cardinality labels, alerting built in"],
+            ["Sensor data next to device and customer tables", "TimescaleDB", "SQL joins, Postgres operations"],
+            ["Per-user request analytics", "ClickHouse or Druid", "High-cardinality columns are cheap"],
+            ["Real-time top-K trending items", "Stream processing (Flink, Kafka Streams) with sketches", "Aggregates across millions of keys as events arrive"],
+          ],
+        },
+        {
+          type: "keypoints",
+          items: [
+            "TSDBs break on ranking across millions of entities, filterable per-user identifiers, joins with relational data and updates to old points.",
+            "Prometheus long-term storage and global views come from Thanos, Cortex, Mimir or VictoriaMetrics; InfluxDB 3 rebuilt on Arrow, DataFusion and Parquet aiming at higher cardinality.",
+          ],
         },
         {
           type: "quiz",
@@ -326,106 +268,31 @@ SELECT add_continuous_aggregate_policy('metrics_1m',
       ],
     },
     {
-      id: "where-tsdbs-break",
-      title: "Where TSDBs break, and what to use instead",
-      kicker: "Choosing a tool",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>A TSDB's advantages come from its assumptions: append-only writes, regular points, low cardinality, queries over a few series. Each assumption has a matching workload that breaks it.</p>
-<ul>
-<li><strong>Ranking across millions of entities</strong> (top products, trending hashtags) needs to scan and sort huge numbers of series.</li>
-<li><strong>Per-user or per-request analytics</strong> needs high-cardinality identifiers as filterable columns.</li>
-<li><strong>Joins with relational data</strong> (metrics plus customer plans plus billing) are awkward or impossible in most TSDBs.</li>
-<li><strong>Frequent updates to old points</strong> fight immutable compressed blocks.</li>
-</ul>`,
-        },
-        {
-          type: "compare",
-          title: "The landscape",
-          items: [
-            { title: "Prometheus", tone: "ok", html: "Pull-based monitoring with a local TSDB (2-hour blocks), PromQL and alerting. The default for service metrics with low-cardinality labels. Long-term storage and global views via Thanos, Cortex, Mimir or VictoriaMetrics." },
-            { title: "InfluxDB", tone: "info", html: "A purpose-built TSDB with line-protocol ingestion and its own query languages; version 3 rebuilt the engine on Arrow, DataFusion and Parquet with a stated goal of handling higher cardinality." },
-            { title: "TimescaleDB", tone: "info", html: "A Postgres extension: hypertables, columnar compression and continuous aggregates with full SQL and joins. The natural choice if you already run Postgres." },
-            { title: "ClickHouse, Druid", tone: "warn", html: "Column-oriented analytic stores. Not TSDBs in the narrow sense, but excellent for high-cardinality event data: billions of rows with user IDs, filtered and aggregated quickly." },
-          ],
-        },
-        {
-          type: "table",
-          title: "Matching workloads to tools",
-          headers: ["Workload", "Good fit", "Why"],
-          rows: [
-            ["Service CPU, latency, error rates", "Prometheus (plus long-term store)", "Low-cardinality labels, alerting built in"],
-            ["Sensor data next to device and customer tables", "TimescaleDB", "SQL joins, Postgres operations"],
-            ["Per-user request analytics", "ClickHouse or Druid", "High-cardinality columns are cheap"],
-            ["Real-time top-K trending items", "Stream processing (Flink, Kafka Streams) with sketches", "Aggregates across millions of keys as events arrive"],
-          ],
-        },
-        {
-          type: "tradeoffs",
-          prosLabel: "When a TSDB is the right call",
-          consLabel: "When it is not",
-          pros: [
-            "Very high write rates of regular, append-only points",
-            "Queries over recent ranges of a modest number of series",
-            "Retention, compression and downsampling handled by the engine",
-          ],
-          cons: [
-            "Identifiers with millions of values must be filterable",
-            "Ranking or sorting across huge numbers of entities",
-            "Joins with relational data or updates to historical points",
-          ],
-        },
-      ],
-    },
-    {
       id: "interview",
       title: "Using it in a design interview",
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>After you have sketched the write path for a metrics system, interviewers typically probe the read side: how does a dashboard query stay fast, how do you keep a year of data, and what happens when someone adds a bad label. Have a crisp answer for each.</p>`,
-        },
-        {
           type: "callout",
           tone: "interview",
-          html: `<p>A strong answer covers:</p>
+          html: `<p>After the write path, expect probes on dashboards, a year of data and bad labels. A strong answer covers:</p>
 <ol>
-<li><strong>Query path:</strong> pick partitions by time, intersect postings lists in the tag index to find series, seek to their chunks, decompress and aggregate while streaming.</li>
-<li><strong>Pruning:</strong> block min/max metadata and Bloom filters skip files that cannot match.</li>
-<li><strong>Downsampling:</strong> raw for a day or a week, then 1-minute, 5-minute and 1-hour rollups, roughly 100x fewer points over a year.</li>
-<li><strong>Rollup contents:</strong> min, max, sum and count; histograms or sketches for percentiles, because percentiles do not roll up.</li>
-<li><strong>Cardinality:</strong> memory scales with series, so identifiers such as user_id go in logs, traces or a column store, never in tags.</li>
+<li><strong>Query path:</strong> partitions by time, postings-list intersection to find series, seek to chunks, aggregate while streaming.</li>
+<li><strong>Pruning:</strong> block min/max metadata and Bloom filters skip files that can't match.</li>
+<li><strong>Downsampling:</strong> raw for a day or week, then 1-minute, 5-minute and 1-hour rollups, about 100x fewer points over a year.</li>
+<li><strong>Rollup contents:</strong> min, max, sum and count; histograms or sketches for percentiles.</li>
+<li><strong>Cardinality:</strong> memory scales with series, so user_id and similar go to logs, traces or a column store; per-user analytics means ClickHouse beside Prometheus, not a stretched TSDB.</li>
 </ol>`,
-        },
-        {
-          type: "text",
-          html: `<p>If the interviewer asks for per-user analytics on the same data, do not stretch the TSDB. Say that the requirement breaks the low-cardinality assumption and propose sending the raw events to a column store such as ClickHouse alongside the service metrics in Prometheus.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "A dashboard shows the hourly average of request latency, computed by averaging the per-minute averages stored in a rollup table. Traffic varies a lot within each hour. What should you change?",
-          options: [
-            "Nothing; averaging averages is exact",
-            "Store sum and count per minute and compute the hourly average as total sum divided by total count",
-            "Switch to median instead of mean",
-            "Increase the rollup resolution to 10 seconds",
-          ],
-          answer: 1,
-          explain: "When minutes have different request counts, a plain average of averages over-weights quiet minutes. Sum and count roll up exactly, so the hourly average is the sum of the minute sums divided by the sum of the minute counts.",
         },
       ],
     },
   ],
   takeaways: [
-    "TSDB queries search series, not points: an in-memory inverted index maps tag values to postings lists, and intersecting them finds the series to read.",
-    "Time partitions, Bloom filters and block min/max metadata prune files and chunks before anything is decompressed.",
-    "Downsampling into tiered rollups (raw, 1 minute, 5 minutes, 1 hour) cuts a year of points per series by about 100x and makes long-range dashboards cheap.",
-    "Rollups must keep min, max, sum and count: averages of averages are wrong and averages hide spikes.",
-    "Percentiles do not roll up; keep histogram buckets or mergeable sketches such as t-digest or DDSketch.",
-    "Memory scales with the number of series. High-cardinality or churning tags (user_id, request IDs, per-deploy container IDs) are the classic way to take a TSDB down.",
-    "For per-user analytics, ranking or joins, use a column store, stream processing or Postgres instead of stretching a TSDB.",
+    "TSDB queries search series, not points: intersect postings lists from an in-memory tag index, then read only those chunks; time partitions, Bloom filters and min/max metadata prune the rest.",
+    "Tiered rollups (raw, 1 minute, 5 minutes, 1 hour) cut a year of points per series by about 100x.",
+    "Rollups must keep min, max, sum and count, because averages of averages are wrong and averages hide spikes.",
+    "Percentiles don't roll up; keep histogram buckets or mergeable sketches such as t-digest or DDSketch.",
+    "Memory scales with series count: high-cardinality or churning tags take TSDBs down, and per-user analytics, ranking or joins belong in a column store, stream processing or Postgres.",
   ],
   furtherReading: [
     { title: "Prometheus documentation: instrumentation best practices", url: "https://prometheus.io/docs/practices/instrumentation/", note: "Guidance on labels and why high-cardinality values do not belong in them." },

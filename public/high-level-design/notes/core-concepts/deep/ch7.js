@@ -1,8 +1,7 @@
 // Deep dive: Chapter 7, API styles and REST resource design. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch7 = {
-  hook: `<p>Fifteen minutes into a ticket-booking interview, you have requirements and a list of entities. The interviewer says, "Let's define the API." One candidate writes <code>POST /bookTicket</code>, <code>GET /getEventSeats?eventId=</code>, <code>POST /cancel</code>, and then spends ten minutes debating whether to use GraphQL. Another writes five clean endpoints in three minutes, names the one that must be idempotent, mentions that the user comes from the auth token, and moves on to the high-level design with time to spare.</p>
-<p>Both APIs would work. The second one tells the interviewer something: this person models the domain in resources, knows what each HTTP method promises, knows which requests are dangerous to retry, and doesn't overspend time. This chapter is about producing that second API quickly and being able to defend every choice in it.</p>`,
+  hook: `<p>This chapter covers how to produce a clean REST API in the five-minute API step of an interview and defend every choice: resource names, where inputs go, what each method promises and which status codes to return.</p>`,
   sections: [
     {
       id: "the-api-step",
@@ -11,8 +10,7 @@ DEEP.ch7 = {
       blocks: [
         {
           type: "text",
-          html: `<p>In most interview frameworks the API comes right after requirements and core entities, and it should take about five minutes. Its job is to turn each functional requirement into the user-facing endpoints that satisfy it, so the rest of the design has a concrete contract to build against.</p>
-<p>The interviewer is looking for three things: a sensible protocol choice stated in a sentence, resources that match the entities you already listed, and correct use of methods, parameters and status codes. They are not looking for completeness. Internal service-to-service APIs usually don't need listing at this stage; it is enough to say during the high-level design that services talk over RPC.</p>`,
+          html: `<p>The API step turns each functional requirement into a user-facing endpoint, so the design has a concrete contract. Interviewers want a protocol choice in one sentence, resources that match your entities and correct methods and status codes, not completeness. Internal APIs can wait: say services talk over RPC.</p>`,
         },
         {
           type: "diagram",
@@ -68,37 +66,22 @@ DEEP.ch7 = {
             "Note that the caller's identity comes from the auth token, then move on.",
           ],
         },
-        {
-          type: "callout",
-          tone: "tip",
-          html: `<p>Interviewers want a reasonable, consistent API, not a perfect one. If you catch yourself debating whether a field belongs in the path or the body for more than a few seconds, pick one, say why in a sentence, and keep going. You can always revise an endpoint later when the design reveals a need.</p>`,
-        },
       ],
     },
     {
-      id: "resources",
-      title: "Resources are your core entities",
-      kicker: "Naming",
+      id: "resources-and-inputs",
+      title: "Resources and where each input goes",
+      kicker: "Naming and parameters",
       blocks: [
         {
-          type: "idea",
-          html: `<p>A REST resource is a <strong>thing</strong> in your system, usually one of the core entities: events, venues, tickets, bookings, users. Name collections with <strong>plural nouns</strong> and let the HTTP method supply the verb. <code>POST /bookings</code> creates a booking; there is no need for <code>/createBooking</code>.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>Some operations sound like verbs: cancel, check in, refund, transfer. There are two clean ways to express them without putting verbs in paths:</p>
-<ul>
-<li><strong>As a state change</strong> on the existing resource: <code>PATCH /bookings/88</code> with <code>{"status": "cancelled"}</code>. Good when the action just moves the resource to another state.</li>
-<li><strong>As a new resource</strong> you create: <code>POST /bookings/88/refunds</code>. Good when the action has its own data, lifecycle or history: a refund has an amount, a status and an ID you may fetch later.</li>
-</ul>
-<h3>Nested or flat?</h3>
-<p>Nest a resource under its parent when the parent is always required to make sense of it: tickets only exist within an event, so <code>/events/{id}/tickets</code> reads naturally. Keep resources flat and filter with query parameters when the relationship is optional or there are several ways to slice the collection: <code>/tickets?event_id=123&amp;section=A</code>, or <code>/bookings?status=confirmed</code>. Deep nesting such as <code>/venues/1/events/2/sections/3/tickets/4</code> is a smell: if a ticket has a globally unique ID, <code>/tickets/4</code> is enough.</p>`,
+          html: `<p>Resources are your core entities, named as <strong>plural nouns</strong>; the HTTP method supplies the verb. Actions become a <strong>state change</strong> (<code>PATCH /bookings/88</code> with <code>{"status": "cancelled"}</code>) or a <strong>new sub-resource</strong> when they have their own data and lifecycle (<code>POST /bookings/88/refunds</code>).</p>`,
         },
         {
           type: "compare",
           items: [
-            { title: "Nested path", tone: "info", html: "<code>GET /events/42/tickets</code><br>Expresses ownership; the parent ID is mandatory. Best for one obvious parent and shallow depth (one level, occasionally two)." },
-            { title: "Flat with filters", tone: "ok", html: "<code>GET /tickets?event_id=42&amp;status=available</code><br>Flexible: filters combine and are all optional. Best when items can be queried by several attributes or the parent is optional." },
+            { title: "Nested path", tone: "info", html: "<code>GET /events/42/tickets</code><br>Expresses ownership; the parent ID is mandatory. Best for one obvious parent and shallow depth. If a child has a globally unique ID, <code>/tickets/4</code> is enough." },
+            { title: "Flat with filters", tone: "ok", html: "<code>GET /tickets?event_id=42&amp;status=available</code><br>Filters combine and are all optional. Best when items are sliced several ways or the parent is optional." },
           ],
         },
         {
@@ -112,29 +95,6 @@ GET  /deleteBooking?id=88      ->  DELETE /bookings/88   (a GET must never chang
 GET  /user/42/booking          ->  GET  /users/42/bookings  (plural collections)`,
         },
         {
-          type: "quiz",
-          q: "Bookings can be listed per user, per event, or by status. Which design is most flexible?",
-          options: [
-            "/users/{id}/events/{id}/bookings/{status}",
-            "/bookings?user_id=...&event_id=...&status=... with optional filters",
-            "A separate endpoint per combination, such as /bookingsByUserAndStatus",
-            "POST /searchBookings with all filters in the body",
-          ],
-          answer: 1,
-          explain: "Bookings have several optional ways to be sliced, so a flat collection with combinable query filters handles all of them with one endpoint. Deep nesting forces a single hierarchy, and per-combination endpoints multiply. A POST search endpoint is sometimes justified for very complex queries, but loses GET's cacheability.",
-        },
-      ],
-    },
-    {
-      id: "inputs",
-      title: "Path, query, body and headers: where each input goes",
-      kicker: "Parameters",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>Each part of a request has a conventional job, and following the convention makes an API predictable without documentation.</p>`,
-        },
-        {
           type: "table",
           headers: ["Location", "Use it for", "Example"],
           rows: [
@@ -145,52 +105,22 @@ GET  /user/42/booking          ->  GET  /users/42/bookings  (plural collections)
           ],
         },
         {
-          type: "text",
-          html: `<p>A quick test for path versus query: if removing the value makes the request mean a different resource, it belongs in the path; if removing it just broadens or reorders the result, it is a query parameter. <code>/events/42</code> without 42 is a different thing; <code>/events?city=NYC</code> without the city is still "events", just more of them.</p>
-<h3>Identity never travels in the body</h3>
-<p>Notice what is missing from the booking body above: a <code>user_id</code>. The server learns who is booking from the verified token in the <code>Authorization</code> header. If clients could pass a user ID, any user could book or cancel on someone else's behalf by editing a field. When a path names a user (<code>/users/42/bookings</code>), the server still checks that the authenticated caller is allowed to see user 42's bookings, or offers <code>/users/me/bookings</code> instead.</p>`,
-        },
-        {
-          type: "code",
-          lang: "http",
-          title: "A complete booking request",
-          code: `POST /bookings HTTP/1.1
-Host: api.tickets.example
-Authorization: Bearer eyJhbGciOi...        <- who: from the verified token
-Idempotency-Key: 5f1c0a3e-8d2b-4c55-9e57   <- makes a retry safe
-Content-Type: application/json
-
-{"event_id": 42, "ticket_ids": [701, 702]}
-
-HTTP/1.1 201 Created
-Location: /bookings/88
-
-{"id": 88, "status": "pending_payment", "expires_at": "2026-10-15T18:10:00Z"}`,
-        },
-        {
-          type: "quiz",
-          q: "Where does a sort order such as \"newest first\" belong for GET /events?",
-          options: [
-            "In the path: /events/newest",
-            "In a query parameter: /events?sort=-date",
-            "In the request body",
-            "In the Authorization header",
+          type: "keypoints",
+          items: [
+            "<strong>Path or query?</strong> If removing the value names a different resource, it's path; if it just broadens or reorders the result, it's query.",
+            "<strong>Identity never travels in the body.</strong> The server learns the user from the verified token; a path naming a user (<code>/users/42/bookings</code>) still needs an access check, or offer <code>/users/me/bookings</code>.",
           ],
-          answer: 1,
-          explain: "Sorting doesn't identify a different resource; it modifies how the same collection is returned, and it is optional. That is exactly what query parameters are for. GET requests generally shouldn't carry a body, because many caches and proxies ignore or reject it.",
         },
       ],
     },
     {
       id: "methods-and-idempotency",
-      title: "What each method promises, and why idempotency matters",
+      title: "What each method promises",
       kicker: "Semantics",
       blocks: [
         {
           type: "text",
-          html: `<p>The HTTP specification (RFC 9110) defines two properties that clients and infrastructure rely on.</p>
-<p>A method is <strong>safe</strong> if it is read-only: the client doesn't request any change of state. GET and HEAD are safe, which is why browsers prefetch links, crawlers follow them and caches store their responses.</p>
-<p>A method is <strong>idempotent</strong> if sending the same request several times has the same intended effect on the server as sending it once. GET, HEAD, PUT and DELETE are idempotent. POST is not, and PATCH is not guaranteed to be. Idempotency matters because networks lose responses: after a timeout the client cannot know whether its request was applied, and it can only blindly retry requests whose repetition is harmless.</p>`,
+          html: `<p>RFC 9110 defines two properties. <strong>Safe</strong> (read-only): GET and HEAD, which is why they get prefetched, crawled and cached. <strong>Idempotent</strong> (repeating has the same effect on server state as sending once): GET, HEAD, PUT and DELETE. POST is not; PATCH is not guaranteed. After a timeout, clients can only blindly retry idempotent requests.</p>`,
         },
         {
           type: "diagram",
@@ -238,13 +168,12 @@ Location: /bookings/88
           caption: "Choose a request and how many copies reach the server, then compare the final state with what a single delivery would have produced.",
         },
         {
-          type: "text",
-          html: `<h3>PUT versus PATCH</h3>
-<p><strong>PUT</strong> sends the complete new representation: "make the resource look exactly like this". Fields you omit are, by definition, removed or reset, which is why PUT is idempotent and also why clients rarely want it for large resources. <strong>PATCH</strong> sends only the changes. Whether it is idempotent depends on what the patch says. "Set status to cancelled" gives the same result however often it runs; "append this item" or "increment the counter" does not. The two standard patch formats differ here: JSON Merge Patch (RFC 7396) describes target values, while JSON Patch (RFC 6902) is a list of operations, including array appends that repeat on retry.</p>
-<h3>Why DELETE counts as idempotent</h3>
-<p>The second DELETE of the same booking usually returns <code>404</code>, which looks like a different outcome. Idempotency is about the <em>server's state</em>, not the response: after one DELETE or after five, the booking is gone. The client should treat a 404 on a retried DELETE as success.</p>
-<h3>Making POST safe</h3>
-<p>POST creates something new each time, so retrying a timed-out booking could reserve seats twice. The standard fix is an <strong>idempotency key</strong>: the client sends a unique key per logical operation, and the server stores it with the result and returns that result for repeats. The next chapter covers how to implement it without races.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>PUT</strong> sends the full representation; omitted fields are reset. <strong>PATCH</strong> sends changes: \"set status\" is idempotent in practice, \"append\" or \"increment\" is not (JSON Merge Patch, RFC 7396, sets values; JSON Patch, RFC 6902, lists operations).",
+            "<strong>DELETE</strong> is idempotent even though a retry returns 404: idempotency is about state, not the response. Treat that 404 as success.",
+            "<strong>POST</strong> creates each time, so retried bookings need an <strong>idempotency key</strong> (next chapter).",
+          ],
         },
         {
           type: "quiz",
@@ -261,14 +190,10 @@ Location: /bookings/88
       ],
     },
     {
-      id: "status-codes",
-      title: "Status codes that tell clients what to do next",
-      kicker: "Responses",
+      id: "status-codes-and-styles",
+      title: "Status codes, and when to leave REST",
+      kicker: "Responses and alternatives",
       blocks: [
-        {
-          type: "text",
-          html: `<p>A status code is an instruction to the client as much as a description. A handful covers nearly every interview API:</p>`,
-        },
         {
           type: "table",
           headers: ["Code", "Meaning", "Booking example", "Client should"],
@@ -286,55 +211,17 @@ Location: /bookings/88
           ],
         },
         {
-          type: "realworld",
-          items: [
-            { org: "GitHub", title: "404 instead of 403", html: "GitHub's REST API documentation notes that some requests needing authentication return <code>404 Not Found</code> rather than <code>403 Forbidden</code>, so that the API doesn't reveal that a private repository exists. Choosing between 403 and 404 is a security decision, not just a style one." },
-          ],
-        },
-        {
           type: "callout",
           tone: "mistake",
-          html: `<p>Returning <code>200 OK</code> with <code>{"success": false}</code>. Retry policies, monitoring, load balancers and client libraries all read the status code; a failure dressed as a success slips past every one of them. Use the right 4xx or 5xx code and put the details in a consistent error body.</p>`,
-        },
-      ],
-    },
-    {
-      id: "beyond-rest",
-      title: "When GraphQL or RPC beats plain REST",
-      kicker: "Other styles",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>REST is the right default for user-facing CRUD-style products, and most interview prompts are exactly that. Two other styles earn their place under specific conditions, and naming the condition is what makes the choice convincing.</p>
-<p><strong>GraphQL</strong> fits when many different clients need different slices of the same data and change often: a mobile app that wants a compact event card, a web dashboard that wants venue details, seating charts and sales figures. One typed schema, and each client asks for exactly the fields it needs in a single request. The costs are real: naive resolvers produce the <strong>N+1 problem</strong> (one query for a list, then one per item) unless you batch lookups with a DataLoader-style pattern; authorization must be enforced per field and per object rather than per endpoint; and HTTP caching no longer works out of the box because most queries are POSTs to one URL.</p>
-<p><strong>RPC</strong>, usually gRPC, fits internal service-to-service calls where speed and strict contracts matter: the booking service calling inventory and payments thousands of times a second. Calls look like functions (<code>ReserveSeats</code>, <code>ChargeCard</code>), a <code>.proto</code> file defines the contract, and generated clients send compact Protocol Buffers over HTTP/2.</p>`,
+          html: `<p>Returning <code>200 OK</code> with <code>{"success": false}</code> slips past retry policies, monitoring and client libraries. Also note 403 versus 404 is a security choice: GitHub returns 404 for some private resources so it doesn't reveal they exist.</p>`,
         },
         {
           type: "compare",
           items: [
             { title: "REST", tone: "ok", html: "Resource-oriented, cacheable, universal tooling. <strong>Use for:</strong> public and client-facing APIs; the interview default." },
-            { title: "GraphQL", tone: "info", html: "Client-shaped queries over one schema. <strong>Use for:</strong> many diverse, fast-changing clients sharing data. <strong>Watch:</strong> N+1, field-level auth, query cost limits." },
-            { title: "gRPC", tone: "warn", html: "Typed, binary, action-oriented. <strong>Use for:</strong> hot internal paths and streaming. <strong>Watch:</strong> not browser-native; harder to debug by hand." },
+            { title: "GraphQL", tone: "info", html: "Client-shaped queries over one schema. <strong>Use for:</strong> many diverse, fast-changing clients sharing data. <strong>Watch:</strong> N+1, field-level auth, query cost limits, no HTTP caching by default." },
+            { title: "gRPC", tone: "warn", html: "Typed, binary, action-oriented (<code>ReserveSeats</code>, <code>ChargeCard</code>). <strong>Use for:</strong> hot internal paths and streaming. <strong>Watch:</strong> not browser-native; harder to debug by hand." },
           ],
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "Facebook", title: "Where GraphQL came from", html: "GraphQL was built at Facebook so its mobile apps could fetch nested data for feeds in one request, and was open-sourced in 2015. Its origin is a good summary of when it shines: many screens, deeply related data, constrained mobile networks." },
-            { org: "Shopify", title: "GraphQL-first platform API", html: "Shopify has made GraphQL the primary interface for its Admin API, which suits a platform with thousands of third-party apps that each need different data." },
-          ],
-        },
-        {
-          type: "quiz",
-          q: "The interviewer says the mobile app needs a tiny event summary while the web dashboard needs deep event, venue and sales data. What's a strong proposal?",
-          options: [
-            "Two completely separate backends",
-            "Return every field to both clients from REST endpoints",
-            "GraphQL (or a backend-for-frontend per client) so each client fetches exactly what it needs, with batching and field-level authorization",
-            "gRPC directly from the browser",
-          ],
-          answer: 2,
-          explain: "Diverse clients with different data needs is GraphQL's sweet spot; a backend-for-frontend per client is a lighter alternative. Mentioning batching (N+1) and field-level authorization shows you know the costs as well as the benefits.",
         },
       ],
     },
@@ -343,10 +230,6 @@ Location: /bookings/88
       title: "Using it in a design interview",
       kicker: "Interview angle",
       blocks: [
-        {
-          type: "text",
-          html: `<p>Here is what a finished API step for the ticket-booking prompt might look like on the whiteboard. Five endpoints, consistent naming, one idempotency note, identity from the token:</p>`,
-        },
         {
           type: "code",
           lang: "text",
@@ -363,14 +246,19 @@ Internal services (inventory, payments) talk gRPC.`,
         {
           type: "callout",
           tone: "interview",
-          html: `<p>What makes this answer land:</p>
+          html: `<p>A strong API step covers:</p>
 <ol>
-<li>One-sentence protocol choice, with the reason (REST for clients, RPC internally).</li>
+<li>One-sentence protocol choice with the reason (REST for clients, RPC internally).</li>
 <li>Plural noun resources that match the core entities; actions as state changes.</li>
 <li>Path for identity, query for filters and pagination, body for data, headers for auth and idempotency.</li>
 <li>Correct methods, and the dangerous POST made safe with an idempotency key.</li>
 <li>Status codes that guide the client: 201 on create, 409 when a seat is taken, 429 when rate limited.</li>
 </ol>`,
+        },
+        {
+          type: "callout",
+          tone: "tip",
+          html: `<p>Aim for reasonable and consistent, not perfect. If you debate path versus body for more than a few seconds, pick one, say why and move on.</p>`,
         },
         {
           type: "quiz",
@@ -389,11 +277,10 @@ Internal services (inventory, payments) talk gRPC.`,
   ],
   takeaways: [
     "The API step is about five minutes: state the protocol, map each requirement to an operation on a core entity, and move on.",
-    "Resources are plural nouns that match your entities; express actions as state changes (PATCH) or as new sub-resources (POST /bookings/88/refunds).",
-    "Nest only when a parent is always required; otherwise keep collections flat and filter with query parameters.",
-    "Path identifies, query modifies, body carries data, headers carry metadata such as auth and idempotency keys. Identity always comes from the token.",
-    "GET is safe; GET, PUT and DELETE are idempotent; POST isn't, and PATCH depends on the patch. Make retried POSTs safe with idempotency keys.",
-    "Status codes instruct the client: 201 created, 409 conflict, 429 back off, 5xx maybe retry. Pick GraphQL for diverse clients and gRPC for hot internal paths, and name their costs.",
+    "Resources are plural nouns; express actions as state changes or sub-resources, nest only when a parent is always required, and filter flat collections with query parameters.",
+    "Path identifies, query modifies, body carries data, headers carry auth and idempotency keys. Identity always comes from the token.",
+    "GET is safe; GET, PUT and DELETE are idempotent; POST isn't and PATCH depends on the patch. Make retried POSTs safe with idempotency keys.",
+    "Status codes instruct the client (201, 409, 429, 5xx). Pick GraphQL for diverse clients and gRPC for hot internal paths, and name their costs.",
   ],
   furtherReading: [
     { title: "RFC 9110: HTTP Semantics, sections on methods", url: "https://www.rfc-editor.org/rfc/rfc9110", note: "The precise definitions of safe and idempotent methods." },

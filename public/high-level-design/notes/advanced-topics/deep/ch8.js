@@ -1,33 +1,26 @@
 // Deep dive: Chapter 8, Time series databases: the write path. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch8 = {
-  hook: `<p>You are building monitoring for a fleet of 100,000 servers. Each reports 5 metrics (CPU, memory, disk, network in, network out) every 10 seconds. That is <strong>50,000 data points per second</strong>, 4.32 billion a day, every day, forever. Each point carries 16 bytes of real information: an 8-byte timestamp and an 8-byte float.</p>
-<p>The first design stores each point as a row in Postgres: <code>(time, host, metric, value)</code>. By the end of the first week you have about 30 billion rows. Every insert updates a B-tree index with random I/O, each row costs several times its 16 bytes once you add headers, repeated strings and index entries, and the nightly job that deletes data older than a week runs for most of the day. None of this is Postgres misbehaving. It is a general-purpose engine being asked to do a very particular job, and time series databases exist because that job has a shape you can exploit.</p>`,
+  hook: `<p>This chapter covers how time series databases ingest tens of thousands of points per second cheaply: grouping by series, LSM-style append-only writes, compression to under 2 bytes per point, and time partitions that make retention a file delete.</p>`,
   sections: [
     {
-      id: "the-workload",
-      title: "What makes time series data different",
+      id: "workload-and-model",
+      title: "The workload and the series data model",
       kicker: "The problem",
       blocks: [
         {
-          type: "problem",
-          html: `<p>A general-purpose database is built for any mix of inserts, updates, deletes and lookups. Metrics and sensor data use almost none of that flexibility, but still pay for all of it: per-row overhead, index maintenance on every write, and expensive deletes when old data has to go.</p>`,
-        },
-        {
           type: "keypoints",
-          title: "The shape of the workload",
+          title: "The shape of the workload (every TSDB technique exploits one of these)",
           items: [
-            "<strong>Writes are huge, steady and append-only.</strong> New points arrive in roughly time order and are almost never updated.",
-            "<strong>Reads target recent time ranges of a few series</strong>, usually aggregated: average CPU of these hosts over the last hour.",
-            "<strong>Old data is cold</strong>, read rarely, and eventually deleted in bulk by age.",
-            "<strong>Adjacent points look alike.</strong> Timestamps are evenly spaced and values change slowly.",
+            "<strong>Writes are huge, steady and append-only</strong>, roughly in time order, almost never updated.",
+            "<strong>Reads target recent time ranges of a few series</strong>, usually aggregated.",
+            "<strong>Old data is cold</strong> and deleted in bulk by age.",
+            "<strong>Adjacent points look alike:</strong> evenly spaced timestamps, slowly changing values.",
           ],
         },
         {
           type: "text",
-          html: `<p>Every technique in a time series database (TSDB) exploits one of those four facts. Append-only means sequential writes with no read-modify-write. Recent-range reads mean organizing by time. Bulk deletion by age means partitioning by time so retention is a file delete. And similarity between neighbours means compression that gets a 16-byte point down to one or two bytes.</p>
-<h3>What a row-per-point table really costs</h3>
-<p>In Postgres every row carries a tuple header of 23 bytes (padded to 24) plus a 4-byte line pointer in the page. Add the 8-byte timestamp, the 8-byte value, and the host and metric names repeated as text in every row, perhaps 25 bytes together, and you are near 70 bytes. A B-tree on <code>(host, metric, time)</code> adds another few tens of bytes per row. So 16 bytes of information costs roughly <strong>50-100 bytes</strong>, and at 4.32 billion points a day that is around 300 GB of table per day before indexes.</p>`,
+          html: `<p>Example: 100,000 servers &times; 5 metrics every 10 seconds is <strong>50,000 points per second</strong>, 4.32 billion a day, each with 16 bytes of information. A Postgres row adds a 24-byte tuple header, a 4-byte line pointer, repeated host and metric strings and B-tree entries: <strong>50-100 bytes</strong> per point, around 300 GB of table a day.</p>`,
         },
         {
           type: "table",
@@ -41,44 +34,17 @@ DEEP.ch8 = {
           ],
         },
         {
-          type: "callout",
-          tone: "warning",
-          title: "Do not reach for a TSDB too early",
-          html: `<p>Having timestamps in your data is not a reason to add a new database. Postgres with time-based partitioning, batched inserts and a BRIN index (which stores min and max per block range and suits append-ordered data) handles a surprising load, and extensions such as TimescaleDB go much further. TSDBs can also be <em>worse</em> for workloads that rank across millions of entities, join with relational data, or update old points. In an interview, stretch the general-purpose option first and name the specialized tool when a concrete bottleneck appears.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "Which property of metric data does delta-of-delta timestamp compression exploit?",
-          options: [
-            "Old data is read rarely",
-            "Points arrive at regular intervals, so the gap between gaps is usually zero",
-            "Most queries aggregate over many series",
-            "Values are always integers",
-          ],
-          answer: 1,
-          explain: "A series scraped every 10 seconds has gaps of 10, 10, 10... so the change in the gap is 0 almost every time, and a zero can be stored in a single bit. Time partitioning exploits cold old data; compression of values exploits slowly changing values.",
-        },
-      ],
-    },
-    {
-      id: "data-model",
-      title: "The data model: measurements, tags, fields and series",
-      kicker: "Organizing by series",
-      blocks: [
-        {
           type: "text",
-          html: `<p>TSDBs model a point in four parts. The <strong>measurement</strong> (or metric name) says what is measured: <code>cpu_usage</code>. <strong>Tags</strong> (Prometheus calls them labels) are indexed key-value metadata describing the source: <code>host=web-1</code>, <code>region=us-west</code>. <strong>Fields</strong> are the measured values: <code>value=45.2</code>. And the <strong>timestamp</strong> says when.</p>
-<p>A <strong>series</strong> is one measurement plus one specific set of tag values. <code>cpu_usage{host=web-1, region=us-west}</code> is a series; the same metric on <code>web-2</code> is another. This is the central idea of the storage layout: the engine stores the tags <em>once per series</em>, then appends a long run of (timestamp, value) pairs to that series.</p>`,
+          html: `<p>A point has a <strong>measurement</strong> (<code>cpu_usage</code>), indexed <strong>tags</strong> or labels (<code>host=web-1</code>), unindexed <strong>fields</strong> (<code>value=45.2</code>) and a <strong>timestamp</strong>. A <strong>series</strong> is one measurement plus one tag set; the engine stores tags once per series and appends (timestamp, value) pairs to it.</p>`,
         },
         {
           type: "code",
           lang: "text",
-          title: "InfluxDB line protocol: one point per line",
+          title: "InfluxDB line protocol: three points, two series",
           code: `# measurement,tag_set field_set timestamp(ns)
 cpu_usage,host=web-1,region=us-west value=45.2 1700000000000000000
 cpu_usage,host=web-1,region=us-west value=45.3 1700000010000000000
 cpu_usage,host=web-2,region=us-west value=12.0 1700000000000000000`,
-          caption: "Three points, two series. On disk, the tag set is stored once per series, not once per point.",
         },
         {
           type: "diagram",
@@ -122,19 +88,10 @@ cpu_usage,host=web-2,region=us-west value=12.0 1700000000000000000`,
 </svg>`,
         },
         {
-          type: "text",
-          html: `<p>The split between tags and fields is a design decision with consequences. Tags are indexed and define series, so you filter and group by them cheaply. Fields are not indexed. Put something with millions of distinct values (a user ID, a request ID) in a tag and you create millions of series, which is the cardinality problem covered in the next chapter. Put something you filter by constantly in a field and every query scans more than it should.</p>`,
-        },
-        {
-          type: "table",
-          title: "The four parts of a point",
-          headers: ["Part", "Example", "Indexed?", "Rule of thumb"],
-          rows: [
-            ["Measurement", "cpu_usage", "Yes", "Like a table name"],
-            ["Tags", "host=web-1, region=us-west", "Yes", "Low-cardinality metadata you filter and group by"],
-            ["Fields", "value=45.2", "No", "The measured numbers"],
-            ["Timestamp", "1700000000", "Via time partitions", "Seconds or milliseconds is usually enough"],
-          ],
+          type: "callout",
+          tone: "warning",
+          title: "Do not reach for a TSDB too early",
+          html: `<p>Timestamps alone aren't a reason for a new database. Postgres with time partitioning, batched inserts and a BRIN index goes far, and TimescaleDB further. TSDBs are <em>worse</em> for ranking across millions of entities, joins or updating old points. And keep high-cardinality values (user IDs, request IDs) out of tags: each distinct value creates a series (next chapter).</p>`,
         },
       ],
     },
@@ -145,11 +102,7 @@ cpu_usage,host=web-2,region=us-west value=12.0 1700000000000000000`,
       blocks: [
         {
           type: "idea",
-          html: `<p>Never update in place. Log every write sequentially for durability, collect recent points in memory grouped by series, and periodically flush them as immutable, compressed, sorted files. Merge small files into bigger ones in the background. This is the log-structured merge (LSM) pattern, specialized for series.</p>`,
-        },
-        {
-          type: "text",
-          html: `<p>Updating data in place means finding the right page, reading it, modifying it and writing it back: random I/O for every write. Appending to the end of a file is sequential, and both spinning disks and SSDs sustain much higher throughput for sequential writes than for small random ones. An append-only design turns 50,000 points per second into a steady stream of large sequential writes.</p>`,
+          html: `<p>Never update in place. Log each write sequentially, buffer recent points in memory by series, flush them as immutable compressed sorted blocks, and merge blocks in the background: the LSM pattern, specialized for series. Sequential appends sustain far more throughput than random page updates.</p>`,
         },
         {
           type: "diagram",
@@ -185,37 +138,19 @@ cpu_usage,host=web-2,region=us-west value=12.0 1700000000000000000`,
           type: "steps",
           title: "What happens to one point",
           items: [
-            "<strong>Append to the write-ahead log (WAL).</strong> A sequential write so the point survives a crash. Batching many points per fsync keeps this cheap.",
-            "<strong>Insert into the in-memory buffer</strong>, under its series. Recent queries read straight from here.",
-            "<strong>Flush.</strong> When the buffer covers enough time or memory, its series are compressed and written as an immutable block: per-series chunks of timestamps and values, plus an index from series to chunk offsets at the end of the file. The WAL up to that point can then be discarded.",
-            "<strong>Compact.</strong> Background jobs merge small blocks into larger ones covering longer time ranges, apply deletions, and keep the number of files a query must open small.",
+            "<strong>Append to the WAL</strong>, batching many points per fsync, so it survives a crash.",
+            "<strong>Insert into the in-memory buffer</strong> under its series; recent queries read from here.",
+            "<strong>Flush</strong> to an immutable block of per-series compressed chunks plus a series-to-offset index; discard that WAL range.",
+            "<strong>Compact</strong> small blocks into larger ones, applying deletions and keeping file counts low. Reading a series is an index lookup plus one chunk.",
           ],
         },
         {
-          type: "text",
-          html: `<p>Because each block holds one series' points contiguously, reading a series over a time range is cheap: look up the series in the block's index, then read one compressed chunk. That is the read-side payoff of grouping by series on write.</p>`,
-        },
-        {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "Prometheus", title: "Head block, WAL, 2-hour blocks", html: "Recent samples live in an in-memory head block backed by a WAL on disk (in 128 MB segments). Periodically the oldest two hours of the head are written out as a persistent block directory with chunk files, an index and metadata; compaction later merges blocks into larger ones." },
-            { org: "InfluxDB 1.x and 2.x", title: "The TSM engine", html: "A WAL and in-memory cache flush into Time-Structured Merge (TSM) files, read-only and compressed per series, which are compacted in levels. InfluxDB 3 moved to a new engine built on Apache Arrow, DataFusion and Parquet." },
-            { org: "TimescaleDB", title: "Postgres underneath", html: "Writes go to ordinary Postgres tables (chunks) with Postgres' own WAL. Older chunks can be converted to a compressed columnar form, grouped by a <code>segmentby</code> column such as the host, which recovers much of the per-series layout." },
-          ],
-        },
-        {
-          type: "tradeoffs",
-          prosLabel: "What the LSM shape buys",
-          consLabel: "What it costs",
-          pros: [
-            "Writes are sequential appends plus an in-memory insert: no random I/O on the hot path",
-            "Immutable files are simple to cache, compress, copy and back up",
-            "Compaction is a natural place to compress harder, apply deletions and downsample",
-          ],
-          cons: [
-            "A read may need to check the buffer and several files (block time ranges and indexes keep this small)",
-            "Compaction rewrites data, spending disk bandwidth and CPU: write amplification",
-            "Out-of-order or very late points complicate the in-memory buffer and may be rejected or handled specially",
+            "<strong>Prometheus:</strong> an in-memory head block with a WAL in 128 MB segments, written out as 2-hour block directories that compaction merges.",
+            "<strong>InfluxDB 1.x/2.x:</strong> WAL and cache flush to TSM files compacted in levels; InfluxDB 3 moved to Arrow, DataFusion and Parquet.",
+            "<strong>TimescaleDB:</strong> ordinary Postgres chunks; older chunks convert to compressed columnar form grouped by a <code>segmentby</code> column such as host.",
+            "<strong>Costs:</strong> reads may check the buffer and several files, compaction rewrites data (write amplification), and late or out-of-order points need special handling.",
           ],
         },
       ],
@@ -227,11 +162,7 @@ cpu_usage,host=web-2,region=us-west value=12.0 1700000000000000000`,
       blocks: [
         {
           type: "text",
-          html: `<p>Grouping a series' points together sets up the real win. Consecutive timestamps are evenly spaced and consecutive values are close, so the engine stores <em>differences</em> instead of absolute numbers, using as few bits as each difference needs.</p>
-<h3>Step 1: deltas and variable-length integers</h3>
-<p>Store the first timestamp in full, then only the gap to the previous one. With millisecond timestamps 10 seconds apart, every gap is 10,000, which needs 14 bits. A <strong>varint</strong> (variable-length integer) uses 7 bits of each byte for data and 1 bit to say "more bytes follow", so 10,000 takes 2 bytes instead of 8. The same trick works for integer values that change by small amounts.</p>
-<h3>Step 2: delta-of-delta for timestamps</h3>
-<p>Take one more difference. If the gaps are 10, 10, 11, 9 seconds, their differences are 0, +1, &minus;2. For a perfectly regular series every one of them is 0. Facebook's Gorilla paper (2015) encodes these with a variable-length prefix code:</p>`,
+          html: `<p>Grouped series have regular timestamps and close values, so store <em>differences</em> in as few bits as they need. Plain deltas plus <strong>varints</strong> (7 data bits per byte) turn a 10,000 ms gap into 2 bytes. Gorilla (Facebook, 2015) goes further with delta-of-delta timestamps and XOR-encoded floats.</p>`,
         },
         {
           type: "table",
@@ -247,11 +178,12 @@ cpu_usage,host=web-2,region=us-west value=12.0 1700000000000000000`,
           note: "Each block header stores a full starting timestamp, and the first delta is stored in 14 bits.",
         },
         {
-          type: "text",
-          html: `<p>Worked example: timestamps at :00, :10, :20, :31 and :40 seconds give gaps 10, 10, 11, 9. After the header and first delta, the deltas-of-deltas 0, +1, &minus;2 cost 1 + 9 + 9 = 19 bits for three timestamps. A perfectly regular scrape costs 1 bit per timestamp instead of 64.</p>
-<h3>Step 3: XOR for floating-point values</h3>
-<p>Differences do not work well for floats, so Gorilla XORs each value's 64 bits with the previous value's. Identical values XOR to zero, stored as a single <code>0</code> bit. Close values share their sign, exponent and leading mantissa bits, so the XOR has a run of leading zeros and usually trailing zeros too, with a short "meaningful" block in the middle. Only that block is stored, plus a few control bits giving its position.</p>
-<p>Worked example: 12.0 is <code>0x4028000000000000</code> and 15.5 is <code>0x402F000000000000</code>. Their XOR is <code>0x0007000000000000</code>: 13 leading zeros, 3 meaningful bits, 48 trailing zeros. Gorilla writes a <code>1</code> (value changed), a <code>1</code> (new position), 5 bits for the leading-zero count, 6 bits for the block length and the 3 bits themselves: 16 bits instead of 64. If the next reading is 15.5 again, it costs 1 bit. When the meaningful bits fit inside the previous value's window, the encoder skips the position fields and writes even less.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Timestamps:</strong> gaps 10, 10, 11, 9 give deltas-of-deltas 0, +1, &minus;2: 1 + 9 + 9 = 19 bits for three timestamps. A perfectly regular scrape costs 1 bit instead of 64.",
+            "<strong>Values:</strong> XOR each float's 64 bits with the previous one. Identical values cost 1 bit; close values share sign, exponent and leading mantissa, so only the short meaningful block is stored. 12.0 then 15.5 XOR to 13 leading zeros, 3 meaningful bits, 48 trailing: 16 bits instead of 64.",
+            "Gorilla reports about <strong>1.37 bytes per point</strong> (about 12x); Prometheus uses Gorilla-style XOR chunks at about 1-2 bytes per sample; TimescaleDB applies delta-of-delta and XOR per column.",
+          ],
         },
         {
           type: "lab",
@@ -259,17 +191,9 @@ cpu_usage,host=web-2,region=us-west value=12.0 1700000000000000000`,
           caption: "Two hours of one series at about 10-second intervals. Add timestamp jitter and value noise and watch the real bit counts: regular timestamps cost 1 bit, unchanged values 1 bit, noisy values far more.",
         },
         {
-          type: "realworld",
-          items: [
-            { org: "Facebook Gorilla", title: "VLDB 2015", html: "An in-memory TSDB for Facebook's monitoring data. Combining delta-of-delta timestamps and XOR values, the paper reports an average of about <strong>1.37 bytes per point</strong>, roughly a 12x reduction from 16 bytes." },
-            { org: "Prometheus", title: "Gorilla-style chunks", html: "Prometheus encodes samples in XOR chunks derived from the Gorilla scheme, and its documentation puts the on-disk cost at about 1-2 bytes per sample on average, which is what its capacity-planning formula uses." },
-            { org: "TimescaleDB", title: "Columnar compression", html: "Compressed chunks store each column separately and pick an algorithm per type, including delta-of-delta for timestamps and integers and Gorilla-style XOR for floats." },
-          ],
-        },
-        {
           type: "callout",
           tone: "insight",
-          html: `<p>Compression ratios depend on the data, not the engine's marketing. A gauge that rarely changes (disk capacity) compresses to almost nothing; a noisy float with full precision (a jittery latency average) keeps most of its mantissa bits. If storage estimates matter, measure bytes per point on a sample of your real metrics. Rounding values to the precision you need (two decimals for a CPU percentage) can dramatically improve XOR compression.</p>`,
+          html: `<p>Ratios depend on the data: a rarely changing gauge compresses to almost nothing, a noisy full-precision float keeps most mantissa bits. Measure bytes per point on real samples, and round values to the precision you need (two decimals for CPU %) to help XOR compression.</p>`,
         },
         {
           type: "quiz",
@@ -286,13 +210,8 @@ cpu_usage,host=web-2,region=us-west value=12.0 1700000000000000000`,
       kicker: "Lifecycle",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Monitoring data has a shelf life. You keep detailed metrics for a week or a month, then delete them. In one big table, deleting old data means a <code>DELETE</code> that finds billions of rows through an index, removes each one, updates every index, and leaves dead tuples behind for vacuum to clean up, all while new writes keep arriving.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>Put numbers on it. The fleet writes 4.32 billion points a day. Suppose deletion runs at 50,000 rows per second including index maintenance (the assumption in the lab below). Deleting one day's worth of expired rows takes 4.32 &times; 10<sup>9</sup> / 50,000 = 86,400 seconds: <strong>a full day</strong>. Retention alone would consume the database.</p>
-<p>The fix is <strong>time-based partitioning</strong>. Store each time window, such as one day, in its own partition (its own table, chunk or block directory). Writes always land in the current partition. Queries touch only partitions overlapping their time range. And retention becomes "drop the oldest partition": a metadata change and a file delete that takes about the same time whether the partition holds a thousand rows or a billion.</p>`,
+          html: `<p>Deleting expired rows from one big table means billions of index-maintained deletes plus vacuum, competing with ingest. At an assumed 50,000 deletes per second, one day's 4.32 billion points takes 86,400 seconds: <strong>a full day</strong>. Instead, store each window (say a day) as its own partition: writes hit the current one, queries prune by range, and retention drops the oldest as one file operation.</p>`,
         },
         {
           type: "diagram",
@@ -333,17 +252,12 @@ cpu_usage,host=web-2,region=us-west value=12.0 1700000000000000000`,
           caption: "Compare one big table, where expired rows are deleted every day, with one partition per day, where the oldest partition is dropped. Change the ingest rate and retention and see how long each approach spends on deletion.",
         },
         {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "TimescaleDB", title: "Hypertables and chunks", html: "A hypertable is split into chunks by time (7 days by default, configurable with <code>chunk_time_interval</code>). <code>add_retention_policy</code> drops whole chunks on a schedule, and queries skip chunks outside their time range." },
-            { org: "Prometheus", title: "Blocks", html: "Each persisted block covers a time range, and retention (15 days by default) deletes whole block directories once they fall out of the window." },
-            { org: "InfluxDB", title: "Shard groups", html: "Data is stored in shards grouped by time; retention policies remove entire shard groups when they expire." },
+            "TimescaleDB hypertables use chunks (7 days by default, <code>chunk_time_interval</code>) with <code>add_retention_policy</code>; Prometheus deletes whole blocks (15-day default retention); InfluxDB drops expired shard groups.",
+            "<strong>Sizing:</strong> the current partition and its indexes should fit in memory, and retention should be a small multiple of the partition size. Too small means thousands of files per long query.",
+            "Partitions make tiering easy: recent on fast SSD, older compressed or on cheaper storage.",
           ],
-        },
-        {
-          type: "text",
-          html: `<h3>Choosing the partition size</h3>
-<p>Partitions that are too large make retention coarse (you can only delete in big steps) and leave the active partition's indexes too big for memory. Partitions that are too small mean thousands of files and per-partition overhead in every long-range query. A useful target is that the current partition and its indexes fit comfortably in memory, and that retention is a small multiple of the partition size. Partitions also make tiering easy: recent ones on fast SSDs, older ones compressed or moved to cheaper storage.</p>`,
         },
         {
           type: "code",
@@ -369,25 +283,21 @@ SELECT add_retention_policy('metrics', INTERVAL '7 days');     -- drop chunks ol
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>Time series storage comes up in metrics and monitoring systems, IoT and sensor platforms, ad and click counters, and financial tick data. Start from the arithmetic: points per second, bytes per point, retention. Those three numbers decide everything else.</p>`,
+          type: "callout",
+          tone: "interview",
+          html: `<p>Start from points per second, bytes per point and retention. A strong answer covers:</p>
+<ol>
+<li><strong>The numbers:</strong> 100,000 hosts &times; 5 metrics / 10 s = 50,000 points/s, about 4.3 billion a day.</li>
+<li><strong>Why not a row per point:</strong> 50-100 bytes each, an index update per insert, and DELETE-based retention that can't keep up.</li>
+<li><strong>The write path:</strong> WAL plus an in-memory buffer by series, flushed to immutable compressed blocks, compacted in the background.</li>
+<li><strong>Compression:</strong> delta-of-delta and XOR, about 1.4 bytes per point, so a day is about 6 GB instead of hundreds.</li>
+<li><strong>Time partitions:</strong> writes to the current one, range pruning, retention by dropping partitions.</li>
+</ol>`,
         },
         {
           type: "callout",
-          tone: "interview",
-          html: `<p>A strong answer covers:</p>
-<ol>
-<li><strong>The numbers:</strong> 100,000 hosts &times; 5 metrics / 10 s = 50,000 points/s, about 4.3 billion per day.</li>
-<li><strong>Why not a row per point:</strong> 50-100 bytes per point, an index update per insert, and DELETE-based retention that cannot keep up.</li>
-<li><strong>The write path:</strong> WAL plus an in-memory buffer by series, flushed to immutable compressed blocks, compacted in the background.</li>
-<li><strong>Compression:</strong> delta-of-delta timestamps and XOR values, about 1.4 bytes per point in Gorilla's data, so a day is about 6 GB instead of hundreds.</li>
-<li><strong>Time partitions:</strong> writes to the current one, queries prune by range, retention drops whole partitions.</li>
-</ol>
-<p>Then add the caveat: if the workload is ranking across millions of entities or needs joins, a TSDB is the wrong tool.</p>`,
-        },
-        {
-          type: "text",
-          html: `<p>Watch for the Top-K trap. "Trending hashtags" or "most viewed products" involves timestamps, so a TSDB sounds natural. But TSDBs are fast at reading a <em>few</em> series over time. Top-K means aggregating and ranking across <em>millions</em> of items, and storing item IDs as tags explodes the series count. A streaming aggregation (Flink, Kafka Streams, count-min sketches) or a columnar OLAP store fits better.</p>`,
+          tone: "mistake",
+          html: `<p>The Top-K trap: "trending hashtags" has timestamps, but TSDBs read a <em>few</em> series over time, while Top-K ranks <em>millions</em> of items, and item IDs as tags explode the series count. Use streaming aggregation (Flink, Kafka Streams, count-min sketches) or a columnar OLAP store.</p>`,
         },
         {
           type: "quiz",
@@ -407,10 +317,9 @@ SELECT add_retention_policy('metrics', INTERVAL '7 days');     -- drop chunks ol
   takeaways: [
     "Time series workloads are append-heavy, read recent ranges of a few series, delete old data in bulk and have similar neighbouring points; every TSDB technique exploits one of these.",
     "A row per point costs 50-100 bytes for 16 bytes of information; grouping by series stores tags once and keeps a series' points together.",
-    "The write path is LSM-shaped: WAL for durability, an in-memory buffer by series, immutable compressed blocks, background compaction.",
-    "Delta-of-delta timestamps (1 bit when regular) and XOR-encoded floats (1 bit when unchanged) got Gorilla to about 1.37 bytes per point.",
-    "Partition by time: writes hit one partition, queries prune by range, and retention is dropping a file instead of deleting billions of rows.",
-    "Stretch Postgres (partitioning, BRIN, TimescaleDB) before adding a TSDB, and do not use a TSDB for ranking across millions of entities.",
+    "The write path is LSM-shaped: WAL, in-memory buffer by series, immutable compressed blocks, background compaction.",
+    "Delta-of-delta timestamps and XOR floats (1 bit each when regular or unchanged) got Gorilla to about 1.37 bytes per point.",
+    "Partition by time so retention is dropping a file; stretch Postgres first, and don't use a TSDB for ranking across millions of entities.",
   ],
   furtherReading: [
     { title: "Gorilla: A Fast, Scalable, In-Memory Time Series Database (Pelkonen et al., VLDB 2015)", note: "Describes the delta-of-delta timestamp and XOR value compression in detail, with measurements on Facebook's data." },

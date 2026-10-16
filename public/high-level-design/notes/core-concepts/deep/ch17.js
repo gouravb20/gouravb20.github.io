@@ -1,53 +1,27 @@
 // Deep dive: Chapter 17, CAP theorem and consistency models. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch17 = {
-  hook: `<p>A concert-ticket site runs in two data centres, one in Virginia and one in Frankfurt, each with copies of the seat map. At 10:00 the big show goes on sale. At 10:02 a fibre cut leaves both data centres running but unable to talk to each other. A fan in Berlin clicks seat F14 and the Frankfurt servers have to decide something right now: sell it, or say "try again later"?</p>
-<p>If Frankfurt sells it, a fan in Boston may buy the same seat from Virginia a second later, and two people show up for one chair. If Frankfurt refuses, the site is down for every European fan until the link comes back. There is no third option that gives both. That forced choice, during a network split, is what the CAP theorem is about, and deciding it per feature early in an interview is one of the clearest signals of design maturity.</p>`,
+  hook: `<p>This chapter answers what CAP actually forces you to choose, how to make that choice per feature, and the tools that make consistency tunable: quorums, weaker consistency models and the everyday latency trade-off captured by PACELC.</p>`,
   sections: [
     {
-      id: "three-properties",
-      title: "What C, A and P actually mean",
-      kicker: "The definitions",
+      id: "cap-basics",
+      title: "What CAP says, and why the choice is C or A",
+      kicker: "The key idea",
       blocks: [
         {
-          type: "text",
-          html: `<p>CAP is about a system that keeps copies of the same data on several machines and serves reads and writes from them. It names three properties:</p>
-<ul>
-<li><strong>Consistency (C):</strong> every read returns the most recent completed write, as if there were only one copy. Formally this is <em>linearizability</em>: once a write is acknowledged, no reader anywhere can see the old value.</li>
-<li><strong>Availability (A):</strong> every request to a node that has not crashed gets a non-error response, without a guarantee that it reflects the latest write.</li>
-<li><strong>Partition tolerance (P):</strong> the system keeps operating even when the network drops or delays messages between nodes, splitting them into groups that cannot communicate.</li>
-</ul>
-<p>The theorem says you cannot guarantee all three at once. While the network is split, a node that receives a request either answers with what it has (possibly stale, so not C) or refuses until it can confirm it is up to date (an error, so not A).</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Consistency (C):</strong> linearizability: every read sees the latest acknowledged write, as if there were one copy.",
+            "<strong>Availability (A):</strong> every non-crashed node answers without error, possibly with stale data.",
+            "<strong>Partition tolerance (P):</strong> the system keeps operating when messages between nodes are lost.",
+            "Partitions are unavoidable in networked systems, so \"CA\" isn't a real option. The question is: <strong>during a partition, does this operation answer possibly stale, or refuse?</strong>",
+          ],
         },
         {
           type: "callout",
           tone: "warning",
           title: "Not the C in ACID",
-          html: `<p>CAP's consistency is about replicas agreeing on the latest value. ACID's consistency is about a transaction moving the database from one valid state to another, respecting constraints and invariants such as "balance never negative". They are unrelated ideas that share a word. A single-node ACID database is not subject to CAP at all, because there is no second copy to disagree with.</p>`,
-        },
-        {
-          type: "callout",
-          tone: "history",
-          html: `<p>Eric Brewer presented the idea as a conjecture in a keynote at the PODC conference in 2000. Seth Gilbert and Nancy Lynch published a formal proof in 2002. In 2012 Brewer wrote a retrospective, "CAP Twelve Years Later", arguing that the "pick two of three" slogan is misleading, because the choice only bites during a partition and can be made differently for different operations.</p>`,
-        },
-        {
-          type: "keypoints",
-          items: [
-            "C means linearizability: every read sees the latest acknowledged write.",
-            "A means every non-crashed node answers, possibly with stale data.",
-            "P means the system survives lost messages between nodes.",
-          ],
-        },
-      ],
-    },
-    {
-      id: "partitions-force-a-choice",
-      title: "Partitions happen, so the real choice is C or A",
-      kicker: "The key idea",
-      blocks: [
-        {
-          type: "idea",
-          html: `<p>In any system spread over a network, partitions are not optional: links fail, switches reboot, cloud regions lose connectivity, long GC pauses make a node look dead. So "CA" is not a real design for a distributed system. The useful question is narrower: <strong>during a partition, does this operation return possibly stale data, or does it refuse?</strong></p>`,
+          html: `<p>ACID consistency means transactions respect invariants; CAP consistency means replicas agree. A single-node database isn't subject to CAP at all. (Brewer's 2000 conjecture was proved by Gilbert and Lynch in 2002; his 2012 retrospective calls "pick two" misleading.)</p>`,
         },
         {
           type: "diagram",
@@ -80,39 +54,27 @@ DEEP.ch17 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<p><strong>Choosing consistency (CP)</strong> means a node that cannot confirm it has the latest data refuses or times out. In the diagram, the EU replicas cannot reach a majority, so they stop serving reads and writes that need fresh data; the US side, holding three of five replicas, keeps working. No one ever reads a stale value, but EU users see errors.</p>
-<p><strong>Choosing availability (AP)</strong> means every node keeps answering from what it has. EU users can read and even write, but they may see old values, and writes on both sides can conflict. When the partition heals, replicas exchange updates and converge, resolving conflicts with a rule such as <em>last write wins</em> (by timestamp), version vectors, or merge logic in the application.</p>
-<p>Notice that the choice only matters <em>while</em> a partition is happening. When the network is healthy, a well-built system can be both consistent and available. That is why the trade-off you face most of the time is a different one: latency (covered under PACELC below).</p>`,
+          type: "compare",
+          items: [
+            { title: "CP during a partition", tone: "info", html: "Nodes that can't confirm the latest data refuse or time out. The minority side stops serving; nobody reads a stale value." },
+            { title: "AP during a partition", tone: "ok", html: "Every node answers from what it has. Reads may be stale and writes on both sides may conflict; after healing, replicas converge via last-write-wins, version vectors or application merges." },
+          ],
         },
         {
           type: "lab",
           id: "capPartition",
           caption: "Toggle the partition, then try updating a profile name and booking a seat under CP and under AP. Watch which side refuses, which side serves stale data, and how last-write-wins reconciles after the partition heals.",
         },
-        {
-          type: "quiz",
-          q: "During a partition, an AP system lets users on both sides update the same profile's display name. What happens when the partition heals?",
-          options: [
-            "Both updates are rejected",
-            "Replicas exchange updates and resolve the conflict with a rule such as last-write-wins, so one of the two names is kept",
-            "The system crashes until an operator intervenes",
-            "Both names are always kept side by side",
-          ],
-          answer: 1,
-          explain: "AP systems accept writes on both sides and reconcile later. With last-write-wins, the update with the later timestamp survives and the other is silently discarded, which is fine for a display name but unacceptable for a seat booking. Some systems keep both versions and let the application merge them, but that has to be designed in.",
-        },
       ],
     },
     {
-      id: "choosing-per-feature",
-      title: "Choosing per feature, not per system",
+      id: "choosing-and-designing",
+      title: "Choosing per feature, and what each design looks like",
       kicker: "Making the call",
       blocks: [
         {
           type: "text",
-          html: `<p>The question that decides it is simple: <strong>would it be harmful if a user briefly saw or acted on stale data?</strong> If two people buying the same seat, overselling the last unit of stock, or trading on an old price would be a real problem, choose consistency for that operation. If the worst case is someone seeing an old bio or a like count that is a few seconds behind, choose availability.</p>
-<p>Most products need both, for different data. A ticketing site books seats with strong consistency but serves the event description, images and venue map from caches and replicas that favour availability. A marketplace takes payments consistently but shows reviews and recommendations with eventual consistency. Saying this explicitly ("seat holds are CP, everything else on the page is AP") is a senior-level signal in an interview.</p>`,
+          html: `<p>Ask: <strong>would it be harmful if a user briefly saw or acted on stale data?</strong> Double-selling a seat or overselling stock: consistency. An old bio or a lagging like count: availability. Most products mix both, and saying so ("seat holds are CP, the rest of the page is AP") is a senior signal.</p>`,
         },
         {
           type: "table",
@@ -129,63 +91,16 @@ DEEP.ch17 = {
           ],
         },
         {
-          type: "callout",
-          tone: "tip",
-          html: `<p>Ask the consistency question during non-functional requirements, before drawing any boxes. It decides the database and replication choices that follow, and it is much harder to retrofit.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "A food-delivery app has three features: restaurant menus, the live order-status page, and charging the customer's card. Which should be designed to choose consistency over availability during a partition?",
-          options: [
-            "All three",
-            "Only charging the card",
-            "Only the restaurant menus",
-            "None; availability is always better for users",
-          ],
-          answer: 1,
-          explain: "Charging must never double-charge or lose a payment, so it should refuse rather than act on uncertain state. A menu that is a few minutes old is harmless, and an order-status page that lags by a few seconds is better than an error. Mixed choices within one product are normal.",
-        },
-      ],
-    },
-    {
-      id: "designing-for-each",
-      title: "What CP and AP designs look like",
-      kicker: "Building it",
-      blocks: [
-        {
           type: "compare",
           items: [
-            { title: "Designing for consistency", tone: "info", html: "Send all writes for the critical data through a single leader, or through a consensus protocol (Raft, Paxos) that needs a majority to commit. Read from the leader or use quorum reads. Replicate synchronously where losing an acknowledged write is unacceptable. Expect higher latency, and expect the minority side of a partition to stop serving." },
-            { title: "Designing for availability", tone: "ok", html: "Let replicas serve reads (and sometimes writes) independently. Replicate asynchronously, possibly across regions with writes accepted in each. Propagate changes to caches and search indexes with change data capture. Expect stale reads, and decide how conflicting writes are merged." },
+            { title: "Designing for consistency", tone: "info", html: "A single leader or a majority consensus protocol (Raft, Paxos); leader or quorum reads; synchronous replication where losing an acknowledged write is unacceptable. etcd, ZooKeeper and Spanner work this way. Expect higher latency and a stalled minority side." },
+            { title: "Designing for availability", tone: "ok", html: "Replicas serve reads (sometimes writes) independently, replicate asynchronously and feed caches and search via CDC. Cassandra is tunable and AP by default; DynamoDB reads are eventual by default (strong reads cost twice the capacity) and global tables use last-writer-wins." },
           ],
         },
         {
-          type: "realworld",
-          items: [
-            { org: "etcd and ZooKeeper", title: "CP coordination stores", html: "Both replicate through a majority-based consensus protocol (Raft for etcd, Zab for ZooKeeper). A node cut off from the majority cannot commit writes, which is exactly what you want for locks, leader election and cluster configuration." },
-            { org: "Google Spanner", title: "Consistency across regions", html: "Spanner replicates with Paxos and uses its TrueTime clock API to give externally consistent transactions, waiting out clock uncertainty at commit. It pays latency for consistency, and replicas that lose their Paxos majority cannot accept writes." },
-            { org: "Apache Cassandra", title: "Tunable, AP by default", html: "Each request picks a consistency level such as <code>ONE</code>, <code>QUORUM</code>, <code>LOCAL_QUORUM</code> or <code>ALL</code>. Lower levels keep answering when replicas are unreachable; higher levels refuse when they cannot gather enough replicas." },
-            { org: "Amazon DynamoDB", title: "Both options per read", html: "Reads are eventually consistent by default; a strongly consistent read costs twice the read capacity. Global tables replicate across regions asynchronously and resolve concurrent writes with last-writer-wins." },
-          ],
-        },
-        {
-          type: "text",
-          html: `<p>A pattern that shows up again and again is to <strong>shrink the consistent part</strong>. Keep the small, critical piece of state (a seat hold, an inventory counter, a username registry) in a strongly consistent store with a conditional write, and let everything else flow through caches, replicas and search indexes that favour availability. The expensive guarantees are paid only where they matter.</p>`,
-        },
-        {
-          type: "tradeoffs",
-          prosLabel: "Strong consistency gives",
-          consLabel: "Strong consistency costs",
-          pros: [
-            "No stale reads, no conflicting writes to merge",
-            "Simple reasoning for invariants such as \"one seat, one buyer\"",
-            "Correctness without compensating logic in the application",
-          ],
-          cons: [
-            "Higher latency: writes wait for a majority or a leader, often across zones or regions",
-            "Unavailability on the minority side of a partition, or when the leader is lost",
-            "Lower throughput on contended keys",
-          ],
+          type: "callout",
+          tone: "tip",
+          html: `<p><strong>Shrink the consistent part.</strong> Keep the small critical state (a seat hold, an inventory counter, a username registry) in a strongly consistent store with a conditional write, and let everything else flow through caches and replicas. Ask the question during non-functional requirements; it drives storage choices and is hard to retrofit.</p>`,
         },
       ],
     },
@@ -196,7 +111,7 @@ DEEP.ch17 = {
       blocks: [
         {
           type: "idea",
-          html: `<p>Store each value on <strong>N</strong> replicas. A write succeeds once <strong>W</strong> replicas acknowledge it; a read asks <strong>R</strong> replicas and returns the newest version among their answers. If <strong>R + W &gt; N</strong>, every read set overlaps every write set in at least one replica, so a read always reaches someone who has the latest acknowledged write.</p>`,
+          html: `<p>Store each value on <strong>N</strong> replicas; a write needs <strong>W</strong> acknowledgements and a read asks <strong>R</strong> replicas and takes the newest. If <strong>R + W &gt; N</strong>, every read set overlaps every write set, so a read always reaches the latest acknowledged write.</p>`,
         },
         {
           type: "diagram",
@@ -237,9 +152,12 @@ DEEP.ch17 = {
           caption: "Adjust N, W and R, then read shortly after a write. See when reads return stale versions, and take replicas down to watch reads or writes start failing when a quorum cannot be reached.",
         },
         {
-          type: "text",
-          html: `<p>Quorums make the CAP trade-off a dial rather than a switch. A partition that leaves fewer than W replicas reachable blocks writes; fewer than R blocks reads. Lowering W and R keeps the system answering through more failures at the cost of possibly stale reads.</p>
-<p>Two caveats keep the rule honest. Overlap alone is not full linearizability: with concurrent writes and replicas catching up at different speeds, edge cases remain unless the system also does things like read repair or coordinates versions carefully. And some Dynamo-style systems use <em>sloppy quorums</em>, accepting writes on substitute nodes during failures (with hinted handoff later), which improves availability but means R + W &gt; N no longer guarantees the overlap.</p>`,
+          type: "keypoints",
+          items: [
+            "Quorums turn CAP into a dial: fewer than W reachable replicas blocks writes, fewer than R blocks reads.",
+            "Overlap isn't full linearizability: concurrent writes and lagging replicas leave edge cases without read repair or careful versioning.",
+            "<strong>Sloppy quorums</strong> accept writes on substitute nodes (hinted handoff later), so R + W &gt; N no longer guarantees overlap.",
+          ],
         },
         {
           type: "quiz",
@@ -252,19 +170,9 @@ DEEP.ch17 = {
     },
     {
       id: "consistency-spectrum",
-      title: "Beyond the binary: consistency models and PACELC",
+      title: "Consistency models and PACELC",
       kicker: "The spectrum",
       blocks: [
-        {
-          type: "text",
-          html: `<p>"Consistent or not" is too coarse for real designs. Between strong consistency and "anything goes" sit models that remove the most confusing anomalies at a fraction of the cost.</p>
-<ul>
-<li><strong>Strong (linearizable):</strong> every read reflects the latest completed write, as if there were one copy. Needed for balances, seat holds and locks. The most expensive.</li>
-<li><strong>Causal:</strong> operations that depend on each other are seen in the same order by everyone. A reply never appears before the comment it answers; unrelated posts may appear in different orders for different users.</li>
-<li><strong>Read-your-own-writes:</strong> a user always sees their own changes immediately, even if others see them later. Implement it by routing that user's reads to the leader (or to a replica known to be caught up past their last write) for a short window after they write.</li>
-<li><strong>Eventual:</strong> if writes stop, replicas converge. Nothing is promised about what a read sees in the meantime. The default for many distributed databases, DNS and caches.</li>
-</ul>`,
-        },
         {
           type: "table",
           title: "Matching models to features",
@@ -278,14 +186,14 @@ DEEP.ch17 = {
         },
         {
           type: "text",
-          html: `<h3>PACELC: the trade-off you face every day</h3>
-<p>CAP only talks about partitions, which are rare. Daniel Abadi's PACELC formulation extends it: if there is a <strong>P</strong>artition, choose <strong>A</strong> or <strong>C</strong>; <strong>E</strong>lse, in normal operation, choose <strong>L</strong>atency or <strong>C</strong>onsistency. Waiting for a majority of replicas, possibly in other zones or regions, makes every request slower even when nothing is broken. A synchronous cross-region write pays at least one cross-region round trip, often 70 to 150 ms.</p>
-<p>Systems sit at different points. Cassandra and DynamoDB default to low latency and eventual consistency (PA/EL), with stronger options per request. Spanner pays latency for consistency all the time (PC/EC). Naming the "else" half shows you understand why strong consistency is not free even on a good day.</p>`,
+          html: `<p><strong>Read-your-writes</strong> is cheap to add: route a user's reads to the leader (or a caught-up replica) for a short window after they write. <strong>PACELC</strong> (Abadi) adds the everyday trade-off: if <strong>P</strong>artition, <strong>A</strong> or <strong>C</strong>; <strong>E</strong>lse, <strong>L</strong>atency or <strong>C</strong>onsistency. A synchronous cross-region write pays at least one cross-region round trip, often 70 to 150 ms.</p>`,
         },
         {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "MongoDB", title: "Write and read concerns", html: "A write with <code>writeConcern: \"majority\"</code> is acknowledged only after a majority of replica-set members have it, and <code>readConcern</code> levels such as <code>\"majority\"</code> and <code>\"linearizable\"</code> control what reads may return. Each step up costs latency." },
+            "Cassandra and DynamoDB default to low latency and eventual consistency (PA/EL), with stronger options per request.",
+            "Spanner pays latency for consistency all the time (PC/EC), using Paxos and TrueTime.",
+            "MongoDB's <code>writeConcern: \"majority\"</code> and <code>readConcern</code> levels (<code>\"majority\"</code>, <code>\"linearizable\"</code>) each trade latency for stronger guarantees.",
           ],
         },
         {
@@ -308,48 +216,30 @@ DEEP.ch17 = {
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>Bring consistency up while gathering non-functional requirements, and frame it as a question about the product rather than a recital of the theorem: "if two users try to book the same seat during a network problem, should one of them get an error, or could we risk a double booking?" Then commit per feature, and let the answer drive the storage choice.</p>`,
-        },
-        {
           type: "callout",
           tone: "interview",
-          html: `<p>A strong one-minute answer:</p>
+          html: `<p>Frame it as a product question during requirements ("double booking or an error?"), then commit per feature. A strong one-minute answer:</p>
 <ol>
-<li><strong>The theorem in one line:</strong> during a network partition, a replicated system must either refuse requests or risk stale answers.</li>
-<li><strong>P is given:</strong> so the choice is consistency or availability during a partition, not "pick two".</li>
-<li><strong>Per feature:</strong> "Seat booking is CP: a strongly consistent store with a conditional write, and we fail the booking if we cannot confirm. Event pages are AP: cached and replicated, a little stale is fine."</li>
-<li><strong>Beyond CAP:</strong> quorums (R + W &gt; N) as a tuning knob, read-your-writes for the user's own edits, and PACELC for the everyday latency cost.</li>
+<li><strong>One line:</strong> during a network partition, a replicated system must either refuse requests or risk stale answers.</li>
+<li><strong>P is given,</strong> so the choice is consistency or availability during a partition, not "pick two".</li>
+<li><strong>Per feature:</strong> "Seat booking is CP: a strongly consistent store with a conditional write, failing if we can't confirm. Event pages are AP: cached and replicated."</li>
+<li><strong>Beyond CAP:</strong> quorums (R + W &gt; N), read-your-writes for a user's own edits, and PACELC for the everyday latency cost.</li>
 </ol>`,
         },
         {
           type: "callout",
           tone: "mistake",
-          html: `<p>"Our system is CA." For anything with more than one machine, partitions will happen, so this signals a misunderstanding. Also avoid declaring the whole system CP or AP; real designs mix both.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "An interviewer asks: \"Is a single PostgreSQL server CP or AP?\" What is the best answer?",
-          options: [
-            "CP, because it is ACID",
-            "AP, because it is always up",
-            "CAP does not really apply: with one copy there is nothing to partition between replicas. It becomes relevant once you add replicas, depending on whether reads go to async replicas or only the primary",
-            "CA, which is the best of both",
-          ],
-          answer: 2,
-          explain: "CAP is about replicated data. A single node is consistent trivially and unavailable when it is down. Once you add replicas, the question appears: reading from asynchronous replicas trades consistency for availability and load, while reading only from the primary (or using synchronous replication) favours consistency.",
+          html: `<p>"Our system is CA," or declaring the whole system CP or AP. Partitions will happen, and real designs mix both. (A single PostgreSQL server isn't really CP or AP: CAP applies once you add replicas.)</p>`,
         },
       ],
     },
   ],
   takeaways: [
-    "CAP: during a network partition, a replicated system must either refuse some requests (consistency) or answer with possibly stale data (availability).",
-    "Partitions are unavoidable in distributed systems, so \"CA\" is not an option; the real question is C or A during a partition.",
+    "During a partition, a replicated system must refuse some requests (consistency) or answer possibly stale (availability); \"CA\" isn't an option.",
     "CAP's consistency is linearizability, unrelated to the C in ACID.",
-    "Decide per feature: bookings, inventory, payments and unique names choose consistency; profiles, feeds and descriptions choose availability.",
-    "Quorums with R + W &gt; N make consistency tunable in Dynamo-style stores; fewer reachable replicas than W or R blocks writes or reads.",
-    "Between strong and eventual sit causal and read-your-own-writes consistency, which fix the most visible anomalies cheaply.",
-    "PACELC adds the everyday trade-off: even without partitions, stronger consistency costs latency.",
+    "Decide per feature: bookings, inventory, payments and unique names choose consistency; profiles, feeds and descriptions choose availability. Keep the consistent part small.",
+    "Quorums with R + W &gt; N make consistency tunable in Dynamo-style stores.",
+    "Causal and read-your-writes fix visible anomalies cheaply; PACELC adds that stronger consistency costs latency even without partitions.",
   ],
   furtherReading: [
     { title: "Brewer's Conjecture and the Feasibility of Consistent, Available, Partition-Tolerant Web Services (Gilbert and Lynch, 2002)", note: "The formal proof of CAP." },

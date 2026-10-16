@@ -1,8 +1,7 @@
 // Deep dive: Chapter 10, How indexes work. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch10 = {
-  hook: `<p>Your login endpoint runs <code>SELECT * FROM users WHERE email = ?</code>. With ten thousand users it returns in a millisecond and nobody thinks about it. Two years later there are fifty million users, the same query takes several seconds, login p99 is on fire, and the database CPU is pinned at 100% even though each request asks for exactly one row.</p>
-<p>The query did not change. What changed is that the database has no way to find that one row except by looking at all fifty million of them. An index is the structure that lets it jump straight to the right place, and the choice of index structure (B-tree, LSM tree or hash) decides how fast reads are, how expensive writes become, and which queries are possible at all.</p>`,
+  hook: `<p>This chapter explains how an index lets a database jump to one row instead of reading the whole table, and how the structure you pick (B-tree, LSM tree or hash) decides read speed, write cost and which queries are possible at all.</p>`,
   sections: [
     {
       id: "full-scans",
@@ -10,48 +9,32 @@ DEEP.ch10 = {
       kicker: "The problem",
       blocks: [
         {
-          type: "problem",
-          html: `<p>A table is stored as a pile of fixed-size <strong>pages</strong> on disk (8 KB in PostgreSQL, 16 KB by default in MySQL's InnoDB). New rows go wherever there is room, so the rows are in no useful order. Asking for <code>email = 'ana@example.com'</code> gives the database no hint about which page holds it, so it must read every page and check every row.</p>`,
+          type: "text",
+          html: `<p>Tables are stored as unordered <strong>pages</strong> (8 KB in PostgreSQL, 16 KB in InnoDB). Without an index, <code>WHERE email = ?</code> reads every page: 50 million rows at about 100 per page is 500,000 pages, about five seconds even sequentially. Cost grows with the table, not the answer. An <strong>index</strong> maps column values to row locations, so a few page reads replace half a million.</p>`,
         },
         {
-          type: "text",
-          html: `<p>Put numbers on it. Fifty million rows at about 100 rows per page is 500,000 pages, roughly 4 GB. Even reading those pages sequentially at 0.01 ms each takes about five seconds, and that is for a single query. Run a few hundred of those per second and no amount of hardware keeps up. The cost of the query grows with the size of the table, not with the size of the answer.</p>
-<p>An <strong>index</strong> is a second, separate structure, organised by the values of one or more columns, that stores where each row lives. Instead of scanning, the database consults the index, learns "page 81,442, slot 7", and reads that page. A handful of page reads replaces half a million.</p>`,
-        },
-        {
-          type: "text",
-          html: `<h3>Nothing is free: what every index costs</h3>
-<p>The index is a copy of the indexed column plus a pointer for every row, so it takes real disk space, sometimes a large fraction of the table itself. Worse for busy systems, it must be kept exactly in sync: every <code>INSERT</code> adds an entry to every index on the table, every <code>DELETE</code> removes one, and every <code>UPDATE</code> that changes an indexed column moves one. A table with eight indexes does roughly nine writes for each logical write.</p>
-<p>That is why "index every column" is wrong. You index for the queries your endpoints actually run, and you accept the write cost only where a read pattern pays for it. An append-only log table that is rarely queried, or a lookup table with 50 rows that fits in one page, may be better with no secondary index at all.</p>`,
+          type: "keypoints",
+          items: [
+            "Each index is a copy of the column plus a pointer per row: real disk space.",
+            "It must stay in sync: a table with eight indexes does roughly nine writes per logical write.",
+            "Index for the queries your endpoints run, not every column. A rarely queried append-only log may need none.",
+          ],
         },
         {
           type: "lab",
           id: "indexScan",
           caption: "Run a point query and a range query with no index, a B-tree, a hash index and an LSM tree. Count the pages each one reads, and note which index types cannot serve the range query at all.",
         },
-        {
-          type: "keypoints",
-          items: [
-            "Without an index the database reads every page: cost grows with the table, not the result.",
-            "An index maps column values to row locations, turning O(N) page reads into a few.",
-            "Each index costs disk space and an extra write on every insert, delete and relevant update.",
-          ],
-        },
       ],
     },
     {
       id: "b-trees",
-      title: "B-trees: a sorted tree only three or four pages deep",
+      title: "B-trees: sorted and only three or four pages deep",
       kicker: "The default index",
       blocks: [
         {
           type: "idea",
-          html: `<p>Keep the index keys <strong>sorted</strong> in a tree whose nodes are exactly one disk page. Because a page holds hundreds of keys, every node has hundreds of children, so even billions of rows sit just three or four levels below the root.</p>`,
-        },
-        {
-          type: "text",
-          html: `<p>A B-tree node is a page full of sorted keys with child pointers between them. To find a key you start at the root, binary-search the keys in that page to pick the right child, read that child page, and repeat until you reach a leaf. Every leaf sits at the same depth, so every lookup costs the same number of page reads.</p>
-<p>Almost every relational database actually uses the <strong>B+ tree</strong> variant: inner nodes hold only keys and child pointers (so more of them fit per page), all entries live in the leaves, and each leaf points to its right-hand neighbour. That last detail matters for ranges: find the first matching key with one descent, then walk sideways along the leaves until you pass the end of the range.</p>`,
+          html: `<p>Keep keys <strong>sorted</strong> in a tree whose nodes are one disk page. A page holds hundreds of keys, so every node has hundreds of children and even billions of rows sit three or four levels below the root.</p>`,
         },
         {
           type: "diagram",
@@ -98,13 +81,6 @@ DEEP.ch10 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<h3>Why the tree stays so shallow</h3>
-<p>With an 8 KB page and a key plus pointer of roughly 20 bytes, one node holds about 400 entries. One level indexes 400 keys, two levels 160,000, three levels 64 million, and four levels about 25 billion. A billion-row table is four levels deep.</p>
-<p>The top of the tree is tiny: the root plus its 400 children is about 3 MB, so it always stays in the database's buffer cache. A point lookup therefore usually costs one or two real disk reads (the leaf, and then the table page the leaf points to), not four. That is the difference between milliseconds and seconds.</p>
-<p>When an insert lands in a full leaf, the leaf <strong>splits</strong> into two half-full pages and pushes a separator key into its parent. Splits ripple upward only rarely, and a root split is the only way the tree grows taller, which keeps every leaf at the same depth no matter what order keys arrive in.</p>`,
-        },
-        {
           type: "table",
           title: "B-tree depth with ~400 entries per page",
           headers: ["Levels", "Keys it can index", "Pages read per lookup (cold)"],
@@ -117,8 +93,13 @@ DEEP.ch10 = {
           note: "In practice the upper one or two levels are cached, so real disk reads per lookup are usually one or two.",
         },
         {
-          type: "text",
-          html: `<p>Sorted order is what makes the B-tree the general-purpose default. The same structure answers equality (<code>email = ?</code>), ranges (<code>created_at &gt; ?</code>), prefixes (<code>name LIKE 'Gar%'</code>) and <code>ORDER BY</code> on the indexed column without a separate sort. PostgreSQL builds a B-tree automatically for every primary key and <code>UNIQUE</code> constraint, InnoDB stores whole tables as B+ trees, and MongoDB, SQLite and SQL Server indexes are B-trees too.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>B+ tree:</strong> inner nodes hold only keys and pointers; entries live in leaves linked left to right, so a range is one descent then a sideways walk.",
+            "The root and its children are about 3 MB and stay cached, so a point lookup usually costs one or two disk reads.",
+            "A full leaf <strong>splits</strong> and pushes a separator up; only a root split adds a level, so all leaves stay at equal depth.",
+            "Sorted order serves equality, ranges, prefixes (<code>LIKE 'Gar%'</code>) and <code>ORDER BY</code>. PostgreSQL, InnoDB, SQLite, SQL Server and MongoDB all use B-trees.",
+          ],
         },
         {
           type: "quiz",
@@ -131,63 +112,47 @@ DEEP.ch10 = {
     },
     {
       id: "clustered-and-secondary",
-      title: "Where the row lives: clustered, secondary and selective indexes",
+      title: "Clustered, secondary and selective indexes",
       kicker: "How lookups finish",
       blocks: [
         {
           type: "text",
-          html: `<p>An index leaf tells you where the row is, but the row itself still has to be fetched. How that happens depends on how the table is stored, and it explains why the same query plan can cost very different amounts in different databases.</p>
-<p>A <strong>primary</strong> or <strong>clustered</strong> index decides the physical order of the rows: the table <em>is</em> the index. In InnoDB the table is a B+ tree keyed by the primary key, and the leaves contain the full rows. A <strong>secondary</strong> index is any other index; its leaves hold the indexed value plus a way to reach the row.</p>`,
+          html: `<p>A <strong>clustered</strong> (primary) index decides the physical row order: the table <em>is</em> the index. A <strong>secondary</strong> index's leaves hold the value plus a way to reach the row, so fetching each row is an extra step: cheap for one row, a random read each for ten thousand.</p>`,
         },
         {
           type: "compare",
           items: [
-            { title: "MySQL InnoDB", tone: "info", html: "Rows live in the primary key's B+ tree. Secondary index leaves store the <strong>primary key value</strong>, so a lookup by email descends the email index, gets the id, then descends the primary key tree. Two tree walks per row; short primary keys keep every secondary index smaller." },
-            { title: "PostgreSQL", tone: "info", html: "Rows live in an unordered heap. Every index, including the primary key's, stores a physical row address (page and slot). A lookup is one tree walk plus one heap page read, but updates that move a row may need to touch the indexes." },
+            { title: "MySQL InnoDB", tone: "info", html: "Rows live in the primary key's B+ tree. Secondary leaves store the <strong>primary key value</strong>, so a lookup walks two trees. Short primary keys keep secondaries small; random UUID keys scatter inserts and cause page splits, so teams prefer sequential or time-ordered IDs." },
+            { title: "PostgreSQL", tone: "info", html: "Rows live in an unordered heap. Every index stores a physical address (page and slot): one tree walk plus one heap read, but updates that move a row may touch the indexes." },
           ],
         },
         {
-          type: "text",
-          html: `<p>The extra step is cheap for one row and expensive for ten thousand: each row costs a random read. That is why the next chapter's <em>covering indexes</em> matter, and why a planner will sometimes ignore your index entirely.</p>
-<h3>Selectivity: when the planner skips your index</h3>
-<p>An index pays off when it narrows the result to a small fraction of the table. An index on <code>user_id</code> or <code>email</code>, with millions of distinct values, narrows a lookup to one or a few rows. An index on <code>is_active</code>, where 95% of rows are true, narrows almost nothing: following 95% of the table through the index means a random read per row, which is slower than just scanning the pages in order.</p>
-<p>Query planners know this. They keep statistics on how many distinct values each column has and how they are distributed, estimate how many rows a filter returns, and choose a sequential scan when the index would not help. A low-cardinality index then costs write overhead on every insert and is never used.</p>`,
-        },
-        {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "PostgreSQL", title: "Planner statistics", html: "<code>ANALYZE</code> samples each table and records per-column statistics such as the number of distinct values and the most common values. The planner uses them to estimate row counts and decide between an index scan, a bitmap scan and a sequential scan." },
-            { org: "MySQL InnoDB", title: "Clustered primary key", html: "Because rows are stored in primary-key order, a random UUID primary key scatters inserts across the whole tree and causes many page splits, while an auto-increment key appends to the right edge. This is a common reason teams prefer sequential or time-ordered ids in InnoDB." },
+            "<strong>Selectivity:</strong> an index pays off when it narrows to a small fraction. On <code>is_active</code> with 95% true, following the index is slower than scanning in order.",
+            "Planners keep statistics (PostgreSQL's <code>ANALYZE</code> records distinct and most common values) and choose a sequential scan when an index won't help, so low-cardinality indexes cost writes and never get used.",
+            "Good candidates: high-cardinality columns in <code>WHERE</code>, <code>JOIN</code> or <code>ORDER BY</code> of frequent queries. Poor: booleans, three-value status fields, nightly-report columns.",
           ],
-        },
-        {
-          type: "callout",
-          tone: "tip",
-          html: `<p>Best index candidates: high-cardinality columns that appear in <code>WHERE</code>, <code>JOIN</code> or <code>ORDER BY</code> clauses of frequent queries. Poor candidates: booleans, status fields with three values, and columns only touched by a nightly report.</p>`,
         },
       ],
     },
     {
-      id: "lsm-trees",
-      title: "LSM trees: making writes sequential",
-      kicker: "Write-heavy workloads",
+      id: "lsm-and-hash",
+      title: "LSM trees, hash indexes and choosing",
+      kicker: "Write-heavy and exact-match workloads",
       blocks: [
         {
-          type: "problem",
-          html: `<p>A B-tree updates pages <em>in place</em>. Inserting a 100-byte row into a random spot of a large index means reading the right leaf, modifying it and eventually writing the whole 8 KB page back, plus a log record. At hundreds of thousands of writes per second (metrics, click events, IoT readings) those scattered page writes become the bottleneck.</p>`,
-        },
-        {
-          type: "idea",
-          html: `<p>A <strong>log-structured merge tree</strong> never updates data in place. It collects writes in memory, writes them to disk in large sorted batches, and cleans up old versions later in the background. Every disk write becomes a big sequential append.</p>`,
+          type: "text",
+          html: `<p>B-trees update pages in place, so at hundreds of thousands of random writes per second the scattered 8 KB page writes become the bottleneck. A <strong>log-structured merge tree</strong> never updates in place: every disk write is a large sequential append.</p>`,
         },
         {
           type: "steps",
           title: "The write path",
           items: [
-            "Append the write to a <strong>write-ahead log</strong> on disk, so it survives a crash. This is sequential and cheap.",
-            "Insert it into the <strong>memtable</strong>, an in-memory sorted structure such as a skip list or balanced tree. The write is now acknowledged.",
-            "When the memtable reaches a size limit (tens of MB), freeze it and write it out as an immutable, sorted file: an <strong>SSTable</strong> (sorted string table). Start a fresh memtable and discard the old log segment.",
-            "In the background, <strong>compaction</strong> merges SSTables into larger ones, keeping only the newest version of each key and dropping deleted keys.",
+            "Append to a <strong>write-ahead log</strong> for durability.",
+            "Insert into the <strong>memtable</strong>, an in-memory sorted structure; the write is acknowledged.",
+            "When the memtable reaches tens of MB, flush it as an immutable sorted <strong>SSTable</strong>.",
+            "Background <strong>compaction</strong> merges SSTables, keeping the newest version of each key and dropping deletes.",
           ],
         },
         {
@@ -237,55 +202,23 @@ DEEP.ch10 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<h3>Reads pay for cheap writes</h3>
-<p>Because SSTables are immutable, an updated key may exist in several files, and only the newest copy counts. A read checks the memtable, then the SSTables from newest to oldest, and stops at the first match. Deletes are written as a <strong>tombstone</strong> marker that hides older copies until compaction removes them.</p>
-<p>Checking many files would be slow, so each SSTable carries a <strong>Bloom filter</strong>: a compact bit array that answers "definitely not here" or "maybe here". Most files are skipped without a disk read. A small sparse index inside each file then points to the right block. Range scans merge the sorted streams from all the files, which works but touches more data than one B-tree leaf walk.</p>
-<p>Compaction is the bill that comes later. It rewrites data again and again as files are merged, consuming disk bandwidth and CPU that would otherwise serve queries, and the disk holds obsolete versions until it runs. Leveled compaction (the LevelDB and RocksDB style) keeps reads fast at the cost of more rewriting; size-tiered compaction rewrites less but leaves more files for reads to check.</p>`,
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "Google Bigtable", title: "The 2006 paper", html: "Bigtable described the memtable, SSTables and compactions that later systems copied, building on the LSM-tree paper by O'Neil and colleagues (1996)." },
-            { org: "RocksDB and LevelDB", title: "Embedded LSM engines", html: "LevelDB came out of Google; Facebook forked it into RocksDB, which now sits underneath many other systems as a storage engine, including MyRocks for MySQL and the storage layer of CockroachDB before it moved to its own Pebble engine." },
-            { org: "Apache Cassandra and HBase", title: "Wide-column stores", html: "Both write to a commit log and memtable, flush SSTables (HFiles in HBase) and compact in the background, with Bloom filters to keep reads from checking every file." },
-          ],
-        },
-        {
           type: "tradeoffs",
           prosLabel: "LSM tree wins",
           consLabel: "LSM tree pays",
           pros: [
             "Very high write throughput: all disk writes are large and sequential",
             "Good compression, since immutable sorted files compress well",
-            "Fits SSD wear patterns better than many small in-place page writes",
+            "Used by Bigtable, LevelDB, RocksDB, Cassandra, HBase and ScyllaDB",
           ],
           cons: [
-            "Read amplification: a lookup may consult several structures",
-            "Compaction competes with foreground traffic for I/O and can cause latency spikes",
+            "Read amplification: a lookup checks the memtable and SSTables newest first (Bloom filters skip most files); deletes are tombstones",
+            "Compaction competes with foreground I/O and can cause latency spikes (leveled favours reads, size-tiered rewrites less)",
             "Space amplification: old versions and tombstones linger until compacted",
           ],
         },
-      ],
-    },
-    {
-      id: "hash-indexes",
-      title: "Hash indexes and choosing between the three",
-      kicker: "Exact match only",
-      blocks: [
         {
           type: "text",
-          html: `<p>A <strong>hash index</strong> is a hash table from key to row location. Computing <code>hash(key)</code> leads straight to a bucket, so an exact-match lookup costs about one step regardless of table size. For a pure key-value workload that is as fast as an index gets.</p>
-<p>The price is ordering. Hashing deliberately scatters neighbouring keys, so <code>ana@</code> and <code>anb@</code> land in unrelated buckets. A hash index cannot answer <code>created_at &gt; ?</code>, cannot do <code>LIKE 'ana%'</code>, and cannot return rows in sorted order. For any of those the database falls back to a scan.</p>
-<p>In practice a B-tree lookup is only a few cached page reads, so the speed advantage is usually small, while the loss of ranges is permanent. That is why hash indexes are mostly found where the whole dataset is in memory and every access is by exact key.</p>`,
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "Redis", title: "A hash table is the database", html: "Redis keeps its keyspace in an in-memory hash table, which is why <code>GET</code> is constant time. Ordered access needs a different structure, such as a sorted set." },
-            { org: "Bitcask (Riak)", title: "Hash index over a log", html: "Bitcask appends every write to a log file on disk and keeps an in-memory hash map from each key to its latest offset. Reads are one seek, writes are appends, and the catch is that every key must fit in RAM." },
-            { org: "PostgreSQL and InnoDB", title: "Niche, and automatic", html: "PostgreSQL offers <code>USING hash</code> indexes for equality only, and they have been crash-safe since version 10. InnoDB builds an <em>adaptive hash index</em> by itself over frequently accessed B-tree pages to speed up hot equality lookups." },
-          ],
+          html: `<p>A <strong>hash index</strong> maps <code>hash(key)</code> to a bucket: one step for exact matches, but neighbouring keys scatter, so no ranges, prefixes or sorting. Since a B-tree lookup is only a few cached pages anyway, hash indexes live mostly in in-memory stores (Redis's keyspace, Bitcask's in-memory key map).</p>`,
         },
         {
           type: "table",
@@ -297,12 +230,6 @@ DEEP.ch10 = {
             ["Write cost", "Random in-place page writes", "Sequential appends, compaction later", "Cheap, but resizing can be costly"],
             ["Typical home", "PostgreSQL, MySQL, SQLite, MongoDB", "Cassandra, RocksDB, HBase, ScyllaDB", "Redis, Bitcask, in-memory maps"],
           ],
-        },
-        {
-          type: "text",
-          html: `<h3>Read amplification and write amplification</h3>
-<p>Two terms let you compare the structures precisely. <strong>Write amplification</strong> is how many bytes hit the disk for each byte the application writes: a B-tree rewriting an 8 KB page for a 100-byte change has a high ratio, and an LSM tree pays its share each time compaction rewrites the data. <strong>Read amplification</strong> is how much work a lookup does: a B-tree reads one root-to-leaf path, while an LSM tree may consult the memtable and several files.</p>
-<p>Roughly, B-trees favour reads and predictable latency, and LSM trees favour sustained write throughput. Neither is free, and the right answer depends on the read:write ratio of the workload.</p>`,
         },
         {
           type: "quiz",
@@ -324,48 +251,30 @@ DEEP.ch10 = {
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>In most product-design interviews, indexing comes up when you sketch the data model. The interviewer wants to hear that you connect each important endpoint to an index: "the feed endpoint filters posts by <code>author_id</code> and sorts by <code>created_at</code>, so I'll index those". Infrastructure-heavy interviews (design a key-value store, a metrics database) go further and expect you to pick between B-trees and LSM trees and justify it.</p>
-<p>Two habits signal experience. First, size things: "a B-tree over 500 million rows is about four levels, so the lookup is a couple of disk reads at worst". Second, name the cost: "this table takes 20,000 writes per second, so I'll keep it to two indexes".</p>`,
-        },
-        {
           type: "callout",
           tone: "interview",
-          html: `<p>A strong answer to "how would you make this query fast?" covers:</p>
+          html: `<p>Connect each important endpoint to an index, size it ("500 million rows is about four levels") and name the cost. A strong answer to "how would you make this query fast?" covers:</p>
 <ol>
 <li>Which columns the query filters, joins and sorts on, and the index that serves them.</li>
-<li>Why a B-tree: sorted, so equality, ranges and ordering all work, and only 3-4 levels deep.</li>
+<li>Why a B-tree: sorted, so equality, ranges and ordering work, and only 3-4 levels deep.</li>
 <li>The write and storage cost, and why you are not indexing everything.</li>
-<li>If the workload is write-heavy (logs, metrics, events), an LSM-based store such as Cassandra or RocksDB, with Bloom filters and compaction as the trade-off.</li>
-</ol>
-<p>If you are asked about hash indexes, say they are great for exact matches and useless for ranges, which is why B-trees remain the default.</p>`,
+<li>For write-heavy workloads (logs, metrics, events), an LSM store such as Cassandra or RocksDB, with Bloom filters and compaction as the trade-off.</li>
+<li>Hash indexes: great for exact matches, useless for ranges.</li>
+</ol>`,
         },
         {
           type: "callout",
           tone: "mistake",
-          html: `<p>Proposing an index on a low-cardinality column such as <code>status</code> or <code>is_deleted</code> as the fix for a slow query. The planner will likely ignore it. If you need it, combine it with a selective column (next chapter) or use a partial index.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "An interviewer says writes to your orders table got 40% slower after a teammate added six new indexes, but most queries got no faster. What is the best response?",
-          options: [
-            "Switch the table to a hash index for everything",
-            "Check which indexes queries actually use and drop the unused or low-selectivity ones",
-            "Add more indexes so the writes are spread out",
-            "Move the table to an in-memory cache",
-          ],
-          answer: 1,
-          explain: "Each index is maintained on every write, so six unused indexes are pure overhead. Index usage statistics (for example PostgreSQL's pg_stat_user_indexes) and query plans show which ones earn their keep. Indexes should follow real query patterns.",
+          html: `<p>Proposing an index on <code>status</code> or <code>is_deleted</code> to fix a slow query. The planner will likely ignore it; combine it with a selective column (next chapter) or use a partial index.</p>`,
         },
       ],
     },
   ],
   takeaways: [
-    "Without an index, a query reads every page of the table; an index turns that into a few page reads at the cost of space and extra work on every write.",
-    "B+ trees are the default: page-sized nodes with hundreds of children keep even billions of rows 3-4 levels deep, and sorted order serves equality, ranges and ORDER BY.",
-    "Secondary indexes often need a second step to fetch the row (a primary-key lookup in InnoDB, a heap read in PostgreSQL), which is why fetching many rows through an index gets expensive.",
-    "Low-selectivity indexes (booleans, small enums) are usually ignored by the planner and only slow down writes.",
-    "LSM trees buffer writes in a memtable and flush sorted, immutable SSTables, trading read amplification and compaction for very high write throughput.",
+    "Without an index a query reads every page; an index turns that into a few page reads at the cost of space and extra work on every write.",
+    "B+ trees are the default: hundreds of children per node keep billions of rows 3-4 levels deep, and sorted order serves equality, ranges and ORDER BY.",
+    "Secondary indexes need an extra step per row, and low-selectivity indexes are usually ignored by the planner.",
+    "LSM trees trade read amplification and compaction for very high write throughput.",
     "Hash indexes give one-step exact matches but no ranges or sorting, so they live mostly in in-memory stores.",
   ],
   furtherReading: [

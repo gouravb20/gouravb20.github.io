@@ -1,57 +1,16 @@
 // Deep dive: Chapter 8, API principles and patterns: pagination, idempotency, versioning, security. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch8 = {
-  hook: `<p>Three bug reports land on the same Monday. A user scrolling the news feed sees the same two posts twice and swears a third one vanished. A customer was charged twice for one concert ticket after the app showed a spinner and they tapped "Pay" again. And a partner's integration broke overnight because a field they relied on was renamed in "a small cleanup".</p>
-<p>None of these is a crash. Each endpoint did what it was coded to do. They are failures of API <em>design</em>: offset pagination on a feed that changes underneath the reader, a payment endpoint that isn't safe to retry, and a contract changed without versioning. Interviewers judge APIs against a handful of principles like these even when they never name them, and each principle turns into a concrete pattern you can sketch in a sentence.</p>`,
+  hook: `<p>This chapter turns the principles interviewers quietly check into concrete patterns: cursor pagination, race-free idempotency keys, actionable errors and versioning, authentication versus authorization, and rate limiting. Each is cheap at design time and expensive to retrofit.</p>`,
   sections: [
-    {
-      id: "principles",
-      title: "Nine principles interviewers quietly check",
-      kicker: "The standard",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>A good API is one a new client developer can use correctly without reading the source code, and that keeps working as the system grows and changes. That goal breaks down into a short list of principles:</p>`,
-        },
-        {
-          type: "table",
-          headers: ["Principle", "What it means in practice"],
-          rows: [
-            ["Resources, not actions", "Plural nouns with HTTP methods: <code>POST /bookings</code>, not <code>/createBooking</code>"],
-            ["Consistency", "Same naming, casing, pagination, error shape and date format on every endpoint"],
-            ["Least surprise", "GET never changes state; 200 means it worked; DELETE deletes"],
-            ["Statelessness", "Each request carries its token and parameters; any server can handle it"],
-            ["Safe retries", "Idempotent methods, plus idempotency keys on creates and payments"],
-            ["Paginate what can grow", "No endpoint returns an unbounded list"],
-            ["Secure by default", "Authenticate every request, authorize every resource, rate limit every client"],
-            ["Evolve without breaking", "Add fields freely; remove or rename only in a new version"],
-            ["Actionable errors", "Correct status code plus a stable machine-readable code and a helpful message"],
-          ],
-        },
-        {
-          type: "text",
-          html: `<p>Most of these are cheap to get right at design time and expensive to retrofit. Switching a public feed from offset to cursor pagination, or adding idempotency to a payment API that partners already call, means coordinating every client. That is why interviewers look for them in a five-minute API sketch: they reveal whether you think about the clients who will live with the API for years.</p>`,
-        },
-        {
-          type: "callout",
-          tone: "insight",
-          html: `<p>Statelessness and consistency reinforce each other. If every request carries its own authentication and every endpoint follows the same conventions, gateways, caches, SDK generators and monitoring can treat the whole API uniformly. Special cases are where bugs, security holes and support tickets accumulate.</p>`,
-        },
-      ],
-    },
     {
       id: "pagination",
       title: "Pagination: offset versus cursor",
       kicker: "Lists that grow",
       blocks: [
         {
-          type: "problem",
-          html: `<p>A user's booking history might have 5 entries; a popular feed has millions. Any list endpoint without a limit eventually returns a response too large to build, send or render, and a single heavy client can exhaust the database. Every growable collection needs pages. The question is how the client asks for the next one.</p>`,
-        },
-        {
           type: "text",
-          html: `<p><strong>Offset pagination</strong> asks for "skip N, take L": <code>GET /posts?offset=40&amp;limit=20</code>. It is easy to implement, and supports "jump to page 7" and total page counts, which suits admin tables and search results. It has two weaknesses. The database still has to walk past all the skipped rows, so deep pages get slower and slower. And if items are inserted or deleted while the user is paging, the window shifts: new posts at the top push items the user already saw onto the next page (duplicates), and deletions pull unseen items back onto a page already read (skips).</p>
-<p><strong>Cursor pagination</strong> asks for "the next L items after this one": the response includes an opaque <code>next_cursor</code> encoding the position of the last item returned (often its sort key plus ID), and the next request sends it back. The database seeks straight to that position using an index, so page 1,000 costs the same as page 1, and inserts or deletes elsewhere don't shift the window. The price: no jumping to arbitrary pages and no cheap total count.</p>`,
+          html: `<p>Every growable list needs pages. <strong>Offset</strong> (<code>?offset=40&amp;limit=20</code>) supports page numbers and totals but scans skipped rows and drifts when items are inserted or deleted. <strong>Cursor</strong> returns an opaque <code>next_cursor</code> (sort key plus ID of the last item); the database seeks straight there, so page 1,000 costs the same as page 1.</p>`,
         },
         {
           type: "code",
@@ -129,16 +88,12 @@ LIMIT 20;`,
           caption: "Read page 1, add new posts and delete some old ones, then fetch page 2 with offset and with cursor pagination. Watch for duplicates, silently skipped posts and the cost of deep pages.",
         },
         {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "Stripe", title: "Cursor by object ID", html: "Stripe's list endpoints take a <code>limit</code> plus <code>starting_after</code> or <code>ending_before</code>, each set to the ID of an object from the previous page." },
-            { org: "Slack", title: "Opaque cursors", html: "Slack's Web API returns a <code>next_cursor</code> in <code>response_metadata</code> for paginated methods; clients pass it back unchanged and stop when it comes back empty." },
+            "Cursor gives up jumping to page N and cheap totals; offset suits small, stable lists and admin tables.",
+            "Make cursors <strong>opaque</strong> (e.g. base64 of sort key and ID) so you can change the encoding later. Stripe uses <code>starting_after</code>; Slack returns <code>next_cursor</code>.",
+            "Always include a unique tiebreaker such as the ID in the sort, or equal timestamps skip or repeat at page boundaries.",
           ],
-        },
-        {
-          type: "callout",
-          tone: "tip",
-          html: `<p>Make cursors <strong>opaque</strong> (for example, base64 of the sort key and ID) rather than letting clients build them. You can then change the encoding, add a version byte or switch sort keys without breaking anyone. And always include a unique tiebreaker such as the ID in the sort, or items with equal timestamps can be skipped or repeated at page boundaries.</p>`,
         },
         {
           type: "quiz",
@@ -161,18 +116,17 @@ LIMIT 20;`,
       blocks: [
         {
           type: "text",
-          html: `<p>When a payment or booking request times out, the client has no idea whether it was applied. Retrying blindly risks charging twice; not retrying risks losing the payment. An <strong>idempotency key</strong> resolves this: the client generates a unique key per logical operation (one per checkout attempt, not one per HTTP attempt), sends it with every retry, and the server guarantees that one key produces at most one effect and always the same response.</p>
-<p>The idea is simple. The implementation has a trap. The obvious version, "look up the key; if absent, process the payment and then save the key", has a window between the lookup and the save. A retry that arrives while the first attempt is still talking to the card network finds no key, processes the payment again, and the customer is charged twice despite the key.</p>`,
+          html: `<p>The client sends one key per logical operation (per checkout, not per HTTP attempt); the server guarantees one effect and the same response per key. The trap is <strong>check-then-act</strong>: a retry arriving while the first attempt is still charging finds no key and charges again. The claim must be atomic.</p>`,
         },
         {
           type: "steps",
           title: "A race-free implementation",
           items: [
-            "Claim the key atomically before doing any work: insert it into a table with a unique constraint, with status <code>in_progress</code> and a hash of the request body.",
-            "If the insert fails because the key exists: return the stored response if it is complete; return <code>409 Conflict</code> (or wait briefly) if it is still in progress; reject with an error if the body hash differs.",
-            "Do the work. Where possible, record the business change and the final response in the same database transaction as the key's status update.",
-            "If the work fails in a way that is safe to retry, release or mark the key so a later attempt can try again; otherwise store the error as the key's response.",
-            "Delete keys after a retention window that comfortably exceeds any client's retry horizon, such as 24 hours to a few days.",
+            "Claim the key atomically before any work: insert with a unique constraint, status <code>in_progress</code> and a hash of the request body.",
+            "If the key exists: return the stored response if done; <code>409</code> (or wait) if in progress; an error if the body hash differs.",
+            "Do the work, recording the business change and final response in the same transaction as the key update where possible.",
+            "On a retryable failure, release the key; otherwise store the error as its response.",
+            "Delete keys after a window well beyond any client's retry horizon (24 hours to a few days).",
           ],
         },
         {
@@ -202,30 +156,18 @@ RETURNING key;            -- no row returned means someone already claimed it`,
         {
           type: "callout",
           tone: "warning",
-          html: `<p>Scope keys to the authenticated client. If keys are global, two different customers who happen to generate the same key, or an attacker who guesses one, could receive each other's stored responses. The primary key above includes <code>client_id</code> for exactly that reason.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "A server checks whether an idempotency key exists and, if not, processes the payment and then inserts the key. Customers are still occasionally charged twice. Why?",
-          options: [
-            "The keys are too short",
-            "A retry arriving while the first attempt is in progress also sees no key, because the check and the claim are separate steps",
-            "Idempotency keys only work with PUT",
-            "The client is generating a new key per retry, which is required",
-          ],
-          answer: 1,
-          explain: "Check-then-act is a race. The fix is to claim the key atomically before processing (an insert against a unique constraint) so exactly one attempt wins. A client generating a new key per retry would also cause duplicates, but that is a client bug, not a requirement.",
+          html: `<p>Scope keys to the authenticated client. With global keys, two customers who generate the same key, or an attacker who guesses one, could receive each other's stored responses.</p>`,
         },
       ],
     },
     {
       id: "errors-and-versioning",
-      title: "Actionable errors and evolving without breaking clients",
+      title: "Actionable errors and versioning",
       kicker: "Contracts over time",
       blocks: [
         {
           type: "text",
-          html: `<p>An error is actionable when a program can decide what to do from it and a human can understand why it happened. That takes three things: the right status code class (so generic clients and retry logic behave), a <strong>stable machine-readable code</strong> the client can branch on, and a <strong>human-readable message</strong> with enough context to fix the problem. Use one envelope shape for every error on every endpoint.</p>`,
+          html: `<p>An actionable error has the right status class, a <strong>stable machine-readable code</strong> clients branch on, and a <strong>human message</strong> that can be reworded freely. Use one envelope everywhere (RFC 9457 Problem Details is a published alternative).</p>`,
         },
         {
           type: "code",
@@ -241,43 +183,30 @@ RETURNING key;            -- no row returned means someone already claimed it`,
 }`,
         },
         {
-          type: "text",
-          html: `<p>Clients branch on <code>code</code>, never on the message text, so messages can be reworded or translated freely. A <code>request_id</code> lets support find the exact request in logs. RFC 9457, "Problem Details for HTTP APIs", standardizes a similar shape (<code>type</code>, <code>title</code>, <code>status</code>, <code>detail</code>) if you prefer a published format.</p>
-<h3>Versioning</h3>
-<p>Some changes are safe for existing clients: adding an optional request field, adding a response field, adding an endpoint. Others break them: removing or renaming a field, changing a type or meaning, making an optional field required, tightening validation. Breaking changes need a new version that old clients don't get unless they opt in.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Safe changes:</strong> add an optional request field, a response field or an endpoint.",
+            "<strong>Breaking changes</strong> need a new version: removing or renaming a field, changing a type or meaning, making a field required, tightening validation.",
+            "Teach clients to <strong>ignore unknown fields</strong> from day one; that alone covers most change.",
+          ],
         },
         {
           type: "compare",
           items: [
-            { title: "URL versioning: /v1/events", tone: "ok", html: "Explicit, visible in logs, trivial to route at the gateway, easy to test in a browser. The most common choice for public APIs and the safe interview answer." },
-            { title: "Header versioning", tone: "info", html: "e.g. <code>API-Version: 2</code> or a dated version header. Keeps URLs stable and allows fine-grained versions, but is invisible in a plain link and easy for clients to forget." },
+            { title: "URL versioning: /v1/events", tone: "ok", html: "Explicit, visible in logs, trivial to route at the gateway. The most common choice for public APIs and the safe interview answer." },
+            { title: "Header versioning", tone: "info", html: "e.g. <code>API-Version: 2</code> or a dated version (Stripe's <code>Stripe-Version</code>, GitHub's <code>X-GitHub-Api-Version</code>). Stable URLs, fine-grained versions, but invisible in a link and easy to forget." },
           ],
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "Stripe", title: "Dated versions", html: "Stripe pins each account to the API version current when it started, and clients can override it per request with a <code>Stripe-Version</code> header naming a dated release. Old integrations keep their behaviour while new ones get the latest." },
-            { org: "GitHub", title: "Version header", html: "GitHub's REST API accepts an <code>X-GitHub-Api-Version</code> header with a date-based version, so the URL structure stays the same across versions." },
-          ],
-        },
-        {
-          type: "callout",
-          tone: "tip",
-          html: `<p>Teach clients to <strong>ignore unknown fields</strong> from day one. That single rule lets you add response fields forever without a new version, which is most of the change any API ever needs.</p>`,
         },
       ],
     },
     {
-      id: "authentication-authorization",
-      title: "Authentication, authorization and tokens",
+      id: "auth-and-rate-limiting",
+      title: "Authentication, authorization and rate limiting",
       kicker: "Secure by default",
       blocks: [
         {
           type: "text",
-          html: `<p>Two different questions, often confused. <strong>Authentication</strong>: who is calling? <strong>Authorization</strong>: is this caller allowed to do this to this specific resource? John is authenticated as John; he is authorized to cancel his own booking, not someone else's. Both run on every request.</p>
-<p><strong>API keys</strong> identify an application rather than a person. They are long random secrets, sent in a header, looked up server-side along with the application's permissions and rate limits. Good for server-to-server integrations; never embed them in browser or mobile code, where anyone can extract them. Store only a hash of each key, as you would a password.</p>
-<p><strong>Sessions</strong> store login state on the server; the client holds an opaque session ID, usually in a cookie. Every request needs a lookup, but logging out or revoking is instant: delete the session.</p>
-<p><strong>JWTs</strong> (JSON Web Tokens, RFC 7519) put claims such as user ID, role and expiry into a token signed by the issuer. Any service with the verification key can check it without a database call, which suits many services behind a gateway. The flip side is revocation: a stolen token stays valid until it expires. The usual compromise is short-lived access tokens (minutes) plus longer-lived refresh tokens that the server can revoke.</p>`,
+          html: `<p><strong>Authentication</strong> asks who is calling; <strong>authorization</strong> asks whether this caller may do this to <em>this</em> resource. Both run on every request. Roles (RBAC) answer "can customers cancel bookings?"; only an ownership check (<code>WHERE id = ? AND user_id = ?</code>) answers "is this booking yours?". OWASP's API Top 10 (2023) lists broken object-level authorization first.</p>`,
         },
         {
           type: "diagram",
@@ -304,38 +233,16 @@ RETURNING key;            -- no row returned means someone already claimed it`,
 </svg>`,
         },
         {
-          type: "text",
-          html: `<p><strong>Role-based access control</strong> (RBAC) assigns users roles (customer, venue_manager, admin) and roles permissions. Roles answer "can this kind of user cancel bookings at all?" They don't answer "is this booking yours?", which needs an ownership check against the data: <code>WHERE id = ? AND user_id = ?</code>. Forgetting the second check is the single most common API vulnerability: OWASP's API Security Top 10 (2023) lists broken object-level authorization first.</p>`,
-        },
-        {
           type: "compare",
           items: [
-            { title: "JWT (stateless tokens)", tone: "info", html: "No lookup per request; any service can verify. Hard to revoke before expiry, and claims (like role) can go stale. Use short expiries, strong signing algorithms (RS256 or ES256), and validate issuer, audience and expiry." },
-            { title: "Server-side sessions", tone: "ok", html: "Instant revocation and always-current permissions; tokens reveal nothing. Needs a fast shared session store (often Redis) and a lookup on every request." },
+            { title: "JWT (stateless tokens)", tone: "info", html: "No lookup per request; any service can verify. Hard to revoke before expiry, claims can go stale. Use short-lived access tokens plus revocable refresh tokens, RS256 or ES256, and validate issuer, audience and expiry." },
+            { title: "Server-side sessions", tone: "ok", html: "Instant revocation and current permissions. Needs a fast shared store (often Redis) and a lookup per request." },
+            { title: "API keys", tone: "warn", html: "Identify an application for server-to-server use. Never embed in browser or mobile code; store only a hash." },
           ],
         },
-        {
-          type: "quiz",
-          q: "A logged-in customer calls DELETE /bookings/91, which belongs to another customer. The token is valid and the customer role may cancel bookings. What should stop the request?",
-          options: [
-            "Authentication at the gateway",
-            "The rate limiter",
-            "An object-level authorization check that the booking's owner is the caller",
-            "TLS",
-          ],
-          answer: 2,
-          explain: "Authentication proved who they are and the role check passed, because customers can cancel bookings in general. Only an ownership check on this specific booking catches it. Many APIs return 404 here rather than 403, so they don't confirm that booking 91 exists.",
-        },
-      ],
-    },
-    {
-      id: "rate-limiting",
-      title: "Rate limiting: protecting the API from its clients",
-      kicker: "Fair use",
-      blocks: [
         {
           type: "text",
-          html: `<p>Without limits, one buggy script, scraper or abusive user can consume capacity meant for everyone, and a sudden spike can push the whole service over. <strong>Rate limiting</strong> caps how many requests a client may make in a period: per user or API key for authenticated traffic, per IP for anonymous traffic, and often per endpoint for expensive or sensitive operations (for example, 10 booking attempts a minute, or 5 login attempts). Excess requests get <code>429 Too Many Requests</code>, ideally with a <code>Retry-After</code> header saying when to try again.</p>`,
+          html: `<p><strong>Rate limiting</strong> caps requests per user, API key, IP or endpoint (e.g. 5 login attempts) and answers <code>429</code> with <code>Retry-After</code>. Enforce it at the gateway with counters in a shared store such as Redis, updated atomically (Lua script or atomic increment), or instances see stale counts.</p>`,
         },
         {
           type: "table",
@@ -353,29 +260,16 @@ RETURNING key;            -- no row returned means someone already claimed it`,
           caption: "Feed the same bursty traffic to a fixed window, a sliding log and a token bucket. Look for the double burst at the fixed window's boundary and how the bucket lets short bursts through.",
         },
         {
-          type: "text",
-          html: `<p>Token bucket is the most common general-purpose choice because it matches how real clients behave: idle for a while, then a burst of activity. A bucket of 20 tokens refilled at 2 per second lets a client open an app and fire 15 requests at once, while capping its sustained rate at 2 per second. Amazon API Gateway, for example, documents its throttling in token-bucket terms (a rate and a burst).</p>
-<h3>Where and how to enforce</h3>
-<p>Enforce at the edge, in the API gateway or middleware, before requests consume expensive resources. With many gateway instances, counters must be shared, usually in Redis, and the read-modify-write must be atomic (a Lua script or atomic increment with expiry), or concurrent requests on different instances will all see the old count. Tell clients where they stand: many APIs return headers such as <code>X-RateLimit-Limit</code>, <code>X-RateLimit-Remaining</code> and <code>X-RateLimit-Reset</code>, and an IETF draft is standardizing <code>RateLimit</code> header fields.</p>`,
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "GitHub", title: "Published limits", html: "GitHub's REST API documents per-hour request limits for authenticated and unauthenticated callers and reports the remaining allowance on every response in <code>x-ratelimit-*</code> headers." },
-            { org: "Stripe", title: "Several limiters at once", html: "Stripe's engineering blog post on rate limiters describes layering a request rate limiter (token bucket), a concurrency limiter and load shedders that drop lower-priority traffic first when the system is under strain." },
-          ],
-        },
-        {
           type: "quiz",
-          q: "A client's token bucket holds 10 tokens and refills at 1 token per second. It has been idle for a minute, then sends 15 requests at once. What happens?",
+          q: "A logged-in customer calls DELETE /bookings/91, which belongs to another customer. The token is valid and the customer role may cancel bookings. What should stop the request?",
           options: [
-            "All 15 succeed",
-            "10 succeed immediately and 5 are rejected (or must wait for refills)",
-            "Only 1 succeeds",
-            "All 15 are rejected because it exceeded the rate",
+            "Authentication at the gateway",
+            "The rate limiter",
+            "An object-level authorization check that the booking's owner is the caller",
+            "TLS",
           ],
-          answer: 1,
-          explain: "The bucket filled to its capacity of 10 while idle, and tokens beyond capacity are discarded. The burst spends all 10; the remaining 5 get 429 until tokens refill at one per second. That is the burst-then-average behaviour token buckets are chosen for.",
+          answer: 2,
+          explain: "Authentication proved who they are and the role check passed, because customers can cancel bookings in general. Only an ownership check on this specific booking catches it. Many APIs return 404 here rather than 403, so they don't confirm that booking 91 exists.",
         },
       ],
     },
@@ -385,48 +279,47 @@ RETURNING key;            -- no row returned means someone already claimed it`,
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>You don't need to recite these patterns as a list. Weave them into the API step with one sentence each, at the endpoint where they matter: cursor pagination on the feed, an idempotency key on the booking, rate limits on the endpoint bots will hammer, and identity from the token everywhere.</p>`,
+          type: "table",
+          title: "Principles interviewers quietly check",
+          headers: ["Principle", "What it means in practice"],
+          rows: [
+            ["Resources, not actions", "Plural nouns with HTTP methods: <code>POST /bookings</code>, not <code>/createBooking</code>"],
+            ["Consistency", "Same naming, casing, pagination, error shape and date format on every endpoint"],
+            ["Least surprise", "GET never changes state; 200 means it worked; DELETE deletes"],
+            ["Statelessness", "Each request carries its token and parameters; any server can handle it"],
+            ["Safe retries", "Idempotent methods, plus idempotency keys on creates and payments"],
+            ["Paginate what can grow", "No endpoint returns an unbounded list"],
+            ["Secure by default", "Authenticate every request, authorize every resource, rate limit every client"],
+            ["Evolve without breaking", "Add fields freely; remove or rename only in a new version"],
+            ["Actionable errors", "Correct status code plus a stable machine-readable code and a helpful message"],
+          ],
         },
         {
           type: "callout",
           tone: "interview",
-          html: `<p>Sentences that score well:</p>
+          html: `<p>Weave one sentence per pattern into the endpoint where it matters:</p>
 <ol>
 <li>"The feed uses cursor pagination, since posts arrive constantly and users only scroll forward."</li>
-<li>"<code>POST /bookings</code> takes an <code>Idempotency-Key</code>; the server claims it with a unique constraint before charging, so retries can't double-book."</li>
+<li>"<code>POST /bookings</code> takes an <code>Idempotency-Key</code>, claimed with a unique constraint before charging."</li>
 <li>"Errors share one envelope with a stable code, like <code>SEAT_UNAVAILABLE</code> with a 409."</li>
-<li>"Public API is versioned in the URL; we only add fields within a version."</li>
-<li>"The gateway validates the JWT and rate limits per user with a token bucket in Redis; each service checks ownership of the resource."</li>
+<li>"The public API is versioned in the URL; we only add fields within a version."</li>
+<li>"The gateway validates the JWT and rate limits per user with a token bucket in Redis; each service checks resource ownership."</li>
 </ol>`,
         },
         {
           type: "callout",
           tone: "mistake",
-          html: `<p>Saying "we'll add authentication" and stopping there. Authentication without per-resource authorization is how one user reads another's data. Name both, and give the ownership check as an example.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "Which single sentence best covers safe retries for a ticket purchase endpoint?",
-          options: [
-            "We'll use HTTPS so requests aren't lost",
-            "Clients send an idempotency key per purchase attempt, and the server atomically claims it and returns the stored result for repeats",
-            "We'll make the endpoint a GET",
-            "We'll rate limit retries to one per second",
-          ],
-          answer: 1,
-          explain: "HTTPS doesn't prevent lost responses, GET must not change state, and rate limiting doesn't stop a single retry from double-charging. A per-operation idempotency key, claimed atomically, makes repeats return the original outcome.",
+          html: `<p>Saying "we'll add authentication" and stopping. Without per-resource authorization, one user reads another's data. Name both.</p>`,
         },
       ],
     },
   ],
   takeaways: [
-    "Nine principles (resources, consistency, least surprise, statelessness, safe retries, pagination, security, evolvability, actionable errors) are cheap at design time and expensive to retrofit.",
-    "Offset pagination is simple and supports page numbers but drifts on changing data and slows on deep pages; cursor pagination is stable and constant-cost, ideal for feeds.",
-    "Idempotency keys must be claimed atomically (unique constraint) before doing the work, scoped per client, checked against the request body and expired after a retention window.",
-    "Errors use the right status plus one envelope with a stable code and a helpful message; version breaking changes, add fields freely, and have clients ignore unknown fields.",
-    "Authentication says who is calling; authorization checks this caller against this resource. JWTs avoid lookups but are hard to revoke; sessions revoke instantly but need a shared store.",
-    "Rate limit at the edge per user, IP or endpoint, usually with a token bucket in a shared store, and return 429 with Retry-After.",
+    "Cursor pagination is stable and constant-cost, ideal for feeds; offset suits small, stable lists that need page numbers.",
+    "Claim idempotency keys atomically before doing the work, scope them per client, check the request body and expire them.",
+    "Errors use the right status plus one envelope with a stable code; version breaking changes, add fields freely, and have clients ignore unknown fields.",
+    "Authentication says who is calling; authorization checks this caller against this resource. JWTs avoid lookups but are hard to revoke; sessions revoke instantly.",
+    "Rate limit at the edge, usually with a token bucket in a shared store, and return 429 with Retry-After.",
   ],
   furtherReading: [
     { title: "RFC 9457: Problem Details for HTTP APIs", url: "https://www.rfc-editor.org/rfc/rfc9457", note: "A standard JSON shape for machine-readable error responses." },

@@ -1,28 +1,24 @@
 // Deep dive: Chapter 12, Caching: where to cache and how reads and writes flow. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch12 = {
-  hook: `<p>A social app's profile page makes one query: fetch the user, join their stats, count their followers. It takes 30 ms and the database handles it fine at 2,000 requests per second. Then the app is featured in an app store, traffic jumps to 40,000 profile views per second, and the database CPU hits 100%. Latency climbs to seconds, connection pools fill up, and every other feature that shares the database starts failing too.</p>
-<p>Look at the traffic and a pattern jumps out: the same few thousand popular profiles are fetched over and over, and they change maybe once a day. The database is doing identical work tens of thousands of times a second. A cache keeps that answer in memory after the first request, so the next ten thousand requests never reach the database at all. Deciding <em>where</em> to put that memory and <em>how</em> reads and writes flow through it is what this chapter is about.</p>`,
+  hook: `<p>This chapter covers when a cache pays off, where it should live and how reads and writes flow through it. Done right, the same few hot answers stop hitting the database thousands of times a second.</p>`,
   sections: [
     {
       id: "why-cache",
-      title: "Why a cache pays off: latency, load and skew",
+      title: "Why a cache pays off: hit ratio and skew",
       kicker: "The problem",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Databases are durable, flexible and correct, and those properties cost time. A typical query parses SQL, plans it, walks indexes, may read pages from SSD, takes locks and assembles a result: 5 to 50 ms is normal, and a multi-table feed query can take hundreds. Worse, every one of those queries consumes CPU on a machine that is hard to scale out.</p>`,
+          type: "text",
+          html: `<p>A database query typically takes 5 to 50 ms on a machine that is hard to scale out; Redis or Memcached answers a key lookup in well under a millisecond, around a hundred thousand operations per second per node. A cache both cuts latency and removes reads from the database.</p>`,
         },
         {
-          type: "text",
-          html: `<p>An in-memory key-value store such as Redis or Memcached answers a lookup by key in well under a millisecond from inside the same data centre, and a single node can serve on the order of a hundred thousand operations per second. Putting it in front of the database does two things at once: it cuts latency for every hit, and it removes those reads from the database entirely.</p>
-<h3>The number that matters: hit ratio</h3>
-<p>The <strong>hit ratio</strong> is hits divided by lookups. The database only sees misses, so its load is proportional to the <em>miss</em> ratio. Moving from 90% to 99% hits sounds like a small tweak but cuts database reads from 10% of traffic to 1%: a tenfold reduction. Average latency follows the same curve. With a 1 ms hit and a 31 ms miss (30 ms query plus filling the cache), 90% hits average about 4 ms, while 99% hits average about 1.3 ms.</p>`,
-        },
-        {
-          type: "text",
-          html: `<h3>Why a small cache can serve most traffic</h3>
-<p>Real access patterns are heavily skewed, roughly following a Zipf distribution: a small fraction of items receives most of the requests. The top celebrities, the front-page products and today's news get hit constantly, while the long tail is read rarely. A cache that holds a few percent of the data, if it holds the right few percent, can absorb the majority of reads. That is also why eviction policy matters (next chapter): its job is to keep that hot set in memory.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Database load is proportional to the miss ratio.</strong> Going from 90% to 99% hits cuts database reads tenfold.",
+            "Latency follows: with 1 ms hits and 31 ms misses, 90% hits average about 4 ms, 99% about 1.3 ms.",
+            "<strong>Skew</strong> (roughly Zipf) means a small hot set gets most requests, so a cache holding a few percent of the data can absorb most reads, if eviction keeps the right items.",
+          ],
         },
         {
           type: "lab",
@@ -32,7 +28,7 @@ DEEP.ch12 = {
         {
           type: "callout",
           tone: "warning",
-          html: `<p>A cache is not free. It adds a second copy of the data that can be stale, invalidation logic that can have bugs, and a new component that can fail. Justify it with a number ("40K reads per second at 30 ms is saturating the primary") before you add it.</p>`,
+          html: `<p>A cache adds a second copy that can be stale, invalidation logic that can have bugs and a component that can fail. Justify it with a number ("40K reads per second at 30 ms is saturating the primary").</p>`,
         },
         {
           type: "quiz",
@@ -50,12 +46,12 @@ DEEP.ch12 = {
     },
     {
       id: "where-to-cache",
-      title: "Where caches live: client, CDN, in-process and external",
+      title: "Where caches live",
       kicker: "Cache layers",
       blocks: [
         {
           type: "text",
-          html: `<p>"Add a cache" is ambiguous until you say where. A request passes through several places that can each keep a copy of the answer, and each one trades speed against how widely it is shared and how much control you keep over staleness.</p>`,
+          html: `<p>Each layer that answers a request saves the work of every layer behind it. Layers closer to the user are faster but shared by fewer requests and harder to invalidate.</p>`,
         },
         {
           type: "diagram",
@@ -93,15 +89,7 @@ DEEP.ch12 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<p><strong>External cache.</strong> A Redis or Memcached cluster that every app server talks to over the network. It is shared, so one server filling it helps all the others; it has its own memory budget with TTLs and eviction; and you control invalidation in one place. This is the cache interviewers expect by default, and the one to start with.</p>
-<p><strong>CDN.</strong> A network of edge servers in many cities that cache responses close to users and fetch from your origin on a miss. Physics is the reason: a round trip from Mumbai to a server in Virginia is a couple of hundred milliseconds no matter how fast the server is, while a nearby edge answers in tens. CDNs are the standard answer for images, video, JavaScript and CSS, and can also cache public API responses.</p>
-<p><strong>In-process cache.</strong> A map in the application's own memory, such as a Caffeine or Guava cache in Java. No network hop, so it is about a thousand times faster than Redis. But each instance has its own copy: with 50 servers there are 50 copies, and an update on one does not reach the others. Use it for small, very hot, rarely changing data: config, feature flags, reference tables, and a few keys so hot they would overload a single Redis node.</p>
-<p><strong>Client cache.</strong> The browser's HTTP cache, a mobile app's local database, or a library caching metadata (Redis cluster clients cache the slot-to-node map). A client hit costs no request at all, but the backend can only influence it through headers and versioned URLs.</p>`,
-        },
-        {
           type: "table",
-          title: "Comparing the layers",
           headers: ["Layer", "Typical latency", "Shared by", "Invalidation", "Good for"],
           rows: [
             ["Client", "None (no request)", "One user", "Headers, versioned URLs", "Static assets, offline data"],
@@ -111,23 +99,23 @@ DEEP.ch12 = {
           ],
         },
         {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "Netflix Open Connect", title: "A CDN inside ISPs", html: "Netflix built its own CDN and places Open Connect caching appliances inside internet providers' networks, so popular video is served from very close to viewers instead of crossing the internet backbone." },
-            { org: "HTTP caching", title: "Cache-Control and ETags", html: "<code>Cache-Control: max-age=31536000, immutable</code> lets browsers and CDNs keep a fingerprinted asset for a year. For changing resources, an <code>ETag</code> lets the client ask \"has this changed?\" and get a tiny <code>304 Not Modified</code> instead of the full body." },
-            { org: "Redis", title: "Client-side caching support", html: "Since Redis 6, clients can ask the server to track the keys they have read and send invalidation messages when those keys change, which makes an in-process cache in front of Redis safer to run." },
+            "<strong>External cache</strong> is the default: shared, with its own memory budget, TTLs and one place to invalidate.",
+            "<strong>CDN</strong> wins on physics: a nearby edge answers in tens of ms where a cross-world origin takes hundreds. Fingerprinted assets use <code>Cache-Control: max-age=31536000, immutable</code>; changing ones use <code>ETag</code> and <code>304</code>.",
+            "<strong>In-process</strong> is about a thousand times faster than Redis, but 50 servers mean 50 copies an update doesn't reach. Since Redis 6, server-assisted invalidation makes it safer in front of Redis.",
           ],
         },
       ],
     },
     {
       id: "cache-aside",
-      title: "Cache-aside: the default read and write flow",
+      title: "Cache-aside: the default flow",
       kicker: "Pattern 1",
       blocks: [
         {
           type: "idea",
-          html: `<p>The application owns the logic. On a read it asks the cache first; on a miss it reads the database and puts the result in the cache for next time. On a write it updates the database and then <strong>deletes</strong> the cache entry, so the next read reloads the fresh value. The cache never talks to the database itself.</p>`,
+          html: `<p>The application owns the logic: read the cache; on a miss read the database and fill the cache. On a write, update the database, then <strong>delete</strong> the key so the next read reloads it.</p>`,
         },
         {
           type: "diagram",
@@ -180,14 +168,28 @@ def update_profile(user_id, changes):
     redis.delete(f"user:{user_id}:profile")  # then invalidate; next read refills`,
         },
         {
-          type: "text",
-          html: `<p>Three properties make cache-aside the default. It caches <strong>only what is actually read</strong>, so memory goes to the hot set rather than to every row ever written. It <strong>degrades gracefully</strong>: if Redis is unreachable, the code can fall through to the database and keep working (slower, and with the risk of overload that the next chapter addresses). And it works with <strong>any plain key-value store</strong>, because the cache needs no knowledge of the database.</p>
-<p>The costs are a slow first read for every key (the miss pays for the database query plus the cache fill), and a short window where readers can see a stale value. Deleting the key on write, rather than writing the new value into it, avoids a race between concurrent writers; chapter 13 explains why, and why a TTL stays as a backstop.</p>`,
+          type: "tradeoffs",
+          prosLabel: "Why it's the default",
+          consLabel: "What it costs",
+          pros: [
+            "Caches only what is read, so memory goes to the hot set",
+            "Degrades gracefully: if Redis is down, fall through to the database",
+            "Works with any plain key-value store (Facebook's memcache paper describes this look-aside design)",
+          ],
+          cons: [
+            "Every key's first read pays the query plus the fill",
+            "A short window where readers see a stale value",
+            "Deleting (not overwriting) on write avoids races between writers; keep a TTL as a backstop for lost deletes",
+          ],
         },
         {
-          type: "realworld",
+          type: "list",
+          title: "Running it",
           items: [
-            { org: "Facebook", title: "Memcache at scale (NSDI 2013)", html: "Facebook's paper on scaling memcache describes a demand-filled look-aside cache: web servers read from memcache, fall back to the database on a miss, and delete the key after updating the database rather than updating the cached value." },
+            "<strong>Keys you can compute at write time:</strong> <code>user:123:profile</code>. For derived data or format changes, a <strong>versioned key</strong> (<code>feed:v8:42</code>) makes every old entry unreachable at once; old ones age out by TTL.",
+            "<strong>TTL from business tolerance:</strong> a product description can be an hour old, a stock count a few seconds.",
+            "<strong>Size for the hot set:</strong> 100M users × 2 KB is 200 GB; a 20% hot set is about 40 GB, plus 1.5-2× overhead and replicas: a few nodes. Cache the smallest useful unit.",
+            "<strong>Don't cache</strong> what is already fast and rarely read, or what must be exactly current (a balance during a transfer).",
           ],
         },
       ],
@@ -199,14 +201,14 @@ def update_profile(user_id, changes):
       blocks: [
         {
           type: "text",
-          html: `<p>Cache-aside puts the application in charge. The other patterns move responsibility into a cache layer that sits <em>in the path</em> to the database, and each makes a different trade between write latency, freshness and durability.</p>`,
+          html: `<p>These patterns put a cache layer <em>in the path</em> to the database, trading write latency, freshness and durability differently.</p>`,
         },
         {
           type: "compare",
           items: [
-            { title: "Write-through", tone: "info", html: "The application writes to the cache layer, which writes the database <strong>synchronously</strong> before acknowledging. Reads after a write are fresh and warm. Writes pay both latencies, and the cache fills with data that may never be read. It is still two writes that can partially fail, and plain Redis does not do it for you: you need a library or a cache product that supports it." },
-            { title: "Write-behind (write-back)", tone: "warn", html: "The application writes only to the cache, which acknowledges immediately and flushes to the database <strong>later, in batches</strong>. Writes are fast and the database sees far fewer, larger writes. If the cache node dies before flushing, those acknowledged writes are gone." },
-            { title: "Read-through", tone: "ok", html: "The cache acts as a proxy in front of the database and <strong>loads missing data itself</strong>. Application code just asks the cache. Loading logic is centralised, but you need a cache that knows how to reach the source. CDNs are the most common read-through caches." },
+            { title: "Write-through", tone: "info", html: "The cache layer writes the database <strong>synchronously</strong> before acknowledging. Fresh, warm reads; writes pay both latencies and the cache fills with unread data. Plain Redis doesn't do it; DAX in front of DynamoDB does." },
+            { title: "Write-behind (write-back)", tone: "warn", html: "The cache acknowledges immediately and flushes <strong>later, in batches</strong> (e.g. Hazelcast map stores). Fast writes, far fewer database writes; unflushed writes vanish if the node dies." },
+            { title: "Read-through", tone: "ok", html: "The cache <strong>loads missing data itself</strong>, so application code just asks the cache. CDNs are the most common example." },
           ],
         },
         {
@@ -226,17 +228,9 @@ def update_profile(user_id, changes):
           ],
         },
         {
-          type: "realworld",
-          items: [
-            { org: "Amazon DynamoDB Accelerator (DAX)", title: "Read-through and write-through", html: "DAX sits in front of DynamoDB with a compatible API. Reads that miss are loaded from DynamoDB, and writes go through DAX to the table, so the application code barely changes." },
-            { org: "Hazelcast", title: "Write-behind map stores", html: "In-memory data grids such as Hazelcast can be configured to persist map entries to a backing store asynchronously after a delay, batching writes, which is the write-behind pattern built into the cache product." },
-            { org: "CDNs", title: "Read-through at the edge", html: "On a miss, the edge fetches from the configured origin, stores the response according to its cache headers, and serves later requests itself." },
-          ],
-        },
-        {
           type: "callout",
           tone: "mistake",
-          html: `<p>Proposing write-behind for orders, payments or anything a user expects to be saved once they see "success". The acknowledgement comes from memory, so a crash before the flush silently loses data. Write-behind is for data where losing a few seconds is tolerable: view counts, rate-limiter state, analytics events.</p>`,
+          html: `<p>Write-behind for orders or payments. The "success" comes from memory, so a crash before the flush silently loses data. Keep it for view counts, rate-limiter state and analytics.</p>`,
         },
         {
           type: "quiz",
@@ -248,95 +242,37 @@ def update_profile(user_id, changes):
       ],
     },
     {
-      id: "keys-ttls-and-sizing",
-      title: "Keys, TTLs and sizing the cache",
-      kicker: "Making it work",
-      blocks: [
-        {
-          type: "text",
-          html: `<h3>Name keys so you can invalidate them</h3>
-<p>A cache key must be computable from what you know at write time, or you will never be able to delete it. Name keys by entity and purpose: <code>user:123:profile</code>, <code>post:987:comments:page1</code>, <code>trending:global</code>. If a value is derived from many entities (a rendered feed page), consider a <strong>versioned key</strong> such as <code>feed:42:v7</code>: bump the version stored elsewhere and every old entry becomes unreachable at once, then ages out by TTL. The same trick works for whole classes of data after a schema or format change.</p>
-<h3>TTLs bound staleness</h3>
-<p>A TTL is the maximum time an entry may live. Even when you delete on write, keep a TTL as a safety net: if a delete is lost (a crash between the database write and the delete, a bug in one code path), the stale value expires on its own. Pick the TTL from the business tolerance: a product description can be an hour old, a stock count perhaps a few seconds.</p>`,
-        },
-        {
-          type: "text",
-          html: `<h3>Sizing with a back-of-the-envelope estimate</h3>
-<p>Suppose 100 million users with 2 KB profiles: 200 GB in total. If 20% of profiles get almost all of the traffic, the hot set is about 40 GB, which fits on a single large Redis node or a small cluster. Add room for key overhead and fragmentation (often 1.5 to 2 times the raw size) and replicas for availability. The answer is usually "a few nodes", not "a cache as big as the database".</p>
-<p>Also check the value size: caching a 2 MB rendered page per user is very different from caching a 2 KB object. Large values eat memory, network bandwidth and serialisation time; cache the smallest useful unit.</p>`,
-        },
-        {
-          type: "keypoints",
-          title: "What to cache",
-          items: [
-            "Read often, changes rarely, expensive to compute or fetch: the ideal candidate.",
-            "Already fast and rarely read (a well-indexed lookup at 20 requests per second): probably not worth a cache.",
-            "Must be exactly current (account balance during a transfer): read from the source of truth.",
-          ],
-        },
-        {
-          type: "quiz",
-          q: "You cache each user's rendered feed under feed:{user_id}. A product change alters the feed format for everyone. What is the cleanest way to stop serving old-format feeds?",
-          options: [
-            "Scan Redis and delete every feed key",
-            "Include a format version in the key (feed:v8:{user_id}) and bump it; old keys expire by TTL",
-            "Restart all Redis nodes",
-            "Lower the TTL to one second forever",
-          ],
-          answer: 1,
-          explain: "Changing the version in the key makes every old entry unreachable instantly, without a costly scan or a cold cache restart, and the old entries age out through their TTL. Lowering TTLs permanently would destroy the hit ratio.",
-        },
-      ],
-    },
-    {
       id: "interview",
       title: "Adding a cache in a design interview",
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>Bring caching up when you can point at a reason: a read-heavy endpoint, an expensive query (a 200 ms feed join), database CPU pressure in your estimates, or a latency target the database cannot meet. Then be specific. Interviewers are listening for <em>what</em> you cache, <em>which</em> pattern, how entries expire and get invalidated, and what happens when the cache misbehaves.</p>`,
-        },
-        {
           type: "callout",
           tone: "interview",
-          html: `<p>A complete caching answer takes about a minute:</p>
+          html: `<p>Bring caching up when you can point at a reason, then be specific. A complete answer takes about a minute:</p>
 <ol>
 <li><strong>Why:</strong> "Profile reads are 50K per second at 30 ms; that saturates the primary."</li>
 <li><strong>What and where:</strong> "Cache profiles in Redis under <code>user:{id}:profile</code>."</li>
 <li><strong>Pattern:</strong> "Cache-aside: read through the cache, delete the key after updating the database."</li>
 <li><strong>Expiry:</strong> "10-minute TTL as a backstop, LRU eviction."</li>
-<li><strong>Failure modes:</strong> "Coalesce rebuilds of hot keys to avoid a stampede, and protect the database with a circuit breaker if Redis goes down."</li>
+<li><strong>Failure modes:</strong> "Coalesce rebuilds of hot keys to avoid a stampede; protect the database with a circuit breaker if Redis goes down."</li>
 </ol>
-<p>Add a CDN when the system serves media or static assets to users in many regions.</p>`,
+<p>Add a CDN when serving media or static assets to many regions.</p>`,
         },
         {
           type: "callout",
           tone: "mistake",
-          html: `<p>Reaching for an in-process cache as the main cache in a horizontally scaled service. With 40 instances, a profile update leaves 39 stale copies, and every instance warms its own cache separately. Use it only as a small layer in front of a shared cache.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "An interviewer asks why you chose cache-aside over write-through for user profiles. Which answer is strongest?",
-          options: [
-            "Cache-aside is always faster for writes and reads",
-            "Cache-aside only caches profiles that are actually read, works with plain Redis, and a cache outage just means more database reads; profiles tolerate a brief stale window",
-            "Write-through loses data when the cache crashes",
-            "Redis only supports cache-aside, so there is no choice",
-          ],
-          answer: 1,
-          explain: "The strong answer names the concrete benefits (memory spent on the hot set, no special cache layer, graceful degradation) and ties the staleness cost to the data's tolerance. Write-through does not lose data (that is write-behind), and Redis can be used under write-through with a library; it just does not do it natively.",
+          html: `<p>Using an in-process cache as the main cache in a horizontally scaled service: with 40 instances, an update leaves 39 stale copies. Use it only as a small layer in front of a shared cache.</p>`,
         },
       ],
     },
   ],
   takeaways: [
-    "A cache trades a little staleness and complexity for lower latency and far less database load; justify it with numbers first.",
-    "Database load is proportional to the miss ratio: going from 90% to 99% hits cuts database reads tenfold. Skewed traffic is why a small cache can serve most reads.",
-    "The external cache (Redis, Memcached) is the default; CDNs serve media near users; in-process caches suit tiny, very hot data; client caches save whole requests.",
-    "Cache-aside is the default pattern: read the cache, fill on a miss, delete the key after writing the database.",
-    "Write-through keeps reads fresh at the cost of write latency; write-behind is fast but can lose acknowledged writes; read-through centralises loading (CDNs).",
-    "Design keys so they can be invalidated, keep a TTL as a backstop even with delete-on-write, and size the cache for the hot set, not the whole dataset.",
+    "Database load is proportional to the miss ratio; skewed traffic lets a small cache serve most reads. Justify a cache with numbers.",
+    "The external cache (Redis, Memcached) is the default; CDNs serve media near users; in-process caches suit tiny, very hot data.",
+    "Cache-aside is the default: read the cache, fill on a miss, delete the key after writing the database, keep a TTL as a backstop.",
+    "Write-through keeps reads fresh at the cost of write latency; write-behind is fast but can lose acknowledged writes; read-through centralises loading.",
+    "Name keys so they can be invalidated, and size the cache for the hot set, not the whole dataset.",
   ],
   furtherReading: [
     { title: "Scaling Memcache at Facebook (Nishtala et al., NSDI 2013)", url: "https://www.usenix.org/conference/nsdi13/technical-sessions/presentation/nishtala", note: "A look-aside cache at very large scale, including invalidation and regional replication." },

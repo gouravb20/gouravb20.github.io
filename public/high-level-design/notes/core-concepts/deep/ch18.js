@@ -1,23 +1,16 @@
 // Deep dive: Chapter 18, Numbers to know and back-of-the-envelope estimation. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch18 = {
-  hook: `<p>Two candidates get the same prompt: design a bookmarking service for 5 million daily users. The first draws a sharded database across 16 nodes, a Kafka cluster, three cache tiers and a multi-region setup, because "it needs to scale". The second spends two minutes on arithmetic: maybe 50 million requests a day, about 600 per second on average and a few thousand at peak; a couple of million new bookmarks a day at about 1 KB each is under a terabyte a year. Then she says: "One PostgreSQL primary with a replica and a small Redis cache handles this comfortably; here is what would make me shard later."</p>
-<p>The second design is cheaper, simpler and more likely to work, and it took two minutes of numbers to get there. Estimation is how you decide whether you need a cache, shards, a queue or another region, and it only works if your sense of what one machine can do is current. Rules of thumb from a decade ago underestimate modern hardware by orders of magnitude and push designs toward needless complexity.</p>`,
+  hook: `<p>This chapter gives the hardware numbers, latency ratios and single-node limits you need, plus a fast estimation method. Two minutes of arithmetic decides whether a design needs a cache, shards, a queue or another region, and stops you over-engineering.</p>`,
   sections: [
     {
-      id: "why-numbers-matter",
-      title: "Why your hardware intuition needs updating",
-      kicker: "The problem",
+      id: "hardware",
+      title: "What one machine can do today",
+      kicker: "Update your intuition",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Many system design habits were formed when a large server had a few dozen gigabytes of RAM and spinning disks. Advice like "shard once a table passes 100 GB" or "never keep the dataset in memory" made sense then. Applied today, it leads to distributing data that fits comfortably in one machine's memory, and to paying the permanent costs of sharding, routing and cross-shard queries for capacity nobody needed.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>Look at what a cloud provider will rent you by the hour. General-purpose instances with 128 vCPUs and 512 GiB of RAM are ordinary catalogue items. Memory-optimised instances reach several terabytes of RAM, and AWS's High Memory instances go up to 24 TiB. Storage-optimised instances carry tens of terabytes of local NVMe (an i3en.24xlarge has 60 TB), and dense-storage instances hold hundreds of terabytes of hard disk (a d3en.12xlarge has 336 TB). Object storage such as S3 is effectively unlimited for blobs.</p>
-<p>Networks have grown too: 25 Gbps is a common figure for server networking inside a data centre, with high-end instances offering 100 Gbps or more. Within one availability zone a round trip is well under a millisecond.</p>
-<p>The practical consequence: an entire product's hot dataset often fits in one machine's RAM, a single relational primary can hold many terabytes, and "do we need to distribute this?" deserves an actual calculation rather than a reflex.</p>`,
+          html: `<p>Rules like "shard once a table passes 100 GB" date from servers with tens of GB of RAM and spinning disks. Today an entire product's hot dataset often fits in one machine's RAM and a single relational primary holds many terabytes, so "do we need to distribute this?" deserves a calculation, not a reflex.</p>`,
         },
         {
           type: "table",
@@ -35,7 +28,7 @@ DEEP.ch18 = {
         {
           type: "callout",
           tone: "modern",
-          html: `<p>Hardware numbers drift quickly, so memorise <em>orders of magnitude</em> rather than SKUs: hundreds of GB to a few TB of RAM, tens of TB of SSD, tens of Gbps of network per machine. That is enough to make every scaling decision in an interview.</p>`,
+          html: `<p>Memorise <em>orders of magnitude</em>, not SKUs: hundreds of GB to a few TB of RAM, tens of TB of SSD, tens of Gbps per machine, sub-millisecond round trips within a zone, and effectively unlimited object storage.</p>`,
         },
       ],
     },
@@ -45,8 +38,8 @@ DEEP.ch18 = {
       kicker: "Latencies",
       blocks: [
         {
-          type: "idea",
-          html: `<p>A few latencies, each roughly 10 to 1,000 times the one before, explain most design decisions: why caches live in memory, why SSDs replaced disks for databases, why you can chain several calls inside a data centre but not across continents.</p>`,
+          type: "text",
+          html: `<p>A few latencies, each roughly 10 to 1,000 times the last, explain why caches live in memory, why databases moved to SSD and why you can chain calls inside a data centre but not across continents.</p>`,
         },
         {
           type: "diagram",
@@ -84,24 +77,19 @@ DEEP.ch18 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<p>Read the ladder as a set of ratios. Memory (about 100 ns) is roughly 1,000 times faster than an SSD random read (about 100 &micro;s), which is why an in-memory cache beats even a well-indexed database read. An SSD read is about 100 times faster than an HDD seek (about 10 ms), which is why databases moved to SSDs. A round trip inside a zone (about half a millisecond) is cheap enough to make several per request; a cross-region round trip (around 100 ms) is not, so a design that calls another continent on every request has a latency floor nobody can optimise away.</p>
-<p>That floor is physics. Light in optical fibre travels at about two thirds of its speed in vacuum, roughly 200 km per millisecond. New York to London is about 5,600 km, so a round trip cannot take less than about 56 ms even on a perfect straight cable, and real routes are longer.</p>`,
+          type: "keypoints",
+          title: "Ratios worth remembering",
+          items: [
+            "Memory (~100 ns) is ~1,000x faster than an SSD random read (~100 &micro;s).",
+            "An SSD random read is ~100x faster than an HDD seek (~10 ms).",
+            "A same-zone round trip (~0.5 ms) is ~200x cheaper than a cross-region one (~100 ms). Light in fibre covers about 200 km/ms, so New York to London can't beat ~56 ms.",
+            "A Redis read (~0.5-1 ms with the network) is typically 5-50x faster than a database query that touches disk or does real work.",
+          ],
         },
         {
           type: "lab",
           id: "latencyLadder",
           caption: "Compare the latencies on a log scale, then switch to the human scale where 1 nanosecond becomes 1 second: a memory access becomes a couple of minutes, an SSD read more than a day, and a cross-region round trip a few years.",
-        },
-        {
-          type: "keypoints",
-          title: "Ratios worth remembering",
-          items: [
-            "Memory is ~1,000x faster than an SSD random read.",
-            "An SSD random read is ~100x faster than an HDD seek.",
-            "A same-zone round trip (~0.5 ms) is ~200x cheaper than a cross-region one (~100 ms).",
-            "A Redis read (~0.5-1 ms including the network) is typically 5-50x faster than a database query that touches disk or does real work.",
-          ],
         },
         {
           type: "quiz",
@@ -118,14 +106,6 @@ DEEP.ch18 = {
       kicker: "Throughput",
       blocks: [
         {
-          type: "text",
-          html: `<p>To decide how many of something you need, compare your load with what one instance handles. These are rough single-node figures for typical workloads, good for deciding "one or many", not benchmarks.</p>
-<p><strong>Application servers.</strong> Tens of cores and plenty of RAM; thousands to tens of thousands of requests per second for simple endpoints, depending heavily on what each request does. With asynchronous I/O, one server can hold on the order of 100,000 mostly idle connections (WebSockets, long polls), limited by memory per connection and file descriptors. They are stateless, so you scale them by adding more behind a load balancer and watch CPU, not connection counts.</p>
-<p><strong>Caches (Redis, Memcached).</strong> Sub-millisecond operations and on the order of 100,000 or more operations per second per node, more with pipelining. Memory per node ranges from tens of GB to around a terabyte. One node covers most interview read loads; shard when data or throughput outgrows it.</p>
-<p><strong>Relational databases (PostgreSQL, MySQL).</strong> Indexed point reads in about 1-5 ms when they touch disk, faster when cached. Thousands to tens of thousands of writes per second and tens of thousands of simple reads per second per node, with read replicas multiplying read capacity. Tens of terabytes per primary is manageable with good operations.</p>
-<p><strong>Message queues (Kafka).</strong> Hundreds of thousands to around a million messages per second per broker for small messages, with single-digit-millisecond latency and retention measured in days or weeks. The queue is rarely the bottleneck; partition count sets consumer parallelism.</p>`,
-        },
-        {
           type: "table",
           title: "Rough single-node limits",
           headers: ["Component", "Throughput", "Capacity", "Scale out when"],
@@ -138,40 +118,39 @@ DEEP.ch18 = {
           ],
         },
         {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "WhatsApp", title: "Connections per server (2012)", html: "WhatsApp's engineering blog described tuning FreeBSD and Erlang servers to hold more than two million concurrent TCP connections on a single machine, far beyond what many designs assume." },
-            { org: "Apache Kafka", title: "LinkedIn benchmark (2014)", html: "A LinkedIn engineering post titled \"Benchmarking Apache Kafka: 2 Million Writes Per Second (On Three Cheap Machines)\" showed how far sequential disk I/O and batching take a small cluster." },
-            { org: "Amazon S3", title: "Per-prefix request rates", html: "AWS documents that S3 supports at least 3,500 write and 5,500 read requests per second per prefix, and that spreading objects over more prefixes scales further." },
+            "<strong>App servers</strong> are stateless, so add more; with async I/O one holds on the order of 100,000 mostly idle connections (WhatsApp described over two million on one tuned machine in 2012).",
+            "<strong>Databases:</strong> indexed point reads take about 1-5 ms when they touch disk; read replicas multiply read capacity, not write capacity.",
+            "<strong>Kafka</strong> is rarely the bottleneck (LinkedIn showed 2 million writes/s on three cheap machines in 2014); partition count sets consumer parallelism. S3 documents at least 3,500 writes and 5,500 reads per second per prefix.",
           ],
         },
         {
           type: "callout",
           tone: "insight",
-          html: `<p>Most consumer apps read 10 to 100 times more than they write. A high read:write ratio points to caches and read replicas. A write-heavy workload (metrics, events, chat messages) points to LSM-based stores, queues that absorb bursts, and eventually sharding, because replicas add no write capacity.</p>`,
+          html: `<p>Most consumer apps read 10 to 100 times more than they write. Read-heavy points to caches and replicas; write-heavy (metrics, events, chat) points to LSM stores, queues that absorb bursts and eventually sharding.</p>`,
         },
       ],
     },
     {
       id: "estimation-method",
-      title: "Back-of-the-envelope estimation, step by step",
+      title: "Back-of-the-envelope estimation",
       kicker: "The method",
       blocks: [
         {
           type: "text",
-          html: `<p>Estimation in an interview is not about precision. It is about getting within a factor of a few, fast, so you can tell whether a design needs one machine or a hundred. Round aggressively, say your assumptions out loud, and keep the arithmetic simple enough to do in your head.</p>`,
+          html: `<p>Aim for the right order of magnitude, fast. Round aggressively, say assumptions out loud and keep the arithmetic in your head.</p>`,
         },
         {
           type: "steps",
           title: "From users to machines",
           items: [
-            "<strong>Requests per day</strong> = daily active users x actions per user per day.",
-            "<strong>Average QPS</strong> = requests per day / 86,400. Round the day to 100,000 seconds: 1 million per day is about 12 per second, 100 million per day about 1,200.",
-            "<strong>Peak QPS</strong> = average x 2-10, depending on how spiky traffic is (daily cycles, events, launches).",
-            "<strong>Split reads and writes</strong> using the read:write ratio, since they scale differently.",
-            "<strong>Storage per year</strong> = writes per day x bytes per write x 365, times the replication factor. Keep media separate from records.",
-            "<strong>Bandwidth</strong> = QPS x response size, at peak.",
-            "<strong>Compare</strong> each number with single-node limits and decide: one instance, replicas, a cache, a CDN, or shards.",
+            "<strong>Requests per day</strong> = daily active users × actions per user.",
+            "<strong>Average QPS</strong> = per day / 86,400 (round to 100,000): 1M/day ≈ 12/s, 100M/day ≈ 1,200/s.",
+            "<strong>Peak QPS</strong> = average × 2-10, depending on spikiness.",
+            "<strong>Split reads and writes</strong>, since they scale differently.",
+            "<strong>Storage per year</strong> = writes/day × bytes × 365 × replication; keep media separate from records.",
+            "<strong>Bandwidth</strong> = peak QPS × response size. Then <strong>compare</strong> with single-node limits.",
           ],
         },
         {
@@ -241,56 +220,16 @@ cache size   = hot fraction (e.g. 20%) x working set
           caption: "Enter daily users, actions per user, read:write ratio and record sizes, and see requests per second, storage and bandwidth compared with rough single-node limits, along with whether the numbers call for a cache, replicas or shards.",
         },
         {
-          type: "quiz",
-          q: "A service has 50 million daily active users, each making 30 requests a day. What average request rate should you plan around, and roughly what peak?",
-          options: [
-            "About 1,700/s average, 5K/s peak",
-            "About 17,000/s average, 50-80K/s peak",
-            "About 170,000/s average, 1M/s peak",
-            "About 1.5 billion/s",
-          ],
-          answer: 1,
-          explain: "50M x 30 = 1.5 billion requests a day. Divided by about 86,400 (or 100,000 for easy maths) that is roughly 15-17K per second on average, and a 3-5x peak gives 50-80K per second: a fleet of stateless app servers, with the database's needs depending on the read:write split and caching.",
-        },
-      ],
-    },
-    {
-      id: "worked-example",
-      title: "A worked example: a photo-sharing app",
-      kicker: "Putting it together",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>Assume 20 million daily active users. Ten percent upload one photo a day, and every user views about 100 photos and loads their feed 10 times a day. Photos average 2 MB as uploaded and about 200 KB as served in the feed. Metadata (owner, caption, timestamps, counts) is about 1 KB per photo.</p>`,
-        },
-        {
           type: "table",
-          title: "The numbers",
-          headers: ["Quantity", "Calculation", "Result"],
+          title: "Worked example: photo sharing, 20M DAU (10% upload one 2 MB photo a day; 100 views and 10 feed loads per user)",
+          headers: ["Quantity", "Calculation", "Result", "Decision"],
           rows: [
-            ["Uploads", "20M x 10% = 2M/day; / 86,400", "~23/s average, ~100/s peak"],
-            ["Photo storage", "2M x 2 MB", "4 TB/day, ~1.5 PB/year (before replicas or resized copies)"],
-            ["Metadata storage", "2M x 1 KB", "2 GB/day, ~730 GB/year"],
-            ["Feed loads (metadata reads)", "20M x 10 = 200M/day", "~2,300/s average, ~10K/s peak"],
-            ["Photo views", "20M x 100 = 2B/day", "~23K/s average, ~100K/s peak"],
-            ["Image bandwidth at peak", "100K/s x 200 KB", "~20 GB/s, about 160 Gbps"],
+            ["Photo storage", "2M × 2 MB", "4 TB/day, ~1.5 PB/year", "Object storage"],
+            ["Image bandwidth at peak", "100K views/s × 200 KB", "~20 GB/s, about 160 Gbps", "CDN"],
+            ["Metadata storage", "2M × 1 KB", "2 GB/day, ~730 GB/year", "One relational primary for years"],
+            ["Feed loads", "20M × 10 = 200M/day", "~2,300/s avg, ~10K/s peak", "Replicas plus a Redis cache"],
+            ["Uploads", "2M/day", "~23/s avg, ~100/s peak", "Trivial; resize images via a queue"],
           ],
-        },
-        {
-          type: "text",
-          html: `<p>Now let each number make a decision:</p>
-<ul>
-<li><strong>Photo bytes</strong> (petabytes, 160 Gbps at peak) cannot sensibly live in or flow through a database or app servers. They go to object storage, served through a CDN so the edge absorbs the bandwidth near users.</li>
-<li><strong>Metadata</strong> at well under a terabyte a year fits on one relational primary for years. No sharding needed yet.</li>
-<li><strong>Metadata reads</strong> at about 10K/s peak are within reach of a primary plus read replicas, and a Redis cache for hot feeds and profiles keeps database load and latency low.</li>
-<li><strong>Uploads</strong> at about 100/s peak are trivial for the database; the heavy part, resizing images, belongs on a queue with background workers.</li>
-</ul>
-<p>Two minutes of arithmetic produced the architecture: CDN plus object storage for media, one database with replicas and a cache for metadata, and a queue for image processing. Just as important, it shows what is <em>not</em> needed, and what number would change that (metadata writes in the tens of thousands per second, or tens of terabytes of records).</p>`,
-        },
-        {
-          type: "callout",
-          tone: "tip",
-          html: `<p>Separate the big bytes from the small records early. Media and blobs dominate storage and bandwidth and belong in object storage behind a CDN; the database holds only metadata and pointers. Most "do we need to shard?" questions disappear once you do.</p>`,
         },
         {
           type: "quiz",
@@ -312,18 +251,13 @@ cache size   = hot fraction (e.g. 20%) x working set
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>Do estimates where they change a decision, not as a ritual at the start. A good moment is right after the functional requirements: work out QPS, storage and the read:write ratio, then let them justify each component you add. Later, when you propose a cache or sharding, point back at the number that requires it.</p>
-<p>Keep the arithmetic visible and rounded: "a day is about 100,000 seconds", "a KB times a billion is a TB". Interviewers care much more about whether you reach the right order of magnitude and draw the right conclusion than about exact figures.</p>`,
-        },
-        {
           type: "callout",
           tone: "interview",
-          html: `<p>A strong estimation segment sounds like:</p>
+          html: `<p>Estimate right after functional requirements, where it changes decisions, and point back at the number whenever you add a component. A strong segment sounds like:</p>
 <ol>
 <li>"10M DAU, about 20 requests each: 200M a day, roughly 2,300 per second, maybe 10K at peak."</li>
 <li>"Reads outnumber writes about 20 to 1, so reads are the pressure: a cache and replicas."</li>
-<li>"Records are about 1 KB, a million new ones a day: around 1 TB a year with replication. One database is fine."</li>
+<li>"Records are about 1 KB, a million a day: around 1 TB a year with replication. One database is fine."</li>
 <li>"Media goes to object storage behind a CDN; that's where the petabytes are."</li>
 <li>"I'd revisit sharding if writes approach the tens of thousands per second."</li>
 </ol>`,
@@ -331,30 +265,17 @@ cache size   = hot fraction (e.g. 20%) x working set
         {
           type: "callout",
           tone: "mistake",
-          html: `<p>Over-engineering is a red flag, not a safety margin: sharding a database that fits on one machine, caching data that is already fast, or going multi-region for a single-country app. Each adds permanent cost and failure modes, and using outdated limits ("split at 100 GB") signals book knowledge rather than hands-on judgment.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "A chat app expects 10 million concurrent users with mostly idle WebSocket connections. Roughly how many connection servers should you plan for, and what else does the number imply?",
-          options: [
-            "One server; connections are free",
-            "On the order of 100 servers at ~100K connections each, plus a way to route each message to the server holding the recipient's connection",
-            "About 10 million servers, one per user",
-            "About 10,000 servers, because each can hold only 1,000 connections",
-          ],
-          answer: 1,
-          explain: "With async I/O a modern server holds on the order of 100K mostly idle connections, limited by memory per connection and file descriptors, so 10M users needs roughly 100 or more servers with headroom. The design then needs a lookup or pub/sub layer that knows which server each user is connected to.",
+          html: `<p>Over-engineering is a red flag, not a safety margin: sharding a database that fits on one machine, caching what is already fast, or going multi-region for a single-country app. Outdated limits ("split at 100 GB") signal book knowledge rather than judgment.</p>`,
         },
       ],
     },
   ],
   takeaways: [
-    "Modern machines are big: hundreds of GB to TBs of RAM, tens of TB of SSD and tens of Gbps of network. Outdated limits lead to over-engineered designs.",
-    "Know the latency ladder by ratios: memory ~1,000x faster than SSD, SSD ~100x faster than HDD seeks, a cross-region round trip ~200x a same-zone one.",
+    "Modern machines are big (hundreds of GB to TBs of RAM, tens of TB of SSD, tens of Gbps); outdated limits lead to over-engineering.",
+    "Know latency by ratios: memory ~1,000x faster than SSD, SSD ~100x faster than HDD seeks, cross-region ~200x a same-zone round trip.",
     "Rough single-node limits: app servers thousands of requests/s, Redis ~100K ops/s, a relational primary ~5-20K writes/s and tens of TB, a Kafka broker hundreds of thousands of messages/s.",
-    "QPS = DAU x actions / ~100,000 seconds; peak is 2-10x average. Storage = writes/day x size x 365 x replication.",
-    "Separate media from records: object storage and a CDN for bytes, the database for metadata.",
-    "Estimate where it changes a decision, round aggressively, and point back to the number whenever you add a cache, replicas, shards or regions.",
+    "QPS = DAU × actions / ~100,000 s, peak 2-10x; storage = writes/day × size × 365 × replication. Separate media (object storage plus CDN) from records.",
+    "Estimate where it changes a decision, round aggressively, and point back to the number when you add caches, replicas, shards or regions.",
   ],
   furtherReading: [
     { title: "Latency numbers every programmer should know", note: "The table popularised by Jeff Dean and Peter Norvig; useful for ratios, though the absolute figures date from older hardware." },

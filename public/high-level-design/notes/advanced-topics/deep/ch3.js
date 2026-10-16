@@ -1,8 +1,7 @@
 // Deep dive: Chapter 3, Bloom filters: probabilistic set membership. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch3 = {
-  hook: `<p>Your web crawler has already fetched 10 billion pages. Before it downloads the next link it must ask one question: <em>have I seen this URL before?</em> An exact answer means keeping every URL you have ever seen. At around 80 bytes per URL that is 800 GB of strings before any hash-table overhead, and the check sits on the hot path of every fetch.</p>
-<p>Now relax the requirement slightly. Suppose the answer may occasionally say "seen it" for a URL you have not seen, and you skip one new page in a hundred, but it must never say "new" for a page you already crawled. With that one concession, the whole seen-set fits in about <strong>12 GB</strong> of RAM, a 60-fold saving, and each check costs a handful of memory reads. That structure is a Bloom filter, and the trade it makes is the model for every probabilistic structure in this part of the book.</p>`,
+  hook: `<p>This chapter explains how a Bloom filter answers "have I seen this?" in a fraction of the memory of an exact set, by allowing occasional false "yes" answers but never a false "no". That trade is the model for every probabilistic structure in this part.</p>`,
   sections: [
     {
       id: "why-probabilistic",
@@ -10,25 +9,20 @@ DEEP.ch3 = {
       kicker: "The problem",
       blocks: [
         {
-          type: "problem",
-          html: `<p>An exact set has to store each member, or at least enough of it to tell members apart. Its memory grows with both the number of items and the size of each key, plus the overhead of the hash table itself. At billions of items, or on a hot path where a disk or network lookup is too slow, that cost decides the design.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>Probabilistic data structures accept a small, <strong>bounded and one-sided</strong> error in return for memory that is fixed or much smaller. The key word is one-sided. A Bloom filter can be wrong in only one direction: it may claim an item is present when it is not, but it never claims an item is absent when it was added. That asymmetry is what makes it safe to put in front of a slower exact store.</p>
-<p>A quick sense of scale: a hash set of 1 billion 16-byte IDs needs tens of gigabytes once pointers, padding and load factor are counted. A Bloom filter for the same billion items at a 1% false-positive rate needs about 1.2 GB, and the figure would be the same if each key were a 2 KB document, because the filter never stores the key at all.</p>`,
+          html: `<p>An exact set's memory grows with item count <em>and</em> key size. Probabilistic structures accept a small, <strong>bounded, one-sided</strong> error for much less memory. A Bloom filter for a billion items at 1% false positives needs about 1.2 GB, whether keys are 16-byte IDs or 2 KB documents, because it never stores keys. For a crawler's 10 billion seen URLs (around 800 GB as strings), that's about 12 GB.</p>`,
         },
         {
           type: "compare",
           items: [
-            { title: "Exact set (hash set, Redis set)", tone: "info", html: "Answers yes or no correctly. Memory grows with item count <em>and</em> key size. Supports deletes, listing members and counting them. The right default up to tens of millions of items." },
-            { title: "Bloom filter", tone: "ok", html: "Answers <strong>definitely not</strong> or <strong>probably yes</strong>. About 10 bits per item for 1% false positives, whatever the key size. No deletes, no listing. Worth it at billions, or where every lookup saved is a disk read avoided." },
+            { title: "Exact set (hash set, Redis set)", tone: "info", html: "Correct yes or no. Memory grows with count and key size. Supports deletes, listing and counting. The right default up to tens of millions of items." },
+            { title: "Bloom filter", tone: "ok", html: "Answers <strong>definitely not</strong> or <strong>probably yes</strong>. About 10 bits per item for 1%, whatever the key size. No deletes or listing. Worth it at billions, or where each saved lookup is a disk read." },
           ],
         },
         {
           type: "callout",
           tone: "mistake",
-          html: `<p>Reaching for a Bloom filter when the set is small. Ten million 16-byte IDs fit in a few hundred megabytes in a hash set or a Redis set, with no false positives and full delete support. Justify a probabilistic structure with a number: item count, memory budget and the cost of a lookup it saves.</p>`,
+          html: `<p>Using a Bloom filter for a small set. Ten million 16-byte IDs fit in a few hundred megabytes in a hash set, exact and deletable. Justify it with item count, memory budget and the cost of the lookup it saves.</p>`,
         },
       ],
     },
@@ -39,12 +33,15 @@ DEEP.ch3 = {
       blocks: [
         {
           type: "idea",
-          html: `<p>Start with m bits, all zero, and pick k hash functions that each map an item to one of the m positions. To <strong>add</strong> an item, set its k bits to 1. To <strong>check</strong> an item, look at its k bits: if any of them is 0, the item was never added. If all are 1, it probably was.</p>`,
+          html: `<p>Start with m zero bits and k hash functions. <strong>Add</strong> sets an item's k bits to 1. <strong>Check</strong> reads them: any 0 means never added; all 1 means probably added.</p>`,
         },
         {
-          type: "text",
-          html: `<p>Why "probably"? Bits are shared. Every item sets k of them, and after enough inserts a fresh item's k positions may all have been switched on by <em>other</em> items. The filter cannot tell whose bits they are, so it says "maybe". That is a <strong>false positive</strong>.</p>
-<p>The reverse can never happen. Bits only ever go from 0 to 1, so once an item has set its k bits they stay set. Checking that same item later always finds all k bits at 1: <strong>no false negatives</strong>, ever. Both operations cost exactly k hash computations and k memory reads, independent of how many items are in the filter.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>False positives:</strong> bits are shared, so a new item's k bits may all have been set by others.",
+            "<strong>No false negatives, ever:</strong> bits only go from 0 to 1, so an added item always finds its bits set.",
+            "Both operations cost k hashes and k memory reads, regardless of how many items are stored.",
+          ],
         },
         {
           type: "diagram",
@@ -122,28 +119,10 @@ DEEP.ch3 = {
       blocks: [
         {
           type: "text",
-          html: `<p>The false-positive rate depends on three numbers: m bits, n items and k hash functions. The derivation is short enough to do on a whiteboard.</p>
-<p>One hash of one insert misses a given bit with probability 1 &minus; 1/m. After n items, each hashed k times, the bit is still 0 with probability (1 &minus; 1/m)<sup>kn</sup>, which is very close to e<sup>&minus;kn/m</sup>. A false positive needs all k bits of a new item to be 1:</p>
-<p><span class="formula">p &asymp; (1 &minus; e<sup>&minus;kn/m</sup>)<sup>k</sup></span></p>`,
-        },
-        {
-          type: "text",
-          html: `<h3>Choosing k</h3>
-<p>Too few hash functions and each check looks at too few bits to rule items out. Too many and every insert sets so many bits that the array fills up. The minimum sits at</p>
-<p><span class="formula">k<sub>opt</sub> = (m / n) &middot; ln 2 &asymp; 0.69 &middot; m/n</span></p>
-<p>At that k, exactly half the bits end up set, and the false-positive rate becomes p = (1/2)<sup>k</sup>. Turning it around gives the sizing rule you actually use:</p>
-<p><span class="formula">m / n = &minus;ln p / (ln 2)<sup>2</sup> &asymp; 1.44 &middot; log<sub>2</sub>(1/p) bits per item</span></p>
-<p>For p = 1%, that is 1.44 &times; 6.64 &asymp; <strong>9.6 bits per item</strong> with k = 7. Each further tenfold cut in p costs another 1.44 &times; log<sub>2</sub> 10 &asymp; 4.8 bits per item.</p>`,
-        },
-        {
-          type: "steps",
-          title: "Worked example: 100 million usernames at 1%",
-          items: [
-            "Bits per item: &minus;ln(0.01) / (ln 2)<sup>2</sup> = 4.605 / 0.480 &asymp; 9.59.",
-            "Total bits: 100,000,000 &times; 9.59 &asymp; 959 million bits, about <strong>120 MB</strong>.",
-            "Hash functions: 9.59 &times; 0.693 &asymp; 6.6, so k = 7.",
-            "Each signup check reads 7 bits. Ninety-nine of every hundred names not yet taken get a definite \"available\" with no database query; the rest go to the database to confirm.",
-          ],
+          html: `<p>After n items hashed k times into m bits, a bit is still 0 with probability about e<sup>&minus;kn/m</sup>, and a false positive needs all k bits set:</p>
+<p><span class="formula">p &asymp; (1 &minus; e<sup>&minus;kn/m</sup>)<sup>k</sup></span></p>
+<p>The best k is <code>(m / n) &middot; ln 2 &asymp; 0.69 &middot; m/n</code>, which leaves half the bits set and gives the sizing rule:</p>
+<p><span class="formula">m / n = &minus;ln p / (ln 2)<sup>2</sup> &asymp; 1.44 &middot; log<sub>2</sub>(1/p) bits per item</span></p>`,
         },
         {
           type: "table",
@@ -158,9 +137,11 @@ DEEP.ch3 = {
           note: "Memory grows linearly while the error falls exponentially: each 4.8 extra bits per item cuts it tenfold.",
         },
         {
-          type: "text",
-          html: `<h3>You don't need k independent hash functions</h3>
-<p>Computing seven good hashes per item would be wasteful. Kirsch and Mitzenmacher showed in 2006 that two hashes are enough: derive the i-th position as <code>(h1 + i &middot; h2) mod m</code>, and the false-positive rate is essentially unchanged. Most libraries do exactly this, usually with a fast non-cryptographic hash such as MurmurHash or xxHash.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Worked example:</strong> 100 million usernames at 1% is 9.59 bits each, about 959 million bits (<strong>120 MB</strong>), k = 7. Ninety-nine of every hundred free names get a definite \"available\" with no database query.",
+            "<strong>Two hashes are enough</strong> (Kirsch and Mitzenmacher, 2006): position i = <code>(h1 + i &middot; h2) mod m</code>, usually with MurmurHash or xxHash.",
+          ],
         },
         {
           type: "code",
@@ -185,65 +166,29 @@ class Bloom:
     def maybe_contains(self, item):
         return all(self.bits[i // 8] >> (i % 8) & 1 for i in self._positions(item))`,
         },
-        {
-          type: "quiz",
-          q: "You need a 0.1% false-positive rate for 50 million items. Roughly how much memory does the Bloom filter need?",
-          options: ["About 6 MB", "About 60 MB", "About 90 MB", "About 900 MB"],
-          answer: 2,
-          explain: "0.1% needs about 14.4 bits per item (9.6 for 1% plus 4.8 for one more factor of ten). 50 million &times; 14.4 = 720 million bits, which is 90 MB.",
-        },
       ],
     },
     {
-      id: "limits-and-variants",
-      title: "Saturation, deletion and the variants that fix them",
-      kicker: "Limits",
+      id: "limits-and-where-used",
+      title: "Limits, variants and where filters earn their keep",
+      kicker: "Real systems",
       blocks: [
         {
-          type: "problem",
-          html: `<p>A Bloom filter is sized for a fixed n. Keep inserting past it and more and more bits become 1, until nearly every check returns "maybe" and the filter filters nothing. And because bits are shared, you can't remove an item without risking damage to others.</p>`,
-        },
-        {
-          type: "text",
-          html: `<p><strong>Saturation is fast.</strong> Take a filter sized for 1 million items at 1% (9.6 bits per item, k = 7). Insert 2 million items and you are effectively at 4.8 bits per item with seven hashes: the formula gives about <strong>16%</strong>. At 3 million it is about <strong>43%</strong>. The filter does not grow in place, because every position depends on m; changing m means rehashing every item, and the filter does not store the items.</p>
-<p>The usual fixes: size for expected growth up front; rebuild a bigger filter from the source of truth when a counter of inserts passes the design capacity; or partition by time, one filter per day or per hour, so old filters can simply be dropped and queries check the few recent ones.</p>`,
-        },
-        {
-          type: "text",
-          html: `<p><strong>Deletion breaks the guarantee.</strong> Suppose alice and bob share bit 7. Deleting alice by clearing her bits zeroes bit 7, and now a check for bob finds a 0 and reports "definitely not". The one promise a Bloom filter makes, no false negatives, is gone.</p>
-<ul>
-<li>A <strong>counting Bloom filter</strong> replaces each bit with a small counter (4 bits is the usual choice). Inserts increment, deletes decrement, and a position counts as set while its counter is above zero. It costs about four times the memory.</li>
-<li>A <strong>cuckoo filter</strong> (Fan et al., 2014) stores short fingerprints of items in a cuckoo hash table. It supports deletion, and at low false-positive rates it uses about as much space as a Bloom filter, or less.</li>
-<li>A <strong>scalable Bloom filter</strong> (Almeida et al., 2007) handles growth by adding a new, larger and slightly stricter filter whenever the current one fills, and checks all of them.</li>
-</ul>`,
-        },
-        {
-          type: "table",
-          title: "Set-membership structures",
-          headers: ["Structure", "False negatives", "False positives", "Delete", "Memory"],
-          rows: [
-            ["Hash set", "No", "No", "Yes", "Key size plus overhead per item"],
-            ["Bloom filter", "No", "Yes, tunable", "No", "~10 bits per item for 1%"],
-            ["Counting Bloom filter", "No", "Yes", "Yes", "~4x a Bloom filter"],
-            ["Cuckoo filter", "No", "Yes", "Yes", "Similar to Bloom at low error rates"],
+          type: "keypoints",
+          items: [
+            "<strong>Saturation is fast:</strong> a filter sized for 1 million at 1% hits about 16% false positives at 2 million and 43% at 3 million. It can't grow in place (positions depend on m, and keys aren't stored), so size for growth, rebuild from the source of truth, or keep one filter per day or hour.",
+            "<strong>Deletion breaks the guarantee:</strong> clearing alice's bits can zero a bit bob shares, creating a false negative.",
+            "Variants: a <strong>counting Bloom filter</strong> (4-bit counters, about 4x memory) supports deletes; a <strong>cuckoo filter</strong> (2014) stores fingerprints, deletes, and uses similar space at low error rates; a <strong>scalable Bloom filter</strong> (2007) stacks larger, stricter filters as each fills.",
           ],
         },
         {
           type: "callout",
           tone: "warning",
-          html: `<p>Deletion in a cuckoo or counting filter is only safe for items that really were inserted. Deleting something that was never added (perhaps because of a false positive) decrements or removes someone else's entry and can create false negatives. Delete only what your source of truth confirms.</p>`,
+          html: `<p>Delete from a counting or cuckoo filter only what your source of truth confirms was inserted. Deleting a false positive removes someone else's entry and creates false negatives.</p>`,
         },
-      ],
-    },
-    {
-      id: "where-used",
-      title: "Where Bloom filters earn their keep",
-      kicker: "Real systems",
-      blocks: [
         {
           type: "text",
-          html: `<p>The pattern is always the same: a cheap in-memory check stands in front of an expensive lookup, and most lookups are for things that are not there. A "definitely not" short-circuits the expensive path; a "maybe" pays for it as before.</p>
-<p>The most widespread use is inside storage engines built on <strong>log-structured merge trees</strong>. An LSM tree keeps data in many immutable sorted files (SSTables). A point read for a key that is in none of them, or in only one, would otherwise have to probe file after file. Each SSTable therefore carries a Bloom filter of its keys, kept in memory, and the read only touches files whose filter says "maybe".</p>`,
+          html: `<p>The pattern: a cheap in-memory check in front of an expensive lookup, where most lookups are for absent things. The biggest use is in <strong>LSM-tree</strong> engines: each immutable SSTable carries an in-memory filter, so a point read only touches files that answer "maybe".</p>`,
         },
         {
           type: "diagram",
@@ -286,21 +231,13 @@ class Bloom:
 </svg>`,
         },
         {
-          type: "realworld",
-          items: [
-            { org: "RocksDB, Cassandra, HBase", title: "Per-file filters", html: "All three can attach a Bloom filter to each on-disk file. RocksDB configures it in bits per key (10 bits is a common setting, roughly 1%); Cassandra exposes <code>bloom_filter_fp_chance</code> per table, trading memory against wasted disk reads." },
-            { org: "Akamai", title: "Cache on second hit", html: "Akamai has described using Bloom filters to admit an object into its CDN caches only on the second request. A large share of objects are requested once and never again; keeping them out leaves room for content that will be reused." },
-            { org: "Redis Stack", title: "RedisBloom", html: "<code>BF.RESERVE key error_rate capacity</code> creates a filter, <code>BF.ADD</code> and <code>BF.EXISTS</code> use it. By default it grows like a scalable Bloom filter, stacking new sub-filters as each fills, so many app servers can share one filter." },
-          ],
-        },
-        {
           type: "list",
-          title: "Other good fits",
+          title: "Where they're used",
           items: [
-            "<strong>Web crawlers:</strong> 10 billion seen URLs at 1% is about 12 GB; a false positive skips one new page.",
-            "<strong>Username or key existence:</strong> most checks are for names that are free, and those return without a query.",
-            "<strong>Distributed joins:</strong> ship a filter of one side's keys to the other side so rows that cannot match are dropped before crossing the network.",
-            "<strong>Known-bad lists:</strong> malicious URLs or leaked passwords, where a \"maybe\" triggers a slower exact check.",
+            "<strong>RocksDB, Cassandra, HBase:</strong> per-file filters (RocksDB commonly 10 bits per key, roughly 1%; Cassandra's <code>bloom_filter_fp_chance</code> per table).",
+            "<strong>Akamai:</strong> admit an object to CDN caches only on its second request, since many objects are requested once.",
+            "<strong>RedisBloom:</strong> <code>BF.RESERVE</code>, <code>BF.ADD</code>, <code>BF.EXISTS</code>; grows as a scalable filter so many app servers share one.",
+            "<strong>Crawlers, username checks, distributed joins</strong> (ship one side's key filter to drop non-matching rows) and <strong>known-bad lists</strong> where \"maybe\" triggers an exact check.",
           ],
         },
       ],
@@ -311,18 +248,14 @@ class Bloom:
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>Bloom filters come up in web crawlers, URL shorteners (is this short code taken?), recommendation feeds (has this user already seen this item?), and any storage-engine discussion that reaches LSM trees. They are also a favourite trap: the interviewer may be checking whether you reach for one when a plain set would do.</p>`,
-        },
-        {
           type: "callout",
           tone: "interview",
-          html: `<p>A strong answer covers four points:</p>
+          html: `<p>They come up in crawlers, URL shorteners, "already seen" feeds and LSM discussions, and as a trap when a plain set would do. A strong answer covers:</p>
 <ol>
 <li><strong>Semantics:</strong> "definitely not" or "probably yes"; no false negatives, tunable false positives, no deletes.</li>
-<li><strong>Sizing:</strong> about 9.6 bits per item and 7 hashes for 1%, plus 4.8 bits per item for each further factor of ten. Do the arithmetic for your n out loud.</li>
-<li><strong>Placement:</strong> it sits in front of an exact store; a "maybe" goes on to confirm, so a false positive costs a lookup, not a wrong answer.</li>
-<li><strong>Lifecycle:</strong> it saturates and can't grow, so size for growth, rebuild, use time-partitioned filters, or use a scalable or cuckoo variant.</li>
+<li><strong>Sizing:</strong> about 9.6 bits per item and 7 hashes for 1%, plus 4.8 bits per item per further factor of ten. Do the arithmetic for your n.</li>
+<li><strong>Placement:</strong> in front of an exact store, so a false positive costs a lookup, not a wrong answer.</li>
+<li><strong>Lifecycle:</strong> it saturates and can't grow: size for growth, rebuild, time-partition, or use a scalable or cuckoo variant.</li>
 </ol>`,
         },
         {
@@ -357,12 +290,11 @@ class Bloom:
     },
   ],
   takeaways: [
-    "A Bloom filter is m bits plus k hashes: adding sets k bits, checking tests them. Any zero means <strong>definitely not</strong>; all ones means <strong>probably yes</strong>.",
-    "It never gives false negatives, which is why it is safe as a pre-check in front of an exact store.",
-    "False-positive rate is about (1 &minus; e<sup>&minus;kn/m</sup>)<sup>k</sup>; the best k is (m/n) ln 2, and 9.6 bits per item gives 1%, with 4.8 more bits for every further factor of ten.",
-    "Memory depends on the item count and target error, never on key size.",
-    "It saturates and can't be resized or have items removed; use rebuilds, time partitions, scalable, counting or cuckoo filters when that matters.",
-    "Its biggest production use is skipping SSTables in LSM-tree databases; justify any other use with an item count that a plain set can't handle.",
+    "A Bloom filter is m bits plus k hashes: any zero means <strong>definitely not</strong>, all ones means <strong>probably yes</strong>, and there are no false negatives.",
+    "About 9.6 bits per item gives 1% false positives (best k = (m/n) ln 2), with 4.8 more bits per further factor of ten; memory never depends on key size.",
+    "It sits in front of an exact store, so a false positive costs a lookup, not a wrong answer.",
+    "It saturates and can't be resized or have items removed; use rebuilds, time partitions, or scalable, counting or cuckoo filters.",
+    "Its biggest production use is skipping SSTables in LSM engines; justify any other use with an item count a plain set can't handle.",
   ],
   furtherReading: [
     { title: "Space/Time Trade-offs in Hash Coding with Allowable Errors (Burton H. Bloom, CACM 1970)", note: "The original paper." },

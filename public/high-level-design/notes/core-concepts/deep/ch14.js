@@ -1,8 +1,7 @@
 // Deep dive: Chapter 14, Partitioning, sharding and choosing a shard key. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch14 = {
-  hook: `<p>A messaging startup runs everything on one PostgreSQL primary with two read replicas. Reads are fine: the replicas and a Redis cache absorb them. But every message is a write, and at 40,000 messages per second the primary's disk and WAL can no longer keep up. Replicas do not help, because every replica must apply every write too. There is no bigger machine left to buy.</p>
-<p>The only way forward is to split the data so that different machines accept different writes. That raises two questions that will shape the system for years: <strong>which column decides where a row lives</strong>, and <strong>how that column maps to a machine</strong>. Get them right and adding capacity is routine. Get them wrong and you end up with one machine on fire while the rest idle, or with every query asking every machine.</p>`,
+  hook: `<p>This chapter answers when to shard and the two decisions that shape the system for years: which column decides where a row lives, and how that value maps to a machine. Get them right and adding capacity is routine; get them wrong and one machine burns while the rest idle.</p>`,
   sections: [
     {
       id: "do-you-need-to-shard",
@@ -10,18 +9,15 @@ DEEP.ch14 = {
       kicker: "Before you split",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Sharding is permanent complexity. Every query needs routing, some queries must ask every shard, transactions across shards need special handling, and moving data between shards is an operational project. Teams that shard too early pay all of those costs for capacity they did not need.</p>`,
+          type: "text",
+          html: `<p>Sharding is permanent complexity: routing, cross-shard queries and transactions, and data moves. Single machines go far (around 200 vCPUs, over a terabyte of RAM, tens of terabytes of NVMe), and one well-indexed primary handles thousands to tens of thousands of writes per second.</p>`,
         },
         {
-          type: "text",
-          html: `<p>Modern hardware pushes the point where you <em>must</em> shard very far out. Cloud catalogues routinely offer database instances with around 200 vCPUs and well over a terabyte of RAM, and fast NVMe storage measured in tens of terabytes. A single well-indexed PostgreSQL or MySQL primary handles thousands to tens of thousands of writes per second, and read replicas plus a cache multiply read capacity.</p>
-<p>So the order of moves is: fix queries and indexes, add a cache, add read replicas, scale the machine up. Shard only when an estimate shows a limit none of those can move. The usual triggers are:</p>
-<ul>
-<li><strong>Write throughput</strong> beyond what one primary sustains (replicas do not add write capacity).</li>
-<li><strong>Data size</strong> heading past a few tens of terabytes, where backups, restores, index builds and replica rebuilds become painfully slow.</li>
-<li><strong>Read load</strong> that replicas and caches cannot absorb, or a working set far larger than one machine's memory.</li>
-</ul>`,
+          type: "keypoints",
+          items: [
+            "<strong>Order of moves:</strong> fix queries and indexes, add a cache, add read replicas, scale up. Shard only when an estimate shows none of those suffice.",
+            "<strong>Triggers:</strong> write throughput beyond one primary (replicas don't add write capacity); data heading past a few tens of terabytes; reads or a working set no cache and replicas can absorb.",
+          ],
         },
         {
           type: "table",
@@ -37,7 +33,7 @@ DEEP.ch14 = {
         {
           type: "callout",
           tone: "mistake",
-          html: `<p>"We'll shard the users table from day one." For most products a single primary carries them a long way. Interviewers look for the estimate that justifies sharding, not the reflex. If you do shard, say which number forced it.</p>`,
+          html: `<p>"We'll shard the users table from day one." Interviewers look for the number that justifies sharding, not the reflex.</p>`,
         },
       ],
     },
@@ -47,10 +43,11 @@ DEEP.ch14 = {
       kicker: "Two kinds of split",
       blocks: [
         {
-          type: "text",
-          html: `<p>The words are often used loosely, so be precise about whether the pieces live on one machine or many.</p>
-<p><strong>Partitioning</strong> splits a large table into smaller pieces <em>inside one database</em>. Horizontal partitioning splits rows (one partition per month of orders); vertical partitioning splits columns (keep small, hot columns apart from large, rarely read blobs). Queries that filter on the partition column only scan the relevant pieces, and maintenance gets easier: dropping last year's data becomes dropping a partition rather than deleting billions of rows. But the machine's CPU, memory, disk and connection limits are unchanged.</p>
-<p><strong>Sharding</strong> is horizontal partitioning <em>across machines</em>. Each shard is a complete, independent database server holding a subset of rows. Together they hold the whole dataset, and because each has its own hardware, storage and both read and write throughput grow with the number of shards.</p>`,
+          type: "compare",
+          items: [
+            { title: "Partitioning", tone: "info", html: "Splits a table <em>inside one database</em>: by rows (one partition per month) or columns (hot columns apart from blobs). Queries prune partitions and old data drops cheaply (PostgreSQL range, list and hash partitioning). Same CPU, disk and connection limits." },
+            { title: "Sharding", tone: "ok", html: "Horizontal partitioning <em>across machines</em>. Each shard is an independent server with a subset of rows, so storage and read and write throughput grow with shard count. Citus (PostgreSQL) and Vitess (MySQL, from YouTube) add it to existing databases." },
+          ],
         },
         {
           type: "diagram",
@@ -88,16 +85,9 @@ DEEP.ch14 = {
 </svg>`,
         },
         {
-          type: "realworld",
-          items: [
-            { org: "PostgreSQL", title: "Declarative partitioning", html: "Since version 10, PostgreSQL supports <code>PARTITION BY RANGE</code> and <code>LIST</code>, with <code>HASH</code> added in 11. The planner prunes partitions that cannot match a query, and old partitions can be detached or dropped in one cheap operation." },
-            { org: "Citus and Vitess", title: "Sharding layers for existing databases", html: "Citus turns PostgreSQL into a sharded cluster with a coordinator that routes and parallelises queries. Vitess, which started at YouTube, does the same for MySQL, routing queries to shards through a proxy layer." },
-          ],
-        },
-        {
           type: "callout",
           tone: "tip",
-          html: `<p>The two combine well. A common pattern is to shard by <code>user_id</code> across machines and, inside each shard, partition large append-heavy tables by month so old data can be archived cheaply.</p>`,
+          html: `<p>They combine well: shard by <code>user_id</code> across machines and, inside each shard, partition append-heavy tables by month so old data archives cheaply.</p>`,
         },
       ],
     },
@@ -108,18 +98,17 @@ DEEP.ch14 = {
       blocks: [
         {
           type: "idea",
-          html: `<p>The <strong>shard key</strong> is the column whose value decides which shard holds a row. A good one has three properties: <strong>high cardinality</strong> (many distinct values), <strong>even distribution</strong> (no value or range carries a disproportionate share of data or traffic) and <strong>query alignment</strong> (the most common requests include it, so they touch exactly one shard).</p>`,
+          html: `<p>A good shard key has <strong>high cardinality</strong>, <strong>even distribution</strong> and <strong>query alignment</strong>: the most common requests include it, so they touch one shard. Start from the dominant access pattern: "this user's something" means <code>user_id</code>.</p>`,
         },
         {
-          type: "text",
-          html: `<p>Start from the dominant access pattern, not from the data model. In a social app, nearly every request is "this user's something": their profile, their posts, their inbox. Sharding by <code>user_id</code> keeps each user's rows together, there are millions of users so the data spreads over many shards, and hashing the id spreads them evenly. For an order system where lookups are by order, <code>order_id</code> plays the same role.</p>
-<h3>How shard keys go wrong</h3>
-<ul>
-<li><strong>Low cardinality.</strong> <code>is_premium</code> has two values, so the data can never spread over more than two shards, and one of them holds 90% of users.</li>
-<li><strong>Skew.</strong> <code>country</code> has a couple of hundred values, but a few countries hold most users, so their shards are huge and hot while dozens of others are nearly empty.</li>
-<li><strong>Monotonic values.</strong> <code>created_at</code> (or an auto-increment id) with range sharding sends every new row to the newest shard. That one shard takes all the writes and most of the reads, because recent data is the hottest.</li>
-<li><strong>Misaligned with queries.</strong> Sharding messages by <code>message_id</code> spreads writes perfectly, but "show this conversation" now has to ask every shard.</li>
-</ul>`,
+          type: "list",
+          title: "How shard keys go wrong",
+          items: [
+            "<strong>Low cardinality:</strong> <code>is_premium</code> can never spread past two shards, one with 90% of users.",
+            "<strong>Skew:</strong> <code>country</code> puts most users on a few huge, hot shards.",
+            "<strong>Monotonic values</strong> under range sharding: <code>created_at</code> sends every new (and hottest) row to the newest shard.",
+            "<strong>Misaligned with queries:</strong> messages by <code>message_id</code> spread writes perfectly but \"show this conversation\" asks every shard.",
+          ],
         },
         {
           type: "lab",
@@ -140,7 +129,7 @@ DEEP.ch14 = {
         {
           type: "callout",
           tone: "warning",
-          html: `<p>Changing a shard key later means rewriting where every row lives, usually with dual writes, backfills and a cutover while the system stays live. Some databases now support online resharding (MongoDB added <code>reshardCollection</code> in 5.0), but it is still a heavy operation. Spend the time to choose well up front.</p>`,
+          html: `<p>Changing a shard key later means rewriting where every row lives (dual writes, backfills, cutover). Even with online resharding (MongoDB's <code>reshardCollection</code>, 5.0), it's heavy. Choose well up front.</p>`,
         },
         {
           type: "quiz",
@@ -158,13 +147,9 @@ DEEP.ch14 = {
     },
     {
       id: "distribution-strategies",
-      title: "Range, hash and directory: mapping keys to shards",
+      title: "Mapping keys to shards, and logical shards",
       kicker: "Distribution strategies",
       blocks: [
-        {
-          type: "text",
-          html: `<p>Once you have a key, you need a rule that turns a key value into a shard. There are three families, and most real systems are one of them or a blend.</p>`,
-        },
         {
           type: "diagram",
           title: "Three ways to route key 1,234,567",
@@ -222,68 +207,24 @@ DEEP.ch14 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<p><strong>Range-based</strong> sharding gives each shard a contiguous interval of keys. Range scans on the key are efficient because neighbours sit together, and the routing table is tiny. But real traffic is rarely uniform across ranges: with time-ordered or sequential keys, the newest range takes all the inserts. Range works best when the key is naturally spread, such as tenants that each own a range, or when range scans by key are the main query.</p>
-<p><strong>Hash-based</strong> sharding runs the key through a hash function first, which scatters even sequential keys uniformly. It is the default in interviews and in most key-value stores. The cost is that range queries on the key now touch every shard, and that the naive rule <code>hash(key) mod N</code> moves almost every key when N changes, so real systems use consistent hashing or a fixed set of logical partitions (next section).</p>
-<p><strong>Directory-based</strong> sharding keeps an explicit lookup table from key (or key range, or tenant) to shard. It is the most flexible: you can move one heavy tenant to its own machine by changing one row. But every request pays for a lookup, and the directory becomes a critical dependency that must be fast, cached and highly available.</p>`,
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "MongoDB", title: "Ranged or hashed shard keys", html: "MongoDB lets you choose a ranged or hashed shard key per collection, splits data into chunks, and runs a balancer that migrates chunks between shards to even out their sizes." },
-            { org: "HBase and Bigtable", title: "Range-partitioned by row key", html: "Tables are split into contiguous row-key ranges (regions or tablets). Both projects' documentation warns that row keys starting with a timestamp concentrate writes on one server, and recommends salting, hashing or reordering key fields." },
-            { org: "Vitess", title: "Vindexes", html: "Vitess maps each row to a keyspace id through a configurable \"vindex\", which can be a hash of a column or a lookup table, so the same system can do hash-based or directory-style routing." },
-          ],
-        },
-        {
           type: "compare",
           items: [
-            { title: "Use hash when", tone: "ok", html: "You want even data and load regardless of key patterns, and the main queries are point lookups by key. This is the default." },
-            { title: "Use range when", tone: "info", html: "Range scans by the key are the main query and load is naturally spread across ranges, for example tenants owning ranges." },
-            { title: "Use a directory when", tone: "warn", html: "A few keys need special placement (giant tenants, data residency rules). Often layered on top of hash sharding as a small exception table." },
+            { title: "Hash (the default)", tone: "ok", html: "Scatters even sequential keys evenly; best for point lookups. Ranges on the key hit every shard, and plain <code>hash mod N</code> moves almost every key when N changes." },
+            { title: "Range", tone: "info", html: "Contiguous key intervals: cheap range scans, tiny routing table. Sequential keys make the newest range hot (HBase and Bigtable docs warn against timestamp-first row keys)." },
+            { title: "Directory", tone: "warn", html: "An explicit lookup table: move one giant tenant by changing a row. Every request pays a lookup, and the directory must be fast, cached and highly available. Often a small exception table over hash." },
           ],
-        },
-      ],
-    },
-    {
-      id: "logical-shards",
-      title: "Many logical shards on few machines",
-      kicker: "Planning for growth",
-      blocks: [
-        {
-          type: "problem",
-          html: `<p>Start with four shards using <code>hash(user_id) mod 4</code>. A year later you need eight. Changing the rule to <code>mod 8</code> sends about half of all rows to a different shard, and the system must copy all of them while staying online. The bigger the dataset, the worse every resize gets.</p>`,
         },
         {
           type: "text",
-          html: `<p>The standard fix is a level of indirection. Hash keys into a <strong>fixed, large number of logical shards</strong> (say 1,024), chosen once and never changed. Then assign logical shards to physical machines with a small mapping table. Early on, eight machines might hold 128 logical shards each. To add capacity, move some whole logical shards to new machines and update the mapping. A key's logical shard never changes, so nothing is rehashed; data moves only in whole, well-defined units.</p>
-<p>Two practical bonuses follow. Each logical shard can be its own database or schema on the server, so moving one is a familiar operation (replicate it, cut over). And you can place logical shards deliberately to balance load, moving a hot one next to cold ones.</p>
-<p>The logical shard count caps how far you can spread: 1,024 logical shards can never use more than 1,024 machines. Pick a number comfortably above any realistic machine count.</p>`,
+          html: `<p><strong>Logical shards</strong> fix resizing. Hash keys into a fixed, large number of logical shards (say 1,024), chosen once, and map them to fewer physical machines with a small table. To grow, move whole logical shards and update the map; no key is rehashed. The logical count caps the machine count, so pick it well above any realistic need.</p>`,
         },
         {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "Instagram", title: "Logical shards in PostgreSQL (2012)", html: "Instagram's engineering blog described mapping thousands of logical shards onto far fewer physical PostgreSQL servers, and generating 64-bit ids that embed the logical shard: 41 bits of milliseconds, 13 bits of shard id and 10 bits of a per-shard sequence. Any id tells you where its row lives." },
-            { org: "Notion", title: "Sharding Postgres (2021)", html: "Notion's engineering blog described splitting its monolithic PostgreSQL database into 480 logical shards spread over 32 physical databases, keyed by workspace, so that a workspace's data stays together." },
-            { org: "Redis Cluster and Couchbase", title: "Fixed slots", html: "Redis Cluster hashes every key into one of 16,384 slots and Couchbase into 1,024 vBuckets; nodes own sets of slots, and rebalancing moves whole slots." },
+            "Instagram mapped thousands of logical shards onto few PostgreSQL servers, with 64-bit IDs embedding the shard (41 bits time, 13 bits shard, 10 bits sequence). Notion split into 480 logical shards on 32 databases, keyed by workspace.",
+            "Redis Cluster uses 16,384 slots and Couchbase 1,024 vBuckets; rebalancing moves whole slots.",
+            "Often the database does it: DynamoDB hashes the partition key and splits automatically (per-partition limits of 3,000 read and 1,000 write units per second explain hot-key throttling); Cassandra uses a token ring; Spanner and CockroachDB split ranges.",
           ],
-        },
-        {
-          type: "text",
-          html: `<h3>Usually, the database does it for you</h3>
-<p>Many databases have sharding built in, and in an interview naming the right one with the right key is often enough. <strong>DynamoDB</strong> hashes the partition key and splits partitions automatically as data and traffic grow; each partition has documented throughput limits (3,000 read units and 1,000 write units per second), which is why a hot partition key throttles. <strong>Cassandra</strong> places partitions on a token ring with virtual nodes; the partition key decides placement and clustering columns sort rows within it. <strong>MongoDB</strong>, <strong>Vitess</strong> and <strong>Citus</strong> shard document and SQL databases, and <strong>Spanner</strong> and <strong>CockroachDB</strong> split ranges automatically.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "You hash user ids into 1,024 logical shards hosted on 16 servers. Traffic doubles and you add 16 more servers. Roughly what moves?",
-          options: [
-            "Almost every row, because the hash changes",
-            "About half of the logical shards (512) move whole to the new servers; no key changes logical shard",
-            "Nothing; new servers only take new users",
-            "Exactly one logical shard per new server",
-          ],
-          answer: 1,
-          explain: "To balance 1,024 logical shards over 32 servers, each server should hold 32, so 512 of them move to the new machines. Each key still hashes to the same logical shard; only the shard-to-server mapping changes, and data moves in whole shards.",
         },
       ],
     },
@@ -293,27 +234,23 @@ DEEP.ch14 = {
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>Sharding should appear in your design as the answer to a number, not as a default box on the diagram. Do the estimate first ("40K writes per second and 3 TB of new data a day"), show that one primary with replicas and a cache cannot handle it, and then make the two decisions out loud: the key and the strategy. Finish with what the choice makes hard, because the interviewer will ask anyway.</p>`,
-        },
-        {
           type: "callout",
           tone: "interview",
-          html: `<p>A strong sharding answer, in order:</p>
+          html: `<p>Make sharding the answer to a number. A strong answer, in order:</p>
 <ol>
-<li><strong>Justify it:</strong> the write rate or data size that one primary cannot handle.</li>
-<li><strong>Key:</strong> "Most queries are scoped to one user, so I'll shard by <code>user_id</code>: high cardinality, even, and aligned with the main access pattern."</li>
-<li><strong>Strategy:</strong> "Hash-based, into 1,024 logical shards mapped onto a smaller number of servers, so growth moves whole shards."</li>
-<li><strong>Costs:</strong> "Global queries like trending become scatter-gather, so I'll precompute them; cross-user operations need a saga (next chapter)."</li>
+<li><strong>Justify it:</strong> the write rate or data size one primary can't handle.</li>
+<li><strong>Key:</strong> "Most queries are scoped to one user, so <code>user_id</code>: high cardinality, even, aligned with the main access pattern."</li>
+<li><strong>Strategy:</strong> "Hash into 1,024 logical shards mapped onto fewer servers, so growth moves whole shards."</li>
+<li><strong>Costs:</strong> "Global queries like trending become scatter-gather, so precompute them; cross-user operations need a saga."</li>
 </ol>
-<p>If a managed database fits, say so: "DynamoDB with <code>user_id</code> as the partition key handles this for us."</p>`,
+<p>If a managed database fits, say so: "DynamoDB with <code>user_id</code> as the partition key."</p>`,
         },
         {
           type: "keypoints",
           title: "Red flags interviewers listen for",
           items: [
-            "Sharding before showing that one machine is not enough.",
-            "Shard keys with low cardinality (status, country, booleans).",
+            "Sharding before showing one machine is not enough.",
+            "Low-cardinality keys (status, country, booleans).",
             "Time-based range sharding for a write-heavy table.",
             "Plain <code>hash mod N</code> with no plan for adding shards.",
           ],
@@ -334,12 +271,11 @@ DEEP.ch14 = {
     },
   ],
   takeaways: [
-    "Shard only when an estimate shows one primary (with replicas, caches and a bigger machine) cannot handle the writes, data size or reads.",
-    "Partitioning splits a table within one database for faster scans and easier maintenance; sharding spreads rows across machines for more capacity, at the cost of routing and cross-shard work.",
-    "A good shard key has high cardinality, even distribution and matches the dominant query, so common requests touch one shard.",
-    "Booleans, skewed categories and monotonically increasing values (under range sharding) make bad shard keys.",
-    "Hash-based distribution is the default; range suits range-scan-heavy, naturally spread keys; directories add flexibility at the cost of a lookup.",
-    "Hash into many fixed logical shards and map them to fewer machines, so growth moves whole shards instead of rehashing every key.",
+    "Shard only when an estimate shows one primary (with replicas, caches and a bigger machine) can't handle the writes, data size or reads.",
+    "Partitioning splits a table within one database; sharding spreads rows across machines for capacity, at the cost of routing and cross-shard work.",
+    "A good shard key has high cardinality, even distribution and matches the dominant query; booleans, skewed categories and monotonic range keys are bad.",
+    "Hash distribution is the default; range suits range scans on naturally spread keys; directories add flexibility for exceptions.",
+    "Hash into many fixed logical shards mapped to fewer machines, so growth moves whole shards instead of rehashing keys.",
   ],
   furtherReading: [
     { title: "Sharding & IDs at Instagram (Instagram Engineering, 2012)", note: "Logical shards on PostgreSQL and ids that embed the shard." },

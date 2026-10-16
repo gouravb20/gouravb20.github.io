@@ -1,8 +1,7 @@
 // Deep dive: Chapter 15, Sharding challenges. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch15 = {
-  hook: `<p>A social network shards its database by <code>user_id</code> across 64 machines. The dashboards look healthy: storage is even and average load per shard is a comfortable 30%. Then a pop star with 80 million followers posts, and shard 23, which owns her account, goes to 100% CPU while 63 shards idle. Meanwhile the new "trending posts" page asks all 64 shards for their top posts, and its p99 latency is ten times the p99 of any single shard. And product wants a "send money to a friend" feature, where the friend usually lives on a different shard.</p>
-<p>None of this is a bug in the sharding. It is the price of it. Sharding solves capacity and creates three new classes of problem: <strong>hot spots</strong>, <strong>cross-shard queries</strong> and <strong>cross-shard transactions</strong>. Knowing each one, and the standard responses, is what separates "I'd shard it" from a design that survives contact with real traffic.</p>`,
+  hook: `<p>This chapter covers the three problems sharding creates (hot spots, cross-shard queries and cross-shard transactions) and the standard response to each. Knowing them separates "I'd shard it" from a design that survives real traffic.</p>`,
   sections: [
     {
       id: "hot-spots",
@@ -10,62 +9,35 @@ DEEP.ch15 = {
       kicker: "Challenge 1",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Sharding only helps if load spreads. A <strong>hot spot</strong> is a shard that receives far more than its share of traffic, so it saturates while others idle, and the whole system is only as fast as that one machine. Even distribution of <em>data</em> does not guarantee even distribution of <em>traffic</em>.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>Hot spots come from two sources. <strong>Hot ranges</strong> appear with range sharding on keys that move together, the classic case being time: today's data is where all the writes go and most reads look. Hashing the key fixes this, which is why hash sharding is the default.</p>
-<p><strong>Hot keys</strong> are harder. With <code>user_id</code> sharding, a celebrity account generates orders of magnitude more reads (profile views, timeline fetches) and sometimes writes (incoming likes and comments) than a typical user. Hashing cannot help, because the problem is one key, and one key always maps to exactly one shard. More shards just add idle machines.</p>
-<h3>Responses to hot keys</h3>
-<ul>
-<li><strong>Cache and replicate reads.</strong> Most celebrity traffic is reads. Put their profile and recent posts in a cache (with an in-process layer for the very hottest keys) and serve the rest from that shard's read replicas.</li>
-<li><strong>Split the key.</strong> Use a compound key such as <code>(user_id, bucket)</code> with bucket 0-15, or <code>(user_id, month)</code>, so one entity's data spreads over several shards. Writes spread, but reading that entity now means querying all its buckets.</li>
-<li><strong>Isolate.</strong> Keep a small directory of exceptions that pins known heavy keys (large tenants, celebrities) to dedicated shards with more hardware.</li>
-<li><strong>Split shards dynamically.</strong> Some systems split a hot or oversized shard and move half elsewhere automatically; others leave it to operators.</li>
-</ul>`,
+          html: `<p>Even data doesn't mean even traffic. <strong>Hot ranges</strong> come from range sharding on keys that move together (time), and hashing fixes them. <strong>Hot keys</strong> (a celebrity, a giant tenant, a flash-sale merchant) are harder: one key always maps to one shard, so more shards just add idle machines.</p>`,
         },
         {
-          type: "realworld",
+          type: "list",
+          title: "Responses to hot keys",
           items: [
-            { org: "Amazon DynamoDB", title: "Adaptive capacity", html: "DynamoDB's documentation describes adaptive capacity that lets a busy partition borrow unused throughput and can isolate frequently accessed items onto their own partitions. A single item still has per-partition limits, so a truly hot key needs caching or write sharding." },
-            { org: "MongoDB and Vitess", title: "Splitting and moving data", html: "MongoDB splits chunks and its balancer migrates them between shards automatically. Vitess supports resharding a keyspace into more shards as an operator-driven workflow, copying data and then cutting traffic over." },
-            { org: "Social timelines", title: "Treating celebrities differently", html: "A widely discussed approach in feed systems is to fan out ordinary users' posts to followers' timelines at write time, but to merge very high-follower accounts' posts in at read time, so one post does not trigger tens of millions of writes." },
+            "<strong>Cache and replicate reads:</strong> most celebrity traffic is reads; cache them (in-process for the very hottest) and use the shard's read replicas.",
+            "<strong>Split the key:</strong> <code>(user_id, bucket)</code> with bucket 0-15, or <code>(user_id, month)</code>, spreads one entity's writes; reading it now queries every bucket.",
+            "<strong>Isolate:</strong> a small exception directory pins known heavy keys to dedicated shards.",
+            "<strong>Split shards dynamically:</strong> MongoDB's balancer splits and migrates chunks; DynamoDB's adaptive capacity can isolate hot items, though a single item keeps per-partition limits.",
+            "<strong>Feeds:</strong> fan out ordinary users' posts at write time but merge very high-follower accounts in at read time.",
           ],
         },
         {
           type: "callout",
           tone: "tip",
-          html: `<p>You cannot fix hot spots you cannot see. Monitor per-shard request rate, CPU and latency, not just cluster averages; a 64-shard average of 30% CPU can hide one shard at 100%.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "Your orders table is sharded by hash(merchant_id). One merchant runs a flash sale and writes 50 times more orders than anyone else, overloading its shard. Which change spreads that merchant's writes?",
-          options: [
-            "Add more shards with the same key",
-            "Shard by (merchant_id, bucket) for large merchants, so their orders spread over several shards",
-            "Switch from hash to range sharding on merchant_id",
-            "Increase the cache TTL on merchant pages",
-          ],
-          answer: 1,
-          explain: "Every row with the same merchant_id hashes to the same shard regardless of how many shards exist. Adding a bucket to the key splits one merchant's orders across several shards. The cost is that reading all of that merchant's orders must query each bucket. Caching helps reads, not writes.",
+          html: `<p>Monitor per-shard request rate, CPU and latency, not cluster averages: a 64-shard average of 30% CPU can hide one shard at 100%.</p>`,
         },
       ],
     },
     {
       id: "scatter-gather",
-      title: "Scatter-gather queries and tail latency",
+      title: "Scatter-gather and tail latency",
       kicker: "Challenge 2",
       blocks: [
         {
-          type: "problem",
-          html: `<p>A query that includes the shard key goes to one shard. A query that does not, such as "top 10 posts globally" or "find users named Garcia" in a database sharded by user id, has no way to know where matching rows live. It must ask <strong>every</strong> shard, wait for all of them, and merge the results. This is called scatter-gather or fan-out.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>Fan-out costs grow in two ways. Total work grows with the number of shards: a query that hits 64 shards does 64 times the work of a single-shard query, and if it is common, every shard spends capacity on it. Latency gets worse in a less obvious way: the response cannot return until the <strong>slowest</strong> shard answers, so the query's latency is the maximum of all the shards' latencies, not the average.</p>
-<h3>Why rare slowness becomes common slowness</h3>
-<p>Every server is occasionally slow: a garbage-collection pause, a busy disk, a background compaction, a noisy neighbour. Say each shard exceeds its p99 latency 1% of the time. A query touching one shard is slow 1% of the time. A query touching 100 shards is slow whenever <em>any</em> of them is, with probability <span class="formula">1 &minus; 0.99<sup>100</sup> &asymp; 63%</span>. What was a rare tail event for each server becomes the typical experience for the fan-out query.</p>`,
+          html: `<p>A query without the shard key ("top 10 posts globally") must ask <strong>every</strong> shard and merge. Work grows with shard count, and latency is the <strong>maximum</strong> of all shards, not the average. If each shard is slow 1% of the time, a 100-shard query is slow with probability <code>1 &minus; 0.99<sup>100</sup> &asymp; 63%</code>.</p>`,
         },
         {
           type: "diagram",
@@ -116,14 +88,20 @@ DEEP.ch15 = {
           caption: "Increase the number of shards and watch the fan-out query's latency distribution drift toward the slow tail. Turn on hedged requests to see a backup request to another replica cut the tail.",
         },
         {
-          type: "text",
-          html: `<h3>Taming the tail</h3>
-<p><strong>Hedged requests</strong> send the same request to a second replica if the first has not answered within a short delay (around the normal p95), and use whichever answer arrives first. Because the delay is long enough that most requests have already finished, only a few percent of requests are duplicated, but the far tail shrinks sharply. <strong>Timeouts with partial results</strong> help where completeness is optional: a search page can return results from 63 of 64 shards rather than wait. The best fix, though, is not to fan out on the common path at all.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Hedged requests</strong> (Dean and Barroso, \"The Tail at Scale\"): resend to another replica after about the p95 delay and take the first answer. Few duplicates, much shorter tail.",
+            "<strong>Timeouts with partial results</strong> where completeness is optional: 63 of 64 shards may be fine for search.",
+          ],
         },
         {
-          type: "realworld",
+          type: "compare",
+          title: "Better: design fan-out off the common path",
           items: [
-            { org: "Google", title: "The Tail at Scale (2013)", html: "Jeff Dean and Luiz Andr&eacute; Barroso's CACM article explains how fan-out turns rare per-server slowness into frequent slowness for whole requests, and describes hedged and tied requests as ways to reduce it." },
+            { title: "Precompute global views", tone: "ok", html: "Trending, leaderboards and global counts tolerate a minute of staleness: compute them from events and serve one cached key." },
+            { title: "Denormalize onto the reader's shard", tone: "ok", html: "Store what a query needs on the shard that serves it (posts in a feed shard, names in a conversation shard). Writes do more so reads stay local." },
+            { title: "Global secondary index", tone: "info", html: "A second copy sharded by the other key (orders by <code>merchant_id</code>), usually updated asynchronously; DynamoDB GSI reads are eventually consistent only." },
+            { title: "Search engine", tone: "info", html: "For flexible multi-field queries, stream changes via CDC into Elasticsearch or OpenSearch." },
           ],
         },
         {
@@ -136,81 +114,30 @@ DEEP.ch15 = {
       ],
     },
     {
-      id: "avoiding-cross-shard-reads",
-      title: "Designing away cross-shard reads",
-      kicker: "Responses",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>If a common use case needs "ask every shard", the design or the shard key needs rethinking. Rare queries, such as an admin report or a nightly job, can simply be slow. For the common ones, there are four standard moves.</p>`,
-        },
-        {
-          type: "compare",
-          items: [
-            { title: "Precompute global views", tone: "ok", html: "Trending posts, leaderboards and global counts tolerate being a minute old. A background job or stream processor (fed by like and view events) computes them periodically and stores the result in a cache or small table. Reads become a single key lookup." },
-            { title: "Denormalize onto the reader's shard", tone: "ok", html: "Copy the data a query needs onto the shard that serves it. A user's feed shard can store the posts it shows, not just ids; a conversation shard can store participant names. Writes do more work so reads stay local." },
-            { title: "Global secondary index", tone: "info", html: "Maintain a second copy of the data sharded by the other key, for example orders by <code>customer_id</code> and an index of orders by <code>merchant_id</code>. It is usually updated asynchronously, so it lags the main table." },
-            { title: "Search engine", tone: "info", html: "For flexible queries on many fields (\"users named Garcia in Madrid\"), stream changes into Elasticsearch or OpenSearch with CDC, and query that instead of the shards." },
-          ],
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "Amazon DynamoDB", title: "Global secondary indexes", html: "A GSI lets you query a table by a different partition key. DynamoDB maintains it asynchronously, and GSI reads are eventually consistent only, which is the general trade-off of any index sharded differently from its table." },
-          ],
-        },
-        {
-          type: "callout",
-          tone: "insight",
-          html: `<p>Every one of these responses trades freshness or write cost for read locality. That is usually a good deal, because cross-shard reads are paid on every request while the extra write work is paid once per change. Say which consistency the feature can tolerate when you choose.</p>`,
-        },
-      ],
-    },
-    {
       id: "cross-shard-transactions",
       title: "Cross-shard transactions and two-phase commit",
       kicker: "Challenge 3",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Transfer $200 from Alice (shard 1) to Bob (shard 2). Inside one database this is one transaction: both updates commit or neither does. Across two independent databases, there is no shared transaction. Do the two writes separately and a crash between them leaves $200 debited from Alice and never credited to Bob, or credited to Bob and never debited from Alice.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>The first answer is the best one: <strong>design so it rarely happens</strong>. Choose shard boundaries that keep data changed together on the same shard: one user's balance, ledger and settings live together, so most operations are single-shard transactions. If the product constantly needs transactions spanning shards, that is a strong hint the shard key is wrong.</p>
-<p>When an operation genuinely spans shards, there are two families of solution: make the participants agree atomically (<strong>two-phase commit</strong>), or break the operation into local steps with undo actions (<strong>sagas</strong>, next section).</p>`,
+          html: `<p>Transferring $200 from Alice (shard 1) to Bob (shard 2) has no shared transaction; a crash between two writes loses or creates money. The best answer is <strong>co-location</strong>: keep data changed together on one shard. Constant cross-shard transactions hint the shard key is wrong.</p>`,
         },
         {
           type: "steps",
           title: "Two-phase commit (2PC)",
           items: [
-            "<strong>Prepare.</strong> A coordinator asks every participant to prepare: each does the work, writes it durably, takes the locks it needs, and votes yes or no.",
-            "<strong>Decide.</strong> If every participant voted yes, the coordinator durably records \"commit\"; if any said no or timed out, it records \"abort\".",
-            "<strong>Commit or abort.</strong> The coordinator tells every participant the decision, and they commit or roll back and release their locks.",
+            "<strong>Prepare:</strong> each participant does the work, writes it durably, takes locks and votes yes or no.",
+            "<strong>Decide:</strong> all yes means the coordinator durably records commit; any no or timeout means abort.",
+            "<strong>Commit or abort:</strong> participants apply the decision and release locks.",
           ],
         },
         {
-          type: "text",
-          html: `<p>2PC gives real atomicity, but it is expensive. Every transaction needs extra network round trips, and participants hold locks from the prepare until the decision arrives, which limits throughput on contended rows. The bigger problem is <strong>blocking</strong>: a participant that voted yes has promised to commit if told to, so it cannot decide on its own. If the coordinator crashes after the prepares, participants sit holding locks until it recovers. And every participant must be up for any transaction to succeed, so availability is the product of all of them.</p>`,
-        },
-        {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "XA transactions", title: "Classic 2PC", html: "The X/Open XA standard, supported by MySQL, PostgreSQL (prepared transactions) and many message brokers, implements 2PC across resources. It is used in some enterprise systems but is generally avoided in high-throughput services because of the locking and blocking costs." },
-            { org: "Google Spanner", title: "2PC over replicated participants", html: "Spanner runs two-phase commit across shards, but each participant (and the coordinator) is itself a Paxos-replicated group, so the failure of one machine does not leave the protocol stuck. That is how it offers cross-shard ACID transactions, at the cost of cross-replica latency on every commit." },
+            "<strong>Expensive:</strong> extra round trips, and locks held from prepare to decision.",
+            "<strong>Blocking:</strong> a participant that voted yes can't decide alone; if the coordinator dies, it holds locks until recovery.",
+            "<strong>Fragile availability:</strong> every participant must be up. XA implements classic 2PC and is generally avoided in high-throughput services; Spanner makes each participant a Paxos group so one machine's failure doesn't stall it.",
           ],
-        },
-        {
-          type: "quiz",
-          q: "In two-phase commit, both participants have voted yes and the coordinator crashes before sending the decision. What happens?",
-          options: [
-            "Each participant commits on its own after a timeout",
-            "Each participant aborts on its own after a timeout",
-            "Participants stay blocked, holding locks, until they learn the decision from the recovered coordinator",
-            "The transaction commits on one participant and aborts on the other",
-          ],
-          answer: 2,
-          explain: "After voting yes, a participant cannot unilaterally commit (the other might have been told to abort) or abort (the coordinator might have decided commit). It must wait for the decision, holding its locks. This blocking behaviour is the main reason most production systems avoid plain 2PC.",
         },
       ],
     },
@@ -221,7 +148,7 @@ DEEP.ch15 = {
       blocks: [
         {
           type: "idea",
-          html: `<p>Split the operation into a sequence of <strong>local transactions</strong>, each on one shard and each committed independently. For every step, define a <strong>compensating action</strong> that semantically undoes it. If a later step fails permanently, run the compensations for the completed steps in reverse order.</p>`,
+          html: `<p>Split the operation into <strong>local transactions</strong>, each on one shard and committed independently, with a <strong>compensating action</strong> for each. If a later step fails permanently, run the compensations in reverse (Garcia-Molina and Salem, 1987).</p>`,
         },
         {
           type: "diagram",
@@ -249,15 +176,14 @@ DEEP.ch15 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<p>Several details make sagas work in practice:</p>
-<ul>
-<li><strong>Idempotent steps.</strong> Networks fail after work is done, so every step will sometimes be retried. Key each one by the transfer id ("debit for transfer t-981 already applied") so a retry is a no-op.</li>
-<li><strong>Durable saga state.</strong> Record which steps have completed in a log or table, so a crashed coordinator can resume or compensate after restarting instead of forgetting the transfer halfway.</li>
-<li><strong>Visible intermediate states.</strong> Between steps, Alice has been debited and Bob not yet credited. There is no isolation, so model it explicitly: a transfer row with status <code>pending</code>, and balances that each stay correct on their own shard.</li>
-<li><strong>Compensations are business actions.</strong> You cannot un-send an email; you send a correction. A compensation is a new forward action (a refund), not a database rollback.</li>
-</ul>
-<p>Sagas come in two styles. In <strong>orchestration</strong>, a central coordinator tells each service what to do next and tracks state, which is easier to follow and debug. In <strong>choreography</strong>, each step emits an event that triggers the next one, which avoids a central component but spreads the flow across many services.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Idempotent steps</strong> keyed by the transfer id, so retries are no-ops.",
+            "<strong>Durable saga state</strong>, so a crashed coordinator resumes or compensates (Temporal and AWS Step Functions do this bookkeeping).",
+            "<strong>Visible intermediate states</strong> (no isolation): model them, e.g. a transfer with status <code>pending</code>.",
+            "<strong>Compensations are business actions</strong> (a refund, a correction email), not rollbacks.",
+            "<strong>Orchestration</strong> (a coordinator directs each step; easier to debug) or <strong>choreography</strong> (each step emits an event that triggers the next; no central component).",
+          ],
         },
         {
           type: "lab",
@@ -271,19 +197,12 @@ DEEP.ch15 = {
           pros: [
             "No distributed locks; each step is a fast local transaction",
             "Keeps working when one participant is briefly down (steps retry)",
-            "Fits naturally with services that own their own databases",
+            "Fits services that own their own databases",
           ],
           cons: [
             "Only eventually consistent: intermediate states are visible",
             "Every step needs an idempotency key and a correct compensation",
             "Harder to reason about and test than a single transaction",
-          ],
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "Origins", title: "Garcia-Molina and Salem (1987)", html: "The term saga comes from a 1987 paper on long-lived transactions, which proposed breaking them into a sequence of smaller transactions with compensating transactions." },
-            { org: "Temporal and AWS Step Functions", title: "Saga orchestrators", html: "Workflow engines like these persist each step's state durably and retry or compensate on failure, which is exactly the bookkeeping an orchestrated saga needs." },
           ],
         },
         {
@@ -306,46 +225,29 @@ DEEP.ch15 = {
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>Once you propose sharding, expect the interviewer to probe its weak spots: "what about a celebrity?", "how do you show trending posts?", "how does a transfer between users work?". These are not trick questions; they test whether you know the costs of the choice you just made. Answer each with the problem in one sentence and the standard fix.</p>`,
-        },
-        {
           type: "callout",
           tone: "interview",
-          html: `<p>Ready answers for the three follow-ups:</p>
+          html: `<p>Expect probes on the weak spots you just created. Ready answers:</p>
 <ol>
-<li><strong>Hot key:</strong> "Cache the celebrity's data aggressively and serve reads from replicas; if their writes are the problem, split their data with a compound key or pin them to a dedicated shard. And I'd monitor per-shard load."</li>
-<li><strong>Global query:</strong> "That would be scatter-gather, slow because the slowest of N shards sets the latency. I'll precompute it in the background and serve it from a cache; it tolerates a minute of staleness."</li>
-<li><strong>Cross-shard write:</strong> "Avoid 2PC; use a saga: debit locally with a transfer id, credit locally, refund on permanent failure. Steps are idempotent and the saga state is durable."</li>
+<li><strong>Hot key:</strong> "Cache the celebrity's data and serve reads from replicas; if writes are the problem, split with a compound key or pin to a dedicated shard. Monitor per-shard load."</li>
+<li><strong>Global query:</strong> "That's scatter-gather, where the slowest of N shards sets latency. Precompute it in the background and serve from cache; it tolerates a minute of staleness."</li>
+<li><strong>Cross-shard write:</strong> "Co-locate if possible; otherwise a saga, not 2PC: debit locally with a transfer id, credit locally, refund on permanent failure, with idempotent steps and durable saga state."</li>
 </ol>`,
         },
         {
           type: "callout",
           tone: "mistake",
-          html: `<p>Answering every cross-shard need with "use a distributed transaction". Interviewers usually want to hear that you would first co-locate data so the transaction is single-shard, and that you know why 2PC is slow and blocking before reaching for it.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "You sharded posts by user_id. Product wants a \"most liked posts this hour\" page on the home screen for every user. What is the best approach?",
-          options: [
-            "Query all shards on each page load and merge the top results",
-            "Have a stream processor aggregate like events into an hourly top list, store it in a cache, and serve it as one lookup",
-            "Re-shard posts by like count",
-            "Use two-phase commit to keep a global counter",
-          ],
-          answer: 1,
-          explain: "A home-screen query on every load must not fan out to every shard. The list tolerates being a minute stale, so computing it continuously from events and serving it from a cache turns a 64-shard query into a single key read. Re-sharding by a constantly changing value would be chaos.",
+          html: `<p>Answering every cross-shard need with "use a distributed transaction". Say you'd co-locate data first, and why 2PC is slow and blocking.</p>`,
         },
       ],
     },
   ],
   takeaways: [
-    "Sharding spreads data, not necessarily traffic: hot ranges come from monotonic keys, hot keys from celebrities and giant tenants.",
-    "Hot keys need caching, read replicas, compound keys that split one entity across shards, or dedicated shards; adding shards alone does nothing.",
-    "Queries without the shard key fan out to every shard, and the slowest shard sets the latency: 1% per-shard slowness becomes 63% at 100 shards.",
-    "Avoid fan-out on hot paths by precomputing global views, denormalizing onto the reader's shard, or keeping a secondary index or search engine sharded by the other key.",
-    "Two-phase commit is atomic but slow and blocking when the coordinator fails; most systems avoid it.",
-    "Sagas run local transactions with compensating actions; they need idempotent steps, durable state and explicit intermediate states. Best of all, choose shard boundaries that keep transactions on one shard.",
+    "Sharding spreads data, not necessarily traffic; hot keys need caching, replicas, compound keys or dedicated shards, since adding shards does nothing.",
+    "Queries without the shard key fan out, and the slowest shard sets latency: 1% per-shard slowness becomes 63% at 100 shards.",
+    "Keep fan-out off hot paths with precomputed views, denormalization, secondary indexes or a search engine; hedge what remains.",
+    "Two-phase commit is atomic but slow and blocking when the coordinator fails; choose shard boundaries that keep transactions on one shard.",
+    "Sagas run local transactions with compensations, and need idempotent steps, durable state and explicit intermediate states.",
   ],
   furtherReading: [
     { title: "The Tail at Scale (Dean and Barroso, Communications of the ACM, 2013)", url: "https://research.google/pubs/the-tail-at-scale/", note: "Why fan-out amplifies tail latency, and hedged requests." },

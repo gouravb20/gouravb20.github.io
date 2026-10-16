@@ -1,26 +1,16 @@
 // Deep dive: Chapter 4, Real-time push: polling, SSE, WebSockets, WebRTC. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch4 = {
-  hook: `<p>An online auction ends in ninety seconds. Bids are arriving every few hundred milliseconds, and each bidder's screen needs to show the current price right now, not five seconds ago, or people will bid against a price that no longer exists. Your API is classic request/response: the browser asks, the server answers. There is no way for the server to speak first.</p>
-<p>The obvious fix is to have every browser ask "anything new?" once a second. With 100,000 people watching, that is 100,000 requests per second hitting your servers, almost all of them answered with "no", and the price can still be a second stale. Getting updates <em>pushed</em> to clients is a ladder of techniques. Each rung buys lower latency or two-way traffic, and each one makes the server hold more state and makes the infrastructure in between work harder.</p>`,
+  hook: `<p>This chapter answers how a server gets updates to clients when HTTP only lets clients speak first. The techniques form a ladder: each rung buys lower latency or two-way traffic in exchange for more server state and harder infrastructure.</p>`,
   sections: [
     {
-      id: "why-push",
-      title: "Why request/response can't push, and what polling costs",
-      kicker: "The problem",
+      id: "polling",
+      title: "Polling and long polling",
+      kicker: "The first rungs",
       blocks: [
         {
-          type: "problem",
-          html: `<p>HTTP is client-initiated: a server can only send bytes as the answer to a request. Chat messages, notifications, live scores, prices, collaborative cursors and ride locations all originate on the server side at moments the client can't predict.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>The simplest workaround is <strong>polling</strong>: the client asks on a timer. It works through every proxy, firewall and load balancer, needs nothing special on the server, and is perfectly stateless. It also has two built-in costs that pull against each other:</p>
-<ul>
-<li><strong>Staleness.</strong> An update waits on average half the polling interval, and up to a full interval, before a client sees it.</li>
-<li><strong>Wasted requests.</strong> Shortening the interval to cut staleness multiplies empty responses. One million clients polling every 5 seconds is 200,000 requests per second, each with full HTTP headers, authentication and routing, mostly to say "nothing changed".</li>
-</ul>
-<p>For data that changes rarely or where seconds of delay don't matter (a notification badge, a build status page, an order tracker that updates every few minutes), polling is often the right answer precisely because it is so boring. For anything that needs sub-second freshness at scale, you need the server to speak when it has something to say.</p>`,
+          html: `<p><strong>Polling</strong> asks on a timer: stateless and works everywhere, but staleness (half an interval on average) trades against wasted requests. One million clients polling every 5 seconds is 200,000 requests per second, mostly saying "nothing changed". For rarely changing data, that boring answer is often right.</p>`,
         },
         {
           type: "diagram",
@@ -69,51 +59,15 @@ DEEP.ch4 = {
 </svg>`,
         },
         {
-          type: "quiz",
-          q: "500,000 clients poll a notification endpoint every 10 seconds, and on average a client has a new notification once an hour. Roughly what fraction of polls return nothing?",
-          options: ["About 50%", "About 90%", "More than 99%", "None; polling only returns when there is data"],
-          answer: 2,
-          explain: "Each client polls 360 times an hour and has news about once, so about 359 of every 360 polls are empty: over 99.7%. That is 50,000 requests per second of mostly wasted work, which is why rarely changing data either uses a long interval or a push mechanism.",
-        },
-      ],
-    },
-    {
-      id: "long-polling",
-      title: "Long polling: hold the request until there is news",
-      kicker: "The first rung",
-      blocks: [
-        {
           type: "text",
-          html: `<p><strong>Long polling</strong> keeps polling's request/response shape but changes when the server answers. The client sends a request; if there is nothing new, the server simply doesn't respond yet. It holds the request open until an event arrives or a timeout passes (commonly 20 to 60 seconds, chosen to stay under proxy and load balancer idle limits). Then it responds, and the client immediately sends the next request.</p>
-<p>Latency drops to nearly zero for the first event, and empty responses become rare: only the timeouts. It still runs over plain HTTP, so it passes through corporate proxies and needs no special load balancer support. Before WebSockets were standardized in 2011, this technique (popularized in the mid-2000s under the name Comet) was how most web chat and live feeds worked.</p>`,
+          html: `<p><strong>Long polling</strong> holds the request open until an event arrives or a timeout passes (commonly 20 to 60 seconds, under proxy idle limits), then the client immediately asks again. Delivery is near instant over plain HTTP.</p>`,
         },
         {
-          type: "steps",
-          title: "One long-poll cycle",
+          type: "keypoints",
           items: [
-            "Client sends <code>GET /updates?after=1041</code>, including the ID of the last event it has.",
-            "Server finds nothing newer and parks the request, keeping the connection open.",
-            "Event 1042 arrives. The server responds with it and closes the response.",
-            "Client processes it and immediately sends <code>GET /updates?after=1042</code>.",
-            "If the timeout passes first, the server returns an empty response and the client re-requests.",
-          ],
-        },
-        {
-          type: "text",
-          html: `<p>Two details make or break a long-polling design. First, the <strong>gap</strong>: between one response and the next request, events can arrive with no request waiting for them. The <code>after=</code> cursor solves this, because the server can answer the next request straight from a buffer of recent events. Without it, bursts of events get lost. Second, <strong>held requests are still open connections</strong>. Each waiting client ties up a connection and, on thread-per-request servers, a thread. Long polling scales well only on servers built around asynchronous I/O (Node.js, Netty, Go, nginx), where an idle request costs a few kilobytes rather than a thread stack.</p>`,
-        },
-        {
-          type: "tradeoffs",
-          pros: [
-            "Near-instant delivery with ordinary HTTP",
-            "Works through proxies and firewalls that block upgrades",
-            "Easy to fall back to; many real-time libraries use it as a fallback",
-          ],
-          cons: [
-            "A full HTTP request and response per event burst",
-            "Events can be lost in the gap unless the client sends a cursor",
-            "Holds an open connection per waiting client",
-            "Client-to-server messages still need separate requests",
+            "<strong>Send a cursor</strong> (<code>GET /updates?after=1042</code>): events that arrive between one response and the next request are served from a buffer instead of lost.",
+            "<strong>Each waiting client is an open connection.</strong> It scales only on async-I/O servers (Node.js, Netty, Go, nginx), where an idle request costs kilobytes, not a thread.",
+            "Still one full HTTP request per event burst, and client-to-server messages need separate requests. Many real-time libraries use it as a fallback.",
           ],
         },
       ],
@@ -125,7 +79,7 @@ DEEP.ch4 = {
       blocks: [
         {
           type: "idea",
-          html: `<p>Instead of ending the response after one event, keep it open and write each event as it happens. <strong>Server-Sent Events</strong> (SSE) standardize that: a long-lived HTTP response with type <code>text/event-stream</code>, made of small text records the browser's <code>EventSource</code> API hands to your code one at a time.</p>`,
+          html: `<p>Keep the response open and write each event as it happens. <strong>SSE</strong> standardizes this as a <code>text/event-stream</code> response that the browser's <code>EventSource</code> API delivers one event at a time.</p>`,
         },
         {
           type: "code",
@@ -147,29 +101,24 @@ data: {"lot": 17, "price_cents": 126000}
 `,
         },
         {
-          type: "text",
-          html: `<p>Each event is a few <code>field: value</code> lines followed by a blank line. <code>data</code> is the payload, <code>event</code> an optional type, <code>id</code> a position in the stream, and <code>retry</code> tells the browser how long to wait before reconnecting.</p>
-<h3>Reconnection is built in, which matters more than it looks</h3>
-<p>Long-lived responses get cut constantly: proxies enforce idle limits, load balancers close connections during deploys, phones change networks. <code>EventSource</code> reconnects automatically, and when it does it sends a <code>Last-Event-ID</code> header with the last <code>id</code> it saw. If the server keeps a short buffer of recent events (in memory, or in Redis Streams or Kafka), it can replay what the client missed and the client never notices the break. Without that buffer, every reconnect silently drops events.</p>`,
-        },
-        {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "LLM APIs", title: "Token streaming", html: "OpenAI's API streams generated tokens as server-sent events when a request sets <code>stream: true</code>, and many other model APIs do the same. SSE fits perfectly: one request, a one-way stream of small chunks, plain HTTP." },
-            { org: "Browsers", title: "The HTTP/1.1 connection limit", html: "Over HTTP/1.1, browsers allow about six connections per host, and each open SSE stream uses one, so a user with many tabs open can starve the page of connections. Over HTTP/2 the streams are multiplexed on one connection and the limit stops mattering." },
+            "<strong>Reconnection is built in:</strong> <code>EventSource</code> reconnects and sends <code>Last-Event-ID</code>. Keep a short replay buffer (memory, Redis Streams or Kafka) or every reconnect silently drops events.",
+            "Over HTTP/1.1 each stream uses one of about six connections per host; HTTP/2 multiplexes them and the limit stops mattering.",
+            "OpenAI's API streams tokens as SSE when <code>stream: true</code> is set: one request, a one-way stream of small chunks.",
           ],
         },
         {
           type: "compare",
           items: [
-            { title: "SSE fits", tone: "ok", html: "One-way server-to-client updates: live scores, notifications, dashboards, price tickers, progress bars, streamed AI responses. Client actions go through normal HTTP requests." },
-            { title: "SSE struggles", tone: "warn", html: "Frequent client-to-server messages (chat typing, game input), binary payloads (SSE is UTF-8 text), and environments where an intermediate proxy buffers responses instead of streaming them." },
+            { title: "SSE fits", tone: "ok", html: "One-way updates: live scores, notifications, dashboards, tickers, progress bars, streamed AI responses. Client actions go through normal HTTP requests." },
+            { title: "SSE struggles", tone: "warn", html: "Frequent client-to-server messages, binary payloads (SSE is UTF-8 text), and proxies that buffer responses instead of streaming them." },
           ],
         },
         {
           type: "callout",
           tone: "warning",
-          html: `<p>A buffering proxy or a compression middleware that waits for a full response will hold SSE events back until the buffer fills, so the "real-time" stream arrives in clumps. Disable response buffering on that route (for example nginx's <code>X-Accel-Buffering: no</code> header) and test through the real network path, not just locally.</p>`,
+          html: `<p>A buffering proxy or compression middleware holds SSE events until its buffer fills, so the stream arrives in clumps. Disable buffering on that route (for example nginx's <code>X-Accel-Buffering: no</code>) and test through the real network path.</p>`,
         },
       ],
     },
@@ -180,19 +129,17 @@ data: {"lot": 17, "price_cents": 126000}
       blocks: [
         {
           type: "text",
-          html: `<p>A <strong>WebSocket</strong> (RFC 6455, 2011) starts life as an ordinary HTTP request carrying <code>Upgrade: websocket</code>. If the server agrees, it answers <code>101 Switching Protocols</code>, and from then on the same TCP connection carries WebSocket <strong>frames</strong> in both directions, whenever either side likes, with only a few bytes of framing overhead per message. No headers per message, no request/response pairing.</p>
-<p>The protocol only moves frames; you design the messages on top. A common pattern is JSON objects with a <code>type</code> field (<code>{"type": "message.send", "chatId": 9, "text": "hi"}</code> up, <code>{"type": "message.new", ...}</code> down), plus client-generated IDs so acknowledgements and retries can be matched, and sequence numbers so a reconnecting client can ask for what it missed.</p>`,
+          html: `<p>A <strong>WebSocket</strong> (RFC 6455, 2011) starts as an HTTP request with <code>Upgrade: websocket</code>; after <code>101 Switching Protocols</code> the TCP connection carries small frames both ways. You design the messages: typically JSON with a <code>type</code>, client-generated IDs for acks and retries, and sequence numbers for catch-up.</p>`,
         },
         {
-          type: "text",
-          html: `<h3>Why WebSockets are harder to operate than HTTP</h3>
-<p>Every connected user is now an open connection pinned to one specific server, for minutes or hours. That one fact ripples through the design:</p>
-<ul>
-<li><strong>Load balancing</strong> happens once per connection, not per message, so an algorithm like least connections matters, and a server added during the day stays nearly empty until clients reconnect.</li>
-<li><strong>Every hop must support it.</strong> Load balancers, proxies and gateways must allow the upgrade and long-lived connections, and their idle timeouts (AWS Application Load Balancers default to 60 seconds) force you to send application-level heartbeats.</li>
-<li><strong>Deploys</strong> must drain connections gradually, and clients must reconnect with randomized backoff, or every restart triggers a reconnect stampede.</li>
-<li><strong>Routing messages</strong> between users becomes a distributed problem, because the sender and the recipient are usually connected to different servers.</li>
-</ul>`,
+          type: "list",
+          title: "Why it is harder to operate: each user is a connection pinned to one server",
+          items: [
+            "<strong>Load balancing</strong> happens once per connection, so use least connections; a server added mid-day stays nearly empty until clients reconnect.",
+            "<strong>Every hop</strong> must allow the upgrade and long-lived connections; idle timeouts (AWS ALB defaults to 60 s) force heartbeats.",
+            "<strong>Deploys</strong> must drain gradually and clients must reconnect with randomized backoff, or restarts cause reconnect stampedes.",
+            "<strong>Routing</strong> between users is distributed: sender and recipient are usually on different servers.",
+          ],
         },
         {
           type: "diagram",
@@ -224,35 +171,27 @@ data: {"lot": 17, "price_cents": 126000}
         },
         {
           type: "text",
-          html: `<p>The alternative to broadcast-style pub/sub is a <strong>connection registry</strong>: a fast store (often Redis) mapping each user ID to the server holding their socket, so server 1 can forward the message straight to server 2. Pub/sub is simpler to build; a registry avoids every server receiving traffic for users it doesn't hold. Either way, messages must also be written to durable storage, because the recipient may be offline and the push is only a notification that something is there.</p>`,
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "Slack", title: "Real-time messaging", html: "Slack clients keep a WebSocket open to receive messages and events as they happen, and Slack's Socket Mode lets apps receive events over a WebSocket instead of exposing a public HTTP endpoint." },
-            { org: "Figma", title: "Multiplayer editing", html: "Figma has described its multiplayer system as clients holding WebSocket connections to a server that is the authority for each document, rather than peers syncing directly with each other." },
-          ],
+          html: `<p>The alternative to pub/sub is a <strong>connection registry</strong> (often Redis) mapping user ID to server, so messages go straight to the right server. Pub/sub is simpler; a registry avoids servers receiving traffic for users they don't hold. Either way, persist the message first: the push is only a notification.</p>`,
         },
       ],
     },
     {
       id: "webrtc",
-      title: "WebRTC: peer to peer, through the NAT maze",
+      title: "WebRTC: peer to peer, through NAT",
       kicker: "Direct connections",
       blocks: [
         {
-          type: "problem",
-          html: `<p>For a video call, routing every frame through your servers doubles the path length and costs a fortune in bandwidth. Two browsers talking directly would be ideal, but most devices sit behind NAT routers and firewalls that drop unsolicited inbound connections, so neither side can simply connect to the other's address.</p>`,
+          type: "text",
+          html: `<p><strong>WebRTC</strong> sends audio, video and data directly between browsers, mostly over UDP, so call media doesn't cross your servers. Most devices sit behind NATs that drop unsolicited inbound traffic, so connecting takes supporting infrastructure.</p>`,
         },
         {
-          type: "text",
-          html: `<p><strong>WebRTC</strong> is a set of browser APIs and protocols for direct peer-to-peer audio, video and data, mostly over UDP. Getting two peers connected takes several supporting pieces:</p>
-<ul>
-<li>A <strong>signaling server</strong> that you build, usually over WebSockets. Peers use it to find each other and exchange session descriptions (which codecs, which media) and network candidates (addresses where they might be reachable). WebRTC deliberately doesn't specify how signaling works.</li>
-<li>A <strong>STUN</strong> server answers one question: "what public address and port do you see my packets coming from?" Each peer learns its public-facing address and shares it through signaling. Both then send packets toward each other at the same time, which opens matching holes in most NATs (<strong>hole punching</strong>).</li>
-<li>A <strong>TURN</strong> server is the fallback when no direct path works, for example behind strict corporate firewalls or symmetric NATs. Both peers send their media to the TURN relay, which forwards it. It always works, and it costs you the bandwidth of every relayed call.</li>
-</ul>
-<p>The process of gathering candidates (local, STUN-discovered, TURN relay) and testing them to find the best working pair is called <strong>ICE</strong>.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Signaling</strong> (you build it, usually over WebSockets): peers exchange session descriptions and network candidates.",
+            "<strong>STUN</strong> tells a peer its public address and port; both peers then send toward each other to open NAT holes (hole punching).",
+            "<strong>TURN</strong> relays media when no direct path works (strict firewalls, symmetric NATs). Always works, and you pay for the bandwidth.",
+            "<strong>ICE</strong> gathers candidates (local, STUN, TURN) and picks the best working pair.",
+          ],
         },
         {
           type: "tradeoffs",
@@ -262,15 +201,10 @@ data: {"lot": 17, "price_cents": 126000}
             "Built into every major browser, with encryption required",
           ],
           cons: [
-            "Needs signaling, STUN and TURN infrastructure before anything works",
-            "TURN relays carry the full media stream for calls that can't connect directly",
-            "Full-mesh calls don't scale: each peer uploads a stream to every other peer, so group calls use a media server (SFU) instead",
+            "Needs signaling, STUN and TURN before anything works",
+            "Full-mesh group calls don't scale, so they use a media server (SFU)",
+            "Collaborative editors usually still pick a central WebSocket server for storage, ordering, permissions and late joiners",
           ],
-        },
-        {
-          type: "callout",
-          tone: "insight",
-          html: `<p>Collaborative editors are a tempting WebRTC use case, and most production editors still choose a central server over WebSockets. The server stores the document, orders or merges concurrent edits, enforces permissions and lets late joiners load the latest state. Peer-to-peer editing with CRDTs is possible, but you still need a server for persistence and discovery, so the direct connection buys little.</p>`,
         },
         {
           type: "quiz",
@@ -289,11 +223,11 @@ data: {"lot": 17, "price_cents": 126000}
     {
       id: "choosing",
       title: "Choosing the right rung",
-      kicker: "Trade-offs",
+      kicker: "Trade-offs and interview angle",
       blocks: [
         {
           type: "text",
-          html: `<p>Climb only as high as the requirements force you. Each technique up the ladder holds more state on the server for longer and asks more of every proxy, load balancer and deployment process on the path.</p>`,
+          html: `<p>Climb only as high as the requirements force you. Each rung holds more server state for longer and asks more of every proxy, load balancer and deploy on the path.</p>`,
         },
         {
           type: "table",
@@ -312,52 +246,20 @@ data: {"lot": 17, "price_cents": 126000}
           caption: "Set the number of clients, how often events happen and whether clients send messages back. Compare the requests per second, staleness and open connections each technique costs the server.",
         },
         {
-          type: "keypoints",
-          items: [
-            "Updates a few times a day: polling with a long interval, or a push notification service for mobile.",
-            "One-way live updates: SSE (or long polling if the network path forces it).",
-            "Frequent messages in both directions: WebSockets, with heartbeats, reconnect backoff and a fan-out layer.",
-            "Audio, video or peer data where milliseconds matter: WebRTC, with TURN as the safety net.",
-          ],
-        },
-        {
-          type: "quiz",
-          q: "A notification badge updates a few times a day per user. Which approach is the most sensible default?",
-          options: [
-            "WebSockets for every user",
-            "WebRTC data channels",
-            "Polling on a long interval or on page focus, or SSE if an open stream already exists",
-            "Long polling with a 1-second timeout",
-          ],
-          answer: 2,
-          explain: "A handful of updates a day doesn't justify holding a persistent connection per user. Polling every minute or when the tab regains focus is cheap and stateless; if the app already keeps an SSE stream or WebSocket open for other reasons, piggyback on it.",
-        },
-      ],
-    },
-    {
-      id: "interview",
-      title: "Using it in a design interview",
-      kicker: "Interview angle",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>Real-time requirements show up in chat, notifications, live comments, ride tracking, auctions, collaborative editing and dashboards. Pick the lowest rung that satisfies them, justify it in a sentence, then spend your time on the hard part: how a message produced on one server reaches a client connected to another, and what happens when connections drop.</p>`,
-        },
-        {
           type: "callout",
           tone: "interview",
-          html: `<p>For a "2 million WebSocket connections across 50 servers" style question, cover:</p>
+          html: `<p>Pick the lowest rung, justify it in a sentence, then spend time on fan-out and recovery. For "2 million WebSocket connections across 50 servers", cover:</p>
 <ol>
-<li>Clients connect through an L4 or upgrade-aware L7 load balancer using least connections; each server holds about 40,000 sockets.</li>
-<li>Persist the message first, then route it: pub/sub channels per user or a registry of which server holds which user.</li>
-<li>Offline or disconnected recipients catch up from storage using a last-seen sequence number.</li>
-<li>Heartbeats to survive idle timeouts; deploys drain gradually; clients reconnect with jittered backoff.</li>
+<li>An L4 or upgrade-aware L7 load balancer using least connections; about 40,000 sockets per server.</li>
+<li>Persist the message first, then route it: per-user pub/sub channels or a registry of which server holds which user.</li>
+<li>Disconnected recipients catch up from storage using a last-seen sequence number.</li>
+<li>Heartbeats for idle timeouts; gradual draining on deploys; jittered reconnect backoff.</li>
 </ol>`,
         },
         {
           type: "callout",
           tone: "mistake",
-          html: `<p>Reaching for WebSockets by reflex. If the client only listens, SSE gives you push over plain HTTP with built-in reconnection and replay. Say why you need two-way traffic before you take on WebSocket infrastructure.</p>`,
+          html: `<p>Reaching for WebSockets by reflex. If the client only listens, SSE gives push over plain HTTP with built-in reconnection and replay.</p>`,
         },
         {
           type: "quiz",
@@ -375,12 +277,11 @@ data: {"lot": 17, "price_cents": 126000}
     },
   ],
   takeaways: [
-    "HTTP can't push. Polling is simple and stateless but trades staleness against huge numbers of empty requests.",
-    "Long polling holds each request until there is news; send a cursor with each request so events in the gap between polls aren't lost.",
-    "SSE streams many events in one HTTP response and reconnects automatically with Last-Event-ID; keep a replay buffer on the server.",
-    "WebSockets give a persistent two-way channel, at the cost of per-server connection state, upgrade-aware infrastructure, heartbeats, draining and cross-server message routing.",
-    "WebRTC connects peers directly over UDP using signaling, STUN for public addresses and TURN relays when no direct path exists.",
-    "Choose the lowest rung that meets the requirement; the hard design work is fan-out across servers and recovery after disconnects.",
+    "HTTP can't push. Polling is simple and stateless but trades staleness against huge numbers of empty requests; long polling needs a cursor so gap events aren't lost.",
+    "SSE streams many events in one HTTP response and reconnects with Last-Event-ID; keep a replay buffer on the server.",
+    "WebSockets give a two-way channel at the cost of per-server connection state, heartbeats, draining and cross-server routing.",
+    "WebRTC connects peers directly using signaling, STUN for public addresses and TURN relays when no direct path exists.",
+    "Choose the lowest rung that meets the requirement; the hard work is fan-out across servers and recovery after disconnects.",
   ],
   furtherReading: [
     { title: "RFC 6455: The WebSocket Protocol", url: "https://www.rfc-editor.org/rfc/rfc6455", note: "The upgrade handshake and frame format." },

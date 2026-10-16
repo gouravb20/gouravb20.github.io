@@ -1,18 +1,16 @@
 // Deep dive: Chapter 3, HTTP and API styles: REST, GraphQL, gRPC. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch3 = {
-  hook: `<p>A mobile team ships a new home screen. It shows twenty friends, each with a name, an avatar and the groups they belong to. Against your existing REST API that is one call for the friend list, then a profile call and a groups call for every friend: 41 requests, each paying a round trip over a congested cellular link. The screen takes three seconds to fill in.</p>
-<p>The backend team's quick fix is a single <code>/home</code> endpoint that returns everything about each friend. Now the screen loads in one request, but that response is 400 KB, most of it fields the screen never shows, and every other screen wants its own special endpoint too. Meanwhile, the same backend's internal services are passing large JSON documents to each other thousands of times a second and burning CPU on parsing them.</p>
-<p>These are three different problems with three different tools. HTTP is the common ground under all of them; REST, GraphQL and gRPC are three ways of shaping APIs on top of it, each built to fix a particular pain.</p>`,
+  hook: `<p>This chapter covers the HTTP basics every API relies on and when to shape an API as REST, GraphQL or gRPC. Each style fixes a specific pain: predictable public endpoints, under- and over-fetching, or costly internal calls.</p>`,
   sections: [
     {
-      id: "http-anatomy",
-      title: "HTTP: the request/response protocol under almost everything",
+      id: "http-basics",
+      title: "HTTP: methods, status codes and statelessness",
       kicker: "The foundation",
       blocks: [
         {
           type: "text",
-          html: `<p>HTTP is simple enough to read by eye. A client sends a <strong>method</strong> (what to do), a <strong>path</strong> (to what), <strong>headers</strong> (metadata) and optionally a <strong>body</strong>. The server answers with a <strong>status code</strong>, headers and optionally a body. In HTTP/1.1 this is literally text on a TCP connection; HTTP/2 and HTTP/3 encode the same fields in binary frames, but the meaning is identical, which is why APIs rarely care which version carries them.</p>`,
+          html: `<p>A request is a <strong>method</strong>, a <strong>path</strong>, <strong>headers</strong> and an optional <strong>body</strong>; a response is a <strong>status code</strong>, headers and an optional body. HTTP/2 and HTTP/3 encode the same fields in binary frames, so APIs rarely care which version carries them.</p>`,
         },
         {
           type: "code",
@@ -33,33 +31,6 @@ ETag: "v7"
 {"id": 42, "status": "shipped", "total_cents": 2599}`,
         },
         {
-          type: "text",
-          html: `<h3>Statelessness is the feature that makes it scale</h3>
-<p>Each HTTP request is meant to carry everything the server needs to handle it: who the caller is (a token or cookie), what they want, and any input. The server keeps no memory of earlier requests. That sounds like a limitation, and it is the main reason HTTP services scale so easily: any server behind the load balancer can handle any request, servers can be added or killed at will, and a crashed server loses nothing a retry can't recover.</p>
-<p>Real applications obviously have sessions and shopping carts. Statelessness just means that state lives somewhere shared, such as a signed token the client presents, a database, or a cache like Redis, rather than in the memory of whichever server handled the last request.</p>
-<h3>HTTPS</h3>
-<p>HTTPS is HTTP inside a TLS session: the bytes are encrypted, tampering is detected, and the server proves its identity with a certificate. It protects data in transit and nothing else. It does not authenticate the user, validate input, or make the API safe to call with any parameters a client chooses to send.</p>`,
-        },
-        {
-          type: "keypoints",
-          items: [
-            "Request: method, path, headers, optional body. Response: status, headers, optional body.",
-            "Stateless servers let any instance serve any request; shared state goes to tokens, databases or caches.",
-            "HTTPS secures the channel, not the semantics: you still need authentication and authorization.",
-          ],
-        },
-      ],
-    },
-    {
-      id: "methods-status-headers",
-      title: "Methods, status codes and headers that carry meaning",
-      kicker: "The vocabulary",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>HTTP's methods are not decoration. Proxies, caches, browsers and client libraries make decisions based on them. A <code>GET</code> may be cached, prefetched or retried automatically; a <code>POST</code> generally will not be. Using the wrong method breaks those assumptions in ways that are hard to debug.</p>`,
-        },
-        {
           type: "table",
           headers: ["Method", "Typical use", "Safe (no side effects)", "Idempotent"],
           rows: [
@@ -72,28 +43,18 @@ ETag: "v7"
           note: "Idempotent: repeating the request leaves the server in the same state as sending it once. It decides what a client may retry blindly after a timeout.",
         },
         {
-          type: "text",
-          html: `<h3>Status codes are a contract with the caller</h3>
-<p>The first digit tells the client what kind of thing happened: <strong>2xx</strong> success, <strong>3xx</strong> look elsewhere (or use your cached copy, for 304), <strong>4xx</strong> the caller did something wrong and repeating it unchanged won't help, <strong>5xx</strong> the server failed and a retry might work. Client libraries, retry policies, monitoring dashboards and load balancers all key off that split. Returning <code>200</code> with <code>{"error": ...}</code> in the body hides failures from all of them.</p>
-<h3>Headers and content negotiation</h3>
-<p>Headers are an open-ended metadata channel: authentication, caching (<code>Cache-Control</code>, <code>ETag</code>), content type, tracing IDs. <strong>Content negotiation</strong> is a nice example of designing for change. The client lists what it can handle (<code>Accept-Encoding: gzip, br</code>) and the server picks the best option it also supports and says which (<code>Content-Encoding: br</code>). Old clients that only know gzip keep working; newer ones get Brotli. The same pattern, where the client declares its capabilities and the server falls back gracefully, works for API versions and optional features.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Stateless:</strong> each request carries everything needed (token, input), so any server can handle any request. Shared state lives in signed tokens, databases or caches.",
+            "<strong>Status codes are a contract:</strong> 2xx success, 3xx look elsewhere (304: use your cache), 4xx caller error (don't repeat unchanged), 5xx server error (retry may work). <code>200</code> with an error body hides failures from clients, retries and monitoring.",
+            "<strong>Content negotiation</strong> (<code>Accept-Encoding</code> / <code>Content-Encoding</code>) lets old and new clients coexist; the same pattern works for versions and optional features.",
+            "<strong>HTTPS</strong> secures the channel only. It does not authenticate users or validate input.",
+          ],
         },
         {
           type: "callout",
           tone: "warning",
-          html: `<p><strong>Never trust the request body for identity.</strong> A client can send any <code>userId</code> it likes. If <code>GET /orders?userId=42</code> returns user 42's orders to whoever asks, any logged-in user can read anyone's orders by changing a number. Identity comes from verified credentials (a validated token or session); the server then checks that this caller may access this specific resource. OWASP ranks this flaw, broken object-level authorization, as the top API security risk.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "A client sends PUT /users/42/email with {\"email\": \"a@b.com\"}, the connection drops before the response, and the client retries. Is that safe?",
-          options: [
-            "No, PUT is never safe to retry",
-            "Yes, setting a field to a fixed value has the same result however many times it runs",
-            "Only if the server returns 201",
-            "Only over HTTP/2",
-          ],
-          answer: 1,
-          explain: "PUT replaces state with a given value, so applying it twice leaves the same state as once: it is idempotent. Compare POST /users/42/emails, which might add a second email address on retry, or a PATCH that says \"increment the counter\".",
+          html: `<p><strong>Never trust the request for identity.</strong> If <code>GET /orders?userId=42</code> returns user 42's orders to whoever asks, any user can read anyone's orders. Derive identity from a verified token, then check access to this specific resource. OWASP ranks this flaw, broken object-level authorization, as the top API security risk.</p>`,
         },
       ],
     },
@@ -104,7 +65,7 @@ ETag: "v7"
       blocks: [
         {
           type: "idea",
-          html: `<p>Describe the system as <strong>resources</strong> (nouns) with addresses, and use the standard HTTP methods to read and change them. The API becomes predictable: once you know <code>/orders</code>, you can guess how to list, fetch, create and cancel orders.</p>`,
+          html: `<p>Expose <strong>resources</strong> (nouns) and let standard HTTP methods carry the verb. Once you know <code>/orders</code>, you can guess how to list, fetch, create and cancel orders.</p>`,
         },
         {
           type: "code",
@@ -118,41 +79,33 @@ GET    /orders/{id}/items               items that belong to an order
 POST   /orders/{id}/refunds             create a refund for an order`,
         },
         {
-          type: "text",
-          html: `<p>Actions such as "cancel" or "refund" are the part people find awkward. There are two standard moves. Either express the action as a <strong>state change</strong> on the resource (<code>PATCH /orders/42</code> with <code>{"status": "cancelled"}</code>), or turn the action into a <strong>resource of its own</strong> that you create (<code>POST /orders/42/refunds</code>). The second works well when the action has its own data and lifecycle: a refund has an amount, a status and an ID you may want to fetch later.</p>
-<p>REST's big practical advantage is that it fits HTTP's infrastructure. <code>GET</code> responses can be cached by browsers and CDNs with plain <code>Cache-Control</code> headers, and an <code>ETag</code> lets a client ask "has this changed?" and get a tiny <code>304 Not Modified</code> instead of the whole body. Every language has an HTTP client, every engineer can test an endpoint with <code>curl</code>, and every proxy and gateway understands the traffic.</p>`,
-        },
-        {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "Stripe", title: "A widely copied REST API", html: "Stripe models payments as resources such as customers, payment intents and refunds, uses standard verbs, and accepts an <code>Idempotency-Key</code> header so clients can retry POST requests safely." },
-            { org: "GitHub", title: "REST and GraphQL side by side", html: "GitHub offers a REST API (<code>/repos/{owner}/{repo}/issues</code> and friends) and also a GraphQL API, letting integrators choose predictable endpoints or precise queries." },
+            "<strong>Actions</strong> become a state change (<code>PATCH /orders/42</code> with <code>{\"status\": \"cancelled\"}</code>) or a resource of their own when they have data and a lifecycle (<code>POST /orders/42/refunds</code>).",
+            "<strong>It fits HTTP infrastructure:</strong> GETs cache in browsers and CDNs via <code>Cache-Control</code>; an <code>ETag</code> turns \"has this changed?\" into a tiny <code>304</code>. Every language, proxy and <code>curl</code> understands it.",
+            "Stripe models payments as resources and accepts an <code>Idempotency-Key</code> header so clients can retry POSTs safely.",
           ],
         },
         {
           type: "callout",
           tone: "mistake",
-          html: `<p>RPC disguised as REST: <code>POST /getUser</code>, <code>POST /updateUserEmail</code>, <code>GET /deleteOrder?id=7</code>. Verbs in paths, reads that can't be cached, and a GET that deletes data (a link prefetcher or crawler could trigger it). Name resources, let the method carry the verb.</p>`,
+          html: `<p>RPC disguised as REST: <code>POST /getUser</code>, <code>GET /deleteOrder?id=7</code>. Verbs in paths, reads that can't be cached, and a GET that deletes data (a prefetcher or crawler could trigger it).</p>`,
         },
       ],
     },
     {
-      id: "fetching-and-graphql",
+      id: "graphql",
       title: "Under-fetching, over-fetching and GraphQL",
       kicker: "When REST strains",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Fine-grained REST resources make a screen that shows related data pay for many round trips (<strong>under-fetching</strong>). A coarse endpoint that returns everything costs bytes and server work for fields nobody displays (<strong>over-fetching</strong>), and a custom endpoint per screen multiplies backend work every time a client changes.</p>`,
-        },
-        {
           type: "text",
-          html: `<p><strong>GraphQL</strong>, developed at Facebook for its mobile apps and open-sourced in 2015, attacks this by letting the client describe the exact shape of the data it wants. There is one endpoint and a typed <strong>schema</strong> listing every type and field. A query names the fields and nested relations it needs, and the response has exactly that shape.</p>`,
+          html: `<p>Fine-grained resources make a screen pay many round trips (<strong>under-fetching</strong>); a kitchen-sink endpoint ships fields nobody shows (<strong>over-fetching</strong>). <strong>GraphQL</strong> (Facebook, open-sourced 2015) lets the client ask for exactly the shape it needs from one endpoint backed by a typed schema.</p>`,
         },
         {
           type: "code",
           lang: "graphql",
-          title: "The home screen from the opening, in one request",
+          title: "A friends screen in one request",
           code: `query HomeScreen {
   me {
     friends(first: 20) {
@@ -165,7 +118,7 @@ POST   /orders/{id}/refunds             create a refund for an order`,
         },
         {
           type: "text",
-          html: `<p>On the server, each field has a <strong>resolver</strong>, a function that knows how to fetch that field. This is where the cost moves. A naive implementation resolves the 20 friends with one query, then calls the <code>groups</code> resolver once per friend: 21 database queries for one request, the <strong>N+1 problem</strong>. The standard fix is batching: a loader (Facebook's DataLoader pattern) collects all the friend IDs requested in one tick and fetches their groups in a single query.</p>`,
+          html: `<p>Each field has a <strong>resolver</strong>. Naively, the <code>groups</code> resolver runs once per friend: 21 queries for one request, the <strong>N+1 problem</strong>. A DataLoader-style batch collects the IDs in one tick and fetches them in a single query.</p>`,
         },
         {
           type: "lab",
@@ -180,42 +133,29 @@ POST   /orders/{id}/refunds             create a refund for an order`,
             "One round trip per screen, with exactly the needed fields",
             "Clients change what they fetch without backend changes",
             "A typed schema that doubles as documentation",
-            "One API shared by many teams and client types",
           ],
           cons: [
             "Resolvers cause N+1 queries unless you batch",
             "Arbitrary queries can be very expensive; you need depth and cost limits or persisted queries",
             "HTTP caching is harder: queries are usually POSTs to one URL",
-            "Authorization must be enforced per field and per object, not per endpoint",
+            "Authorization must be enforced per field and per object",
           ],
         },
         {
           type: "callout",
           tone: "tip",
-          html: `<p>A lighter alternative is a <strong>backend for frontend</strong> (BFF): a thin server per client type (iOS, web) that calls the fine-grained services and returns exactly what that client's screens need. It fixes under- and over-fetching without a new query language, at the cost of another service to own.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "A GraphQL query asks for 50 posts and each post's author. The database log shows 51 queries per request. What is happening and what is the fix?",
-          options: [
-            "The schema is too big; split it into several endpoints",
-            "The author resolver runs once per post (N+1); batch author lookups into one query",
-            "GraphQL always needs one query per object; add a cache",
-            "The client is over-fetching; remove the author field",
-          ],
-          answer: 1,
-          explain: "One query loads the posts and the author resolver then fires once per post. Collecting the 50 author IDs and loading them in one query (a DataLoader-style batch) brings it down to two queries without changing the API.",
+          html: `<p>A lighter alternative is a <strong>backend for frontend</strong> (BFF): a thin server per client type that calls fine-grained services and returns exactly what its screens need. No new query language, but another service to own.</p>`,
         },
       ],
     },
     {
       id: "grpc",
-      title: "gRPC and Protocol Buffers: typed, compact service calls",
+      title: "gRPC and Protocol Buffers",
       kicker: "Inside the backend",
       blocks: [
         {
           type: "text",
-          html: `<p>Between your own services, the flexibility of JSON is mostly overhead. Every message repeats every field name as text, numbers are written as decimal strings, and both sides parse strings into objects and back. At tens of thousands of calls per second that becomes real CPU and bandwidth. <strong>gRPC</strong>, open-sourced by Google in 2015 and based on its internal RPC system, takes a different approach: define the API in a schema, generate the code, and send compact binary messages.</p>`,
+          html: `<p>Between your own services, JSON's repeated field names and text parsing are overhead at tens of thousands of calls per second. <strong>gRPC</strong> (Google, open-sourced 2015) defines the API in a schema, generates typed code and sends compact binary Protocol Buffers over HTTP/2.</p>`,
         },
         {
           type: "code",
@@ -231,10 +171,6 @@ message User {
   string name   = 2;
   string email  = 3;
 }`,
-        },
-        {
-          type: "text",
-          html: `<p>The numbers after each field are the key to the encoding. On the wire, Protocol Buffers never send the name <code>email</code>; they send a small <strong>tag</strong> combining the field number and a wire type, then the value. Integers use variable-length encoding, so small numbers take one or two bytes. Both sides know the schema, so the receiver maps field 3 back to <code>email</code>. Unknown field numbers are skipped, which is how old and new versions of a service can talk to each other as long as nobody reuses a number.</p>`,
         },
         {
           type: "diagram",
@@ -319,31 +255,29 @@ message User {
 </svg>`,
         },
         {
+          type: "keypoints",
+          items: [
+            "<strong>Field numbers, not names, go on the wire</strong>, with varint integers. Unknown numbers are skipped, so old and new versions interoperate as long as nobody reuses a number.",
+            "<strong>Generated stubs</strong> in many languages: a renamed field is a compile error, not an incident.",
+            "<strong>Deadlines</strong> propagate across calls, and four call shapes (unary, server, client and bidirectional streaming) share long-lived HTTP/2 connections.",
+            "<strong>Browsers</strong> can't speak it directly: use gRPC-Web through a proxy such as Envoy, or REST at the edge.",
+          ],
+        },
+        {
           type: "lab",
           id: "protobufSize",
           caption: "Edit the user record and compare the real JSON and protobuf encodings byte for byte. Try a large id, an empty string and a long list of tags.",
-        },
-        {
-          type: "text",
-          html: `<p>The encoding is only part of the appeal. gRPC also brings generated, typed client and server stubs in many languages, so a renamed field is a compile error instead of a production incident; <strong>deadlines</strong> that propagate across calls, so a downstream service knows when the caller has already given up; and four call shapes: unary, server streaming, client streaming and bidirectional streaming, all multiplexed over long-lived HTTP/2 connections.</p>`,
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "etcd and Kubernetes", title: "gRPC as the cluster's backbone", html: "The etcd v3 API, which stores Kubernetes cluster state, is a gRPC API, and many cloud-native components talk to each other over gRPC." },
-            { org: "Browsers", title: "The gap", html: "Browsers don't expose the HTTP/2 control gRPC needs, so web clients use gRPC-Web through a translating proxy such as Envoy, or the team exposes REST at the edge instead." },
-          ],
         },
       ],
     },
     {
       id: "choosing",
-      title: "Choosing a style: REST outside, gRPC inside",
+      title: "Choosing a style",
       kicker: "Putting it together",
       blocks: [
         {
           type: "text",
-          html: `<p>A pattern you will see in many companies: public clients you don't control (browsers, mobile apps, partners) talk REST with JSON, or GraphQL when the client landscape is varied, through an API gateway. Behind the gateway, internal services call each other over gRPC. Each choice is made where its strengths matter most: universal reach at the edge, efficiency and strict contracts on the heavily used internal paths.</p>`,
+          html: `<p>A common split: REST (or GraphQL for varied clients) at the edge through a gateway, gRPC between internal services. Starting with REST everywhere is also perfectly reasonable.</p>`,
         },
         {
           type: "diagram",
@@ -390,47 +324,31 @@ message User {
         {
           type: "callout",
           tone: "insight",
-          html: `<p>Serialization is rarely the first bottleneck. A request that waits 30 ms on a database and 80 ms on a cross-region call will not be noticeably faster because its 2 KB JSON body became 600 bytes of protobuf. Switch formats when profiles show encoding or bandwidth costs that matter, typically on very hot internal paths, not by default.</p>`,
-        },
-        {
-          type: "quiz",
-          q: "You are designing the public API for a third-party developer platform. Which choice is easiest to defend?",
-          options: [
-            "gRPC, because it is fastest",
-            "REST with JSON, because any developer can call it from any language and test it with curl",
-            "GraphQL, because it is newest",
-            "A custom binary protocol over TCP",
-          ],
-          answer: 1,
-          explain: "For external developers, reach and ease of use dominate: REST works from browsers, scripts and every HTTP client, is easy to debug and cache. gRPC's speed matters less than the friction of binary tooling and browser limits for people you don't control.",
-        },
-      ],
-    },
-    {
-      id: "interview",
-      title: "Using it in a design interview",
-      kicker: "Interview angle",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>Pick REST for the client-facing API unless the prompt gives you a reason not to, say why in a sentence, and move on. Interviewers mainly want a clean, consistent set of endpoints that satisfies the requirements; the next chapters go deeper on designing them. Raise GraphQL or gRPC only when a requirement points there.</p>`,
+          html: `<p>Serialization is rarely the first bottleneck. A request waiting 30 ms on a database and 80 ms on a cross-region call won't get noticeably faster because 2 KB of JSON became 600 bytes of protobuf. Switch formats when profiles show it matters.</p>`,
         },
         {
           type: "callout",
           tone: "interview",
-          html: `<p>Signals that land well:</p>
+          html: `<p>Pick REST for the client-facing API unless a requirement says otherwise. A strong answer covers:</p>
 <ol>
 <li>Resources as nouns, verbs from HTTP methods, identity from the auth token, never from the body.</li>
-<li>Know which methods are idempotent and make retried creates safe with an idempotency key.</li>
-<li>Use correct status codes so clients and infrastructure can react (429 means back off, 5xx may be retried).</li>
-<li>Mention GraphQL when many different clients need different slices of data, and name its costs: N+1 and query limits.</li>
-<li>Mention gRPC for hot internal paths: schema, compact binary encoding, HTTP/2, deadlines.</li>
+<li>Which methods are idempotent, and an idempotency key for retried creates.</li>
+<li>Correct status codes so clients and infrastructure can react (429 means back off, 5xx may be retried).</li>
+<li>GraphQL when many clients need different slices of data, with its costs: N+1 and query limits.</li>
+<li>gRPC for hot internal paths: schema, binary encoding, HTTP/2, deadlines.</li>
 </ol>`,
         },
         {
-          type: "callout",
-          tone: "mistake",
-          html: `<p>Spending five minutes arguing protobuf versus JSON. Unless the prompt is about extreme throughput between services, the interviewer would rather hear about your data model and bottlenecks.</p>`,
+          type: "quiz",
+          q: "A GraphQL query asks for 50 posts and each post's author. The database log shows 51 queries per request. What is happening and what is the fix?",
+          options: [
+            "The schema is too big; split it into several endpoints",
+            "The author resolver runs once per post (N+1); batch author lookups into one query",
+            "GraphQL always needs one query per object; add a cache",
+            "The client is over-fetching; remove the author field",
+          ],
+          answer: 1,
+          explain: "One query loads the posts and the author resolver then fires once per post. Collecting the 50 author IDs and loading them in one query (a DataLoader-style batch) brings it down to two queries without changing the API.",
         },
         {
           type: "quiz",
@@ -448,12 +366,11 @@ message User {
     },
   ],
   takeaways: [
-    "HTTP is a stateless request/response protocol; statelessness lets any server handle any request, with shared state kept in tokens, databases or caches.",
-    "Methods and status codes are contracts that caches, clients and retry logic rely on: GET is safe, PUT and DELETE are idempotent, POST is not.",
-    "Identity always comes from verified credentials, never from IDs in the body or query; check access per resource.",
+    "HTTP is stateless request/response; methods and status codes are contracts that caches, clients and retries rely on (GET safe, PUT and DELETE idempotent, POST not).",
+    "Identity comes from verified credentials, never from IDs in the request; check access per resource.",
     "REST models resources with standard verbs and fits HTTP caching and tooling: the default for public APIs.",
-    "GraphQL fixes under- and over-fetching with client-shaped queries, but moves cost to the server: N+1 resolvers, query limits, per-field authorization.",
-    "gRPC sends compact Protocol Buffers over HTTP/2 with generated typed stubs, deadlines and streaming; it is a strong fit for internal service calls, less so for browsers.",
+    "GraphQL fixes under- and over-fetching but moves cost to the server: N+1 resolvers, query limits, per-field authorization.",
+    "gRPC sends compact Protocol Buffers over HTTP/2 with typed stubs, deadlines and streaming: a strong fit for internal calls, less so for browsers.",
   ],
   furtherReading: [
     { title: "RFC 9110: HTTP Semantics", url: "https://www.rfc-editor.org/rfc/rfc9110", note: "The definitions of methods, safety, idempotency and status codes." },

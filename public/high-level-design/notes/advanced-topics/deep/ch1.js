@@ -1,8 +1,7 @@
 // Deep dive: Chapter 1, Why a B-tree can't find nearby points, and spatial trees. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch1 = {
-  hook: `<p>A rider in Manhattan taps "Request". Somewhere in your database sit the live positions of every driver in the city, and you need the ten closest ones inside 2 km, in under a hundred milliseconds. The table already has an index on <code>latitude</code>, so the query looks easy: <code>WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?</code>.</p>
-<p>It returns the right answer and it is slow. The plan shows the database reading every driver in a 4 km tall band that runs from New Jersey to Long Island, and, on a real planet-wide table, all the way around the Earth. The index did exactly what B-trees do: it sorted by one number. Nearness on a map needs two numbers at once, and that mismatch is what this chapter is about.</p>`,
+  hook: `<p>This chapter explains why a B-tree can't answer "what is near this point" efficiently, and how spatial trees (quadtrees, k-d and BKD trees, R-trees) do it. Proximity search shows up in ride hailing, delivery, store locators and dating apps.</p>`,
   sections: [
     {
       id: "one-dimension",
@@ -10,13 +9,8 @@ DEEP.ch1 = {
       kicker: "The problem",
       blocks: [
         {
-          type: "problem",
-          html: `<p>A proximity query asks for everything within some distance of a point, or the k nearest things to it. The key you search by is a <em>location</em>, not an ID or a value, and a location has two coordinates. A B-tree, the index behind almost every database, keeps its keys in a single sorted line.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>Index the <code>latitude</code> column and ask for drivers within 2 km. The best the B-tree can do is seek to <code>lat - 0.018</code> and scan to <code>lat + 0.018</code> (a degree of latitude is about 111 km). That range is a horizontal band 4 km tall, and it says nothing about longitude: a driver 50 km to the east sits right next to your rider in the index.</p>
-<p>The waste is easy to put a number on. The circle you want has area &pi; &times; 2<sup>2</sup> &asymp; <strong>12.6 km&sup2;</strong>. Across a 100 km wide metro area the band covers 4 &times; 100 = <strong>400 km&sup2;</strong>, about 32 times more. On a global table the band wraps the planet: at 40&deg; latitude that is roughly 4 &times; 30,700 = 123,000 km&sup2;, nearly <strong>10,000 times</strong> the circle.</p>`,
+          html: `<p>A B-tree keeps keys in one sorted line, but a location has two coordinates. An index on <code>latitude</code> can only return a band: for a 2 km radius, a 4 km tall strip (a degree of latitude is about 111 km). The circle is &pi; &times; 2<sup>2</sup> &asymp; <strong>12.6 km&sup2;</strong>; across a 100 km metro the band is <strong>400 km&sup2;</strong>, about 32 times more, and on a global table nearly <strong>10,000 times</strong>.</p>`,
         },
         {
           type: "diagram",
@@ -55,10 +49,11 @@ DEEP.ch1 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<h3>"Just add longitude to the index"</h3>
-<p>A composite index on <code>(lat, lng)</code> feels like the fix, and it is the most common wrong answer in interviews. A composite B-tree sorts by latitude first and uses longitude only to break ties. Latitudes are almost never equal, so within the band the entries are effectively in latitude order with longitudes scattered. The database still seeks to the start of the band and walks to its end; it can check longitude <em>inside the index</em> to skip table lookups, but it cannot skip the entries themselves.</p>
-<p>Two separate indexes do no better. The planner either picks one strip, or builds bitmaps of both strips (a band and a column) and intersects them, which means reading both strips in full to produce a small square.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>A composite <code>(lat, lng)</code> index</strong> is the most common wrong answer: latitude defines the scan; longitude can filter entries inside the index but can't shrink the walk.",
+            "<strong>Two separate indexes</strong> are no better: the planner picks one strip, or reads both strips in full to intersect them.",
+          ],
         },
         {
           type: "lab",
@@ -81,59 +76,45 @@ DEEP.ch1 = {
     },
     {
       id: "candidates",
-      title: "Every spatial index generates candidates; exact distance picks winners",
+      title: "Indexes generate candidates; exact distance picks winners",
       kicker: "The key idea",
       blocks: [
         {
           type: "idea",
-          html: `<p>A spatial index does not answer "what is within 2 km". It answers a cheaper question, "what is in these few cells or rectangles", and the cells are chosen so that they <strong>cover</strong> the search circle. A final exact distance check removes the candidates that sit in a cell's corners outside the radius.</p>`,
+          html: `<p>A spatial index answers a cheaper question, "what is in these few cells or rectangles", chosen to <strong>cover</strong> the search circle. An exact distance check then drops candidates in the corners. The index keeps candidates few; the filter keeps results correct.</p>`,
         },
         {
           type: "text",
-          html: `<p>Thinking in candidates makes every structure in this part of the book look like the same machine with different gears. The index's job is to keep the candidate set small and to fetch it with few reads. The filter's job is to be correct.</p>
-<p>The correct filter is great-circle distance, because degrees are not kilometres. A degree of latitude is always about 111 km, but a degree of longitude is 111.32 &times; cos(latitude) km: about 111 km at the equator, 84 km in New York and only 56 km in Oslo. The haversine formula handles this on a sphere of radius R &asymp; 6,371 km:</p>
+          html: `<p>Degrees aren't kilometres: a degree of longitude is 111.32 &times; cos(latitude) km (about 84 km in New York, 56 km in Oslo). Use great-circle distance, e.g. haversine with R &asymp; 6,371 km (PostGIS's <code>ST_DWithin</code> and <code>ST_Distance</code> on <code>geography</code> work in metres):</p>
 <p><span class="formula">d = 2R &middot; asin( &radic;( sin&sup2;(&Delta;&phi;/2) + cos &phi;<sub>1</sub> &middot; cos &phi;<sub>2</sub> &middot; sin&sup2;(&Delta;&lambda;/2) ) )</span></p>
-<p>where &phi; is latitude and &lambda; is longitude, in radians. Databases wrap the same maths: PostGIS's <code>ST_DWithin</code> and <code>ST_Distance</code> on the <code>geography</code> type work in metres on the spheroid.</p>`,
-        },
-        {
-          type: "text",
-          html: `<h3>How many candidates are false?</h3>
-<p>If the cells around the query form a square that just encloses a circle of radius r, the square's area is 4r&sup2; and the circle's is &pi;r&sup2;. With evenly spread points, about &pi;/4 &asymp; <strong>79%</strong> of the candidates are real hits and 21% are corners to discard. Real covers are coarser (a few cells, not one perfect square), so ratios of 30 to 60% hits are normal. That is fine: computing a few hundred haversines takes microseconds. What matters is that the index did not hand you 400 km&sup2; of drivers.</p>`,
+<p>A square just enclosing the circle yields &pi;/4 &asymp; <strong>79%</strong> real hits; real covers are coarser, so 30 to 60% is normal. A few hundred haversines take microseconds.</p>`,
         },
         {
           type: "compare",
           title: "Two families of spatial index",
           items: [
-            { title: "Spatial trees", tone: "info", html: "Custom index structures that understand two dimensions: <strong>quadtrees</strong>, <strong>k-d and BKD trees</strong>, <strong>R-trees</strong>. They index shapes as well as points and live in PostGIS, SQLite, Oracle Spatial and Lucene." },
-            { title: "Encoded keys", tone: "ok", html: "Flatten a location into one sortable value or cell ID (<strong>geohash</strong>, <strong>S2</strong>, <strong>H3</strong>) so an ordinary B-tree, sorted set or key-value store can index it. Cheap writes; mostly points. Covered in the next chapter." },
+            { title: "Spatial trees", tone: "info", html: "Structures that understand two dimensions: <strong>quadtrees</strong>, <strong>k-d and BKD trees</strong>, <strong>R-trees</strong>. Index shapes as well as points; live in PostGIS, SQLite, Oracle Spatial and Lucene." },
+            { title: "Encoded keys", tone: "ok", html: "Flatten a location into one sortable value or cell ID (<strong>geohash</strong>, <strong>S2</strong>, <strong>H3</strong>) for an ordinary B-tree, sorted set or key-value store. Cheap writes, mostly points. Next chapter." },
           ],
-        },
-        {
-          type: "callout",
-          tone: "tip",
-          html: `<p>Whatever index you name in a design, finish the sentence with "...and then I post-filter by exact distance and sort." It shows you know the index is an approximation, and it is the step people forget when they draw the query path.</p>`,
         },
       ],
     },
     {
-      id: "quadtrees",
-      title: "Quadtrees: cells that split where the data is dense",
+      id: "quadtrees-and-kd",
+      title: "Quadtrees, k-d trees and BKD trees",
       kicker: "Spatial trees",
       blocks: [
         {
           type: "text",
-          html: `<p>A quadtree starts with the whole map as one square. When a square holds more points than a chosen <strong>leaf capacity</strong>, say 100, it splits into four equal quadrants (north-west, north-east, south-west, south-east) and its points move down into them. Any quadrant that overflows splits again. Points live only in the leaves.</p>
-<p>The result adapts to density on its own. A downtown with thousands of drivers turns into a deep stack of tiny squares; farmland stays one large square near the root. Every leaf ends up holding at most 100 points regardless of how much area it covers.</p>`,
+          html: `<p>A <strong>quadtree</strong> splits any square holding more than a leaf capacity (say 100 points) into four quadrants at the midpoint. Dense downtowns become deep stacks of tiny squares; farmland stays one square.</p>`,
         },
         {
           type: "steps",
           title: "Answering \"everything within r of point q\"",
           items: [
-            "Start at the root square.",
-            "For each child square, test whether it intersects the circle of radius r around q. Skip any that don't.",
-            "Recurse into the children that do intersect, until you reach leaves.",
-            "Collect the points in every intersecting leaf. This includes leaves on the far side of a boundary, so a driver just across a cell edge is not missed.",
-            "Compute exact distance for each candidate, drop those beyond r, sort and return.",
+            "Start at the root; skip child squares that don't intersect the circle.",
+            "Recurse into those that do, down to leaves, including leaves across boundaries.",
+            "Exact-distance filter the collected points, sort and return.",
           ],
         },
         {
@@ -203,74 +184,29 @@ DEEP.ch1 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<h3>Where quadtrees struggle</h3>
-<p>Splits always fall at the geometric midpoint, not where the data is. A cluster sitting near a split line drags the tree many levels deep before its points separate, while a rural query finishes after two levels. Query cost therefore depends on <em>where</em> you search. With a leaf capacity of 100, a million evenly spread points need about log<sub>4</sub>(10,000) &asymp; 7 levels, but a dense city core can need twice that.</p>
-<p>The bigger problem is storage. A quadtree is a pointer structure: each step from parent to child is a jump to an arbitrary memory address. In RAM that costs nanoseconds. On disk each hop can be a random page read, and a tree that is deep in exactly the places people search is a poor fit for a database page cache.</p>`,
-        },
-        {
           type: "lab",
           id: "quadtree",
           caption: "Drop points and watch squares split once they exceed the leaf capacity. Run a radius query and count how few squares it descends into compared with the total.",
         },
         {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "Game engines", title: "Collision detection", html: "Physics and rendering code rebuilds quadtrees (or 3D octrees) in memory every frame or so, so each object only tests collisions against objects in nearby cells instead of every other object." },
-            { org: "Bing Maps", title: "Quadkeys", html: "Map tiles are addressed with quadkeys: each digit (0 to 3) picks one quadrant of the parent tile, so a tile's key is its path down a quadtree and shares a prefix with its parent." },
-          ],
-        },
-      ],
-    },
-    {
-      id: "kd-and-bkd",
-      title: "k-d trees and BKD trees: split the points, not the area",
-      kicker: "Spatial trees",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>A <strong>k-d tree</strong> fixes the quadtree's lopsided depth by splitting at the <em>median point</em> instead of the midpoint, and by splitting in two rather than four. The root divides all points by x at the median x value; each child divides its half by y at its own median y; the next level goes back to x, and so on.</p>
-<p>Because every split halves the number of points, the depth is about log<sub>2</sub>(n) no matter how clustered the data is: 20 levels for a million points, 30 for a billion. That predictability also makes k-d trees good at <strong>nearest-neighbour</strong> search. You descend to the leaf containing the query, then back up and only explore the other side of a split if the split line is closer than the best match found so far.</p>`,
-        },
-        {
-          type: "text",
-          html: `<p>The weakness is the same as the quadtree's: a k-d tree is a chain of pointers, and the medians are computed from the data you have. Inserting many new points unbalances it, and the usual fix is to rebuild. That makes a classic k-d tree great for in-memory nearest-neighbour search over a fixed dataset and awkward as a database index.</p>
-<h3>The BKD tree: a k-d tree packed into disk blocks</h3>
-<p>A <strong>block k-d tree</strong> (BKD) keeps the median-splitting idea but stops splitting once a cell holds a page's worth of points, often around a thousand. Leaves are dense, contiguous blocks; the inner nodes are small enough to keep in memory. A query walks the in-memory inner tree, then reads only the few leaf blocks whose bounding boxes touch the search area.</p>
-<p>It is built once, from a batch, and never modified. That suits engines whose storage is already immutable, which is exactly the Lucene model.</p>`,
-        },
-        {
-          type: "realworld",
-          items: [
-            { org: "Apache Lucene", title: "Point fields", html: "Since Lucene 6, numeric and geo point fields are indexed with BKD trees, one per immutable segment. Range and bounding-box queries read only the leaf blocks that intersect the query." },
-            { org: "Elasticsearch / OpenSearch", title: "geo_point", html: "Both inherit Lucene's BKD trees for <code>geo_point</code> fields, which is why a <code>geo_distance</code> filter combines cheaply with full-text and attribute filters in one query." },
+            "<strong>Quadtree weaknesses:</strong> midpoint splits make depth depend on clustering (about 7 levels for a million even points at capacity 100, twice that in a dense core), and pointer hops become random disk reads. Great in memory (game engines; Bing Maps quadkeys address tiles).",
+            "<strong>k-d tree:</strong> splits two ways at the <em>median</em>, alternating axes, so depth is about log<sub>2</sub>(n) (20 levels for a million) whatever the clustering, and nearest-neighbour search backtracks only across close split lines. Many inserts unbalance it, so it suits fixed in-memory data.",
+            "<strong>BKD tree:</strong> a k-d tree whose leaves are page-sized blocks (around a thousand points) with a small in-memory inner tree. Built once per immutable segment, it backs Lucene point fields (since Lucene 6) and Elasticsearch <code>geo_point</code>.",
           ],
         },
         {
           type: "tradeoffs",
           title: "BKD trees for geo search",
           pros: [
-            "Balanced depth regardless of clustering, with page-sized leaves that suit disk",
-            "Compact and very fast for reads",
+            "Balanced depth with page-sized leaves that suit disk; compact, fast reads",
             "Composes with text and attribute filters in search engines",
           ],
           cons: [
-            "Write-once: new points go into new segments, which are merged later",
-            "Updates only become searchable after a refresh, typically about a second in Elasticsearch",
-            "A driver moving every 4 seconds becomes a delete plus an insert each time, creating constant merge work",
+            "Write-once: new points go into new segments, merged later; visible only after a refresh (about a second in Elasticsearch)",
+            "A driver moving every 4 seconds becomes a delete plus an insert each time: constant merge work",
           ],
-        },
-        {
-          type: "quiz",
-          q: "Why does a k-d tree have predictable depth when a quadtree doesn't?",
-          options: [
-            "It splits four ways instead of two",
-            "It splits at the median point, so each level halves the number of points regardless of where they cluster",
-            "It only stores points in its inner nodes",
-            "It uses a hash of the coordinates to choose a child",
-          ],
-          answer: 1,
-          explain: "Median splits divide the points, not the area, so depth is about log2(n). Quadtrees split at the geometric midpoint, so a tight cluster can force many levels before its points separate.",
         },
       ],
     },
@@ -280,13 +216,8 @@ DEEP.ch1 = {
       kicker: "Spatial trees",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Points are the easy case. "Which delivery zone contains this address?", "Does this new road cross a flood plain?" and "Which geofences does this phone sit inside?" all involve <em>shapes</em> with area and extent. A quadtree or k-d tree splits space through the middle of such shapes; you need an index whose entries can be shapes themselves.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>An <strong>R-tree</strong>, introduced by Antonin Guttman in 1984, wraps every object in its <strong>minimum bounding rectangle</strong> (MBR): the smallest axis-aligned box that contains it. Nearby MBRs are grouped under a parent rectangle that encloses all of them, those parents are grouped again, and so on up to a root. Like a B-tree, every node is one disk page holding many entries, and the tree stays balanced: all leaves are at the same depth.</p>
-<p>A query walks down every branch whose rectangle intersects the search area. At the leaves it tests the cheap rectangle first and runs the expensive exact geometry test (point-in-polygon, line intersection) only on the survivors. The same candidates-then-filter pattern again, now with shapes.</p>`,
+          html: `<p>"Which delivery zone contains this address?" needs an index whose entries are shapes. An <strong>R-tree</strong> (Guttman, 1984) wraps each object in its <strong>minimum bounding rectangle</strong>, groups nearby rectangles under parents, and keeps the tree balanced with one page per node, like a B-tree. Queries test cheap rectangles first and exact geometry only on survivors.</p>`,
         },
         {
           type: "diagram",
@@ -338,10 +269,12 @@ DEEP.ch1 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<h3>Overlap is the performance knob</h3>
-<p>Unlike quadtree cells, sibling rectangles in an R-tree may overlap. A query that lands in an overlap must descend into every overlapping branch, so heavy overlap turns a single root-to-leaf walk into several. How the tree chooses where to insert a new object and how it splits a full node decide how much overlap builds up.</p>
-<p>The <strong>R*-tree</strong> (Beckmann, Kriegel, Schneider and Seeger, 1990) improved those choices: it considers overlap and rectangle perimeter when inserting and splitting, and occasionally removes and reinserts entries to tidy the tree. Most production R-trees are R*-tree variants or close relatives. For static data, <em>bulk loading</em> (sorting the objects first and packing pages full) gives tighter rectangles than inserting one at a time.</p>`,
+          type: "keypoints",
+          items: [
+            "<strong>Overlap is the performance knob:</strong> a query in an overlap descends every overlapping branch.",
+            "The <strong>R*-tree</strong> (1990) weighs overlap and perimeter when inserting and splitting, and reinserts entries to tidy; most production R-trees are variants. <strong>Bulk loading</strong> sorted data packs tighter rectangles.",
+            "PostGIS builds it on GiST (<code>USING GIST (geom)</code>); SQLite has an R*Tree module for the candidate step.",
+          ],
         },
         {
           type: "table",
@@ -355,13 +288,6 @@ DEEP.ch1 = {
           ],
           note: "All four produce candidates; the exact distance or geometry test comes last.",
         },
-        {
-          type: "realworld",
-          items: [
-            { org: "PostGIS", title: "GiST indexes", html: "<code>CREATE INDEX ... USING GIST (geom)</code> builds an R-tree-style index on top of PostgreSQL's Generalized Search Tree framework. <code>ST_DWithin</code> and <code>ST_Intersects</code> use it to find candidates before running exact geometry." },
-            { org: "SQLite", title: "R*Tree module", html: "A built-in virtual table type that stores bounding boxes in an R*-tree. Applications store the exact geometry elsewhere and use the module for the candidate step." },
-          ],
-        },
       ],
     },
     {
@@ -370,35 +296,31 @@ DEEP.ch1 = {
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>Proximity search shows up in ride hailing, food delivery, "restaurants near me", dating apps and store locators. The interviewer is usually checking three things: that you know a plain B-tree will not do, that you can match the index to the <strong>shape of the data and the write rate</strong>, and that you remember the exact filter at the end.</p>`,
-        },
-        {
           type: "list",
-          title: "Pick by data shape",
+          title: "Pick by data shape and write rate",
           items: [
-            "Polygons, routes, zones, containment or intersection: a spatial tree, usually PostGIS with a GiST index.",
-            "Mostly static places plus text and attribute filters (Yelp-style search): Elasticsearch or OpenSearch with a <code>geo_point</code> field, backed by BKD trees.",
-            "Points that move every few seconds (drivers, couriers, devices): encoded cells such as geohash, S2 or H3 on an ordinary index or in Redis, covered next chapter.",
-            "A small, static dataset that fits in application memory: a quadtree or k-d tree is perfectly fine.",
+            "Polygons, routes, zones, containment: a spatial tree, usually PostGIS with GiST.",
+            "Mostly static places plus text and attribute filters: Elasticsearch or OpenSearch <code>geo_point</code> (BKD).",
+            "Points that move every few seconds: encoded cells (geohash, S2, H3) on an ordinary index or in Redis.",
+            "A small static dataset in application memory: a quadtree or k-d tree.",
           ],
         },
         {
           type: "callout",
           tone: "interview",
-          html: `<p>A strong answer to "how would you find nearby X?" covers four points:</p>
+          html: `<p>A strong answer to "how would you find nearby X?" covers:</p>
 <ol>
-<li>Why not a B-tree on latitude or on <code>(lat, lng)</code>: one-dimensional order returns a band, not a neighbourhood.</li>
-<li>The data shape and write rate decide the family: spatial trees for shapes and fairly static data, encoded cells for fast-moving points.</li>
-<li>The index returns candidates from cells or rectangles that cover the circle, including neighbouring cells so boundaries don't hide results.</li>
-<li>Exact haversine distance (or <code>ST_DWithin</code>) removes false candidates, then sort and limit.</li>
-</ol>
-<p>If time allows, explain why Elasticsearch is a good fit for restaurants and a poor fit for live driver positions: segments are write-once and changes appear only after a refresh.</p>`,
+<li>Why not a B-tree on latitude or <code>(lat, lng)</code>: one-dimensional order returns a band.</li>
+<li>Data shape and write rate decide the family: spatial trees for shapes and fairly static data, encoded cells for moving points.</li>
+<li>Candidates come from cells or rectangles covering the circle, including neighbours so boundaries don't hide results.</li>
+<li>Exact haversine (or <code>ST_DWithin</code>) filters, then sort and limit.</li>
+<li>Elasticsearch fits restaurants but not live drivers: write-once segments and refresh delay.</li>
+</ol>`,
         },
         {
           type: "code",
           lang: "sql",
-          title: "A PostGIS radius query, nearest first",
+          title: "A PostGIS radius query, nearest first (ST_MakePoint takes longitude first)",
           code: `CREATE INDEX restaurants_geom ON restaurants USING GIST (geom);
 
 SELECT id, name,
@@ -407,7 +329,6 @@ FROM restaurants
 WHERE ST_DWithin(geom, ST_MakePoint(-73.9857, 40.7484)::geography, 2000)
 ORDER BY meters
 LIMIT 20;`,
-          caption: "ST_DWithin uses the GiST index to fetch candidates; ST_Distance and the ORDER BY are the exact filter and sort. Note ST_MakePoint takes longitude first.",
         },
         {
           type: "quiz",
@@ -425,12 +346,11 @@ LIMIT 20;`,
     },
   ],
   takeaways: [
-    "A B-tree sorts on one dimension, so an index on latitude, or on <code>(lat, lng)</code>, turns a radius query into a band across the whole map.",
-    "Every spatial index only produces <strong>candidates</strong> from cells or rectangles that cover the search area; exact great-circle distance or geometry picks the real answers.",
-    "Quadtrees split at midpoints and adapt to density, but depth varies with clustering and pointer chasing hurts on disk; they shine in memory.",
-    "k-d trees split at medians for depth of about log<sub>2</sub> n; BKD trees pack them into disk blocks and power Lucene and Elasticsearch geo search, at the cost of write-once segments.",
-    "R-trees index bounding rectangles of any shape, stay balanced on disk, and are the default for polygons and containment (PostGIS, SQLite); overlap between rectangles is what slows them.",
-    "Choose by data shape and write rate: spatial trees for shapes and fairly static data, encoded cells for points that move constantly.",
+    "A B-tree sorts on one dimension, so an index on latitude or <code>(lat, lng)</code> turns a radius query into a band across the map.",
+    "Spatial indexes only produce <strong>candidates</strong> from cells or rectangles covering the area; exact great-circle distance or geometry picks the answers.",
+    "Quadtrees adapt to density but vary in depth and suit memory; k-d trees split at medians for log<sub>2</sub> n depth; BKD trees pack them into disk blocks for Lucene, at the cost of write-once segments.",
+    "R-trees index bounding rectangles of any shape, stay balanced on disk and are the default for polygons (PostGIS, SQLite); overlap slows them.",
+    "Choose by data shape and write rate: spatial trees for shapes and static data, encoded cells for constantly moving points.",
   ],
   furtherReading: [
     { title: "R-trees: A Dynamic Index Structure for Spatial Searching (Guttman, SIGMOD 1984)", note: "The original R-tree paper: bounding rectangles, insertion and node splitting." },

@@ -1,22 +1,16 @@
 // Deep dive: Chapter 16, Consistent hashing. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch16 = {
-  hook: `<p>Your cache tier has four servers and a simple rule: a key lives on server <code>hash(key) % 4</code>. Traffic grows, so on a busy Monday you add a fifth. The rule becomes <code>hash(key) % 5</code>, and in that instant roughly <strong>four out of every five keys</strong> now map to a different server. Almost every lookup misses, every miss falls through to the database, and the database that the cache was protecting falls over.</p>
-<p>Nothing was broken. The cache did exactly what it was told. The problem is the rule: it ties every key's home to the total number of servers, so changing the count reshuffles nearly everything. Consistent hashing is the fix, and the reason it shows up in almost every distributed cache, key-value store and load balancer you will be asked to design.</p>`,
+  hook: `<p>This chapter explains why <code>hash(key) % N</code> breaks when servers are added or lost, and how consistent hashing limits each change to about one server's share of keys. It underlies most distributed caches, key-value stores and sharded storage layers.</p>`,
   sections: [
     {
       id: "why-modulo-breaks",
-      title: "Why hash mod N falls apart when the cluster changes",
+      title: "Why hash mod N falls apart",
       kicker: "The problem",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Hashing a key and taking it modulo the number of servers spreads keys evenly, which is why it is the first thing everyone reaches for. But servers are not fixed: they crash, get replaced, and get added when load grows. Each change alters <code>N</code>, and with it the answer for almost every key.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>A key stays put only if <code>h % N</code> happens to equal <code>h % (N+1)</code>. For random hashes that is true for only about <strong>1 in N+1</strong> keys. Going from 4 to 5 servers moves about 80% of the keys; going from 99 to 100 moves about 99%. The bigger your cluster, the worse a single change gets.</p>
-<p>For a cache, every moved key is a miss. For a database or a storage system, every moved key is data that must be copied across the network before the new layout is usable. Either way, the cost of a routine operation (add one machine) scales with the <em>whole dataset</em> instead of with the one machine you touched.</p>`,
+          html: `<p>Modulo placement is even, but every key's home depends on the server count. A key stays put only if <code>h % N</code> equals <code>h % (N+1)</code>, true for about <strong>1 in N+1</strong> keys. Going from 4 to 5 servers moves about 80% of keys; 99 to 100 moves about 99%. For a cache every moved key is a miss that hits the database; for storage it is data to copy.</p>`,
         },
         {
           type: "lab",
@@ -24,28 +18,20 @@ DEEP.ch16 = {
           caption: "Change the cluster by one node and compare how many of the 10,000 keys move under modulo hashing, a plain ring and a ring with virtual nodes.",
         },
         {
-          type: "keypoints",
-          items: [
-            "Modulo placement is even, but it makes each key's home depend on the total server count.",
-            "Changing N by one moves about N/(N+1) of all keys: nearly everything.",
-            "What we want instead: a change to one server should only move the keys that server owned or will own, about 1/N of the data.",
-          ],
+          type: "callout",
+          tone: "insight",
+          html: `<p>The goal: changing one server should move only the keys that server owned or will own, about 1/N of the data.</p>`,
         },
       ],
     },
     {
       id: "the-ring",
-      title: "The ring: placing servers and keys in the same space",
+      title: "The ring",
       kicker: "The key idea",
       blocks: [
         {
           type: "idea",
-          html: `<p>Hash <strong>servers and keys onto the same circle</strong> of hash values. A key belongs to the first server you meet walking clockwise from the key's position. Adding or removing a server only changes ownership of the arc next to it.</p>`,
-        },
-        {
-          type: "text",
-          html: `<p>Take the output range of a hash function, say 0 to 2<sup>32</sup>&minus;1, and bend it into a circle so the largest value wraps back to 0. Hash each server's name (or IP) to get its position on the circle. Hash each key the same way. To find a key's server, start at the key's position and walk clockwise until you hit a server.</p>
-<p>Notice what is <em>not</em> in that rule: the number of servers. A key's owner depends only on where the nearest server sits, so the rest of the ring does not care how many servers exist.</p>`,
+          html: `<p>Hash <strong>servers and keys onto the same circle</strong> (say 0 to 2<sup>32</sup>&minus;1, wrapped). A key belongs to the first server clockwise from it. The server count isn't in the rule, so a change only affects the arc next to it.</p>`,
         },
         {
           type: "diagram",
@@ -82,17 +68,13 @@ DEEP.ch16 = {
         },
         {
           type: "steps",
-          title: "Adding a server, step by step",
+          title: "Adding a server",
           items: [
-            "The new server E hashes to a point between C and D.",
-            "Keys between C and E used to walk on to D. Now they reach E first, so they move to E.",
-            "Every other key still meets the same server it met before. Nothing else moves.",
-            "On average E takes over about 1/(N+1) of the keys, all of them from a single neighbour.",
+            "New server E hashes to a point between C and D.",
+            "Keys between C and E used to walk on to D; now they reach E first and move.",
+            "Every other key meets the same server as before.",
+            "E takes about 1/(N+1) of the keys, all from one neighbour. Removal is the mirror image: its keys walk on to the next server.",
           ],
-        },
-        {
-          type: "text",
-          html: `<p>Removing a server is the mirror image: its keys walk on to the next server clockwise, and no other key changes owner. That is the whole trick, and it is why the change in cost goes from "the whole dataset" to "one server's share".</p>`,
         },
         {
           type: "quiz",
@@ -105,18 +87,12 @@ DEEP.ch16 = {
     },
     {
       id: "virtual-nodes",
-      title: "Virtual nodes: fixing the uneven arcs",
+      title: "Virtual nodes and replication",
       kicker: "Making it balanced",
       blocks: [
         {
-          type: "problem",
-          html: `<p>With one position per server, the arcs are whatever the hash function happens to produce. With four servers, one can easily own twice the ring of another. And when a server dies, its <em>entire</em> load lands on one neighbour, which may then be overloaded too.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>The fix is to give every physical server many positions on the ring, called <strong>virtual nodes</strong> (vnodes) or tokens. Hash <code>"A#0"</code>, <code>"A#1"</code>, ... <code>"A#99"</code> and place all of them. Each physical server now owns many small arcs scattered around the circle instead of one big one.</p>
-<p>Two good things happen. First, the law of large numbers evens out the load: the more arcs each server owns, the closer its total share gets to the average. Second, when a server leaves, its many small arcs are inherited by many different neighbours, so the extra load is spread across the whole cluster instead of dumped on one machine. Joining works the same way in reverse: a new server takes small slices from everyone.</p>
-<p>Vnodes also let you handle mixed hardware. Give a machine with twice the memory twice as many virtual nodes and it will own about twice the keys.</p>`,
+          html: `<p>With one position per server, arcs are uneven (one server can own twice another's share) and a failed server dumps its whole load on one neighbour. <strong>Virtual nodes</strong> give each server many positions (<code>"A#0"</code> ... <code>"A#99"</code>), so it owns many small arcs scattered around the ring.</p>`,
         },
         {
           type: "lab",
@@ -126,75 +102,47 @@ DEEP.ch16 = {
         {
           type: "tradeoffs",
           pros: [
-            "Much more even load per server",
-            "A failed server's load spreads over all survivors",
+            "Much more even load per server (law of large numbers)",
+            "A failed server's load spreads over all survivors; a new one takes small slices from everyone",
             "Weighting is easy: more vnodes for bigger machines",
           ],
           cons: [
-            "The routing table is bigger (servers &times; vnodes entries) and lookups binary-search it",
-            "Rebalancing streams small pieces from many servers, so there are more transfers to coordinate",
-            "Placing replicas gets fiddlier: the next few positions may belong to the same physical server and must be skipped",
+            "A bigger routing table (servers &times; vnodes), binary-searched per lookup",
+            "Rebalancing streams small pieces from many servers",
+            "Replica placement must skip positions owned by a physical server already chosen",
           ],
         },
         {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "Amazon Dynamo", title: "The 2007 paper", html: "Dynamo placed nodes on a ring with multiple virtual nodes each, and replicated every key to the next distinct nodes clockwise. It became the template for later leaderless stores." },
-            { org: "Apache Cassandra", title: "Tokens per node", html: "Each node owns <code>num_tokens</code> positions on the ring. Cassandra 4.0 lowered the default from 256 to 16 and added a token-allocation algorithm that keeps the load balanced with fewer tokens." },
-            { org: "Memcached clients", title: "Ketama", html: "Memcached servers don't talk to each other, so the client library picks the server. The ketama algorithm (from Last.fm) made consistent hashing the standard way to do that, so adding a cache box doesn't wipe the whole cache." },
+            "<strong>Replication:</strong> store each key on its owner and the next R&minus;1 <em>distinct physical</em> servers clockwise; when the owner fails, the next already has a copy.",
+            "Amazon's Dynamo (2007) used a ring with virtual nodes and this replication. Cassandra 4.0 lowered default <code>num_tokens</code> from 256 to 16 with a balancing allocation algorithm. Memcached clients use ketama, since servers don't talk to each other.",
           ],
         },
       ],
     },
     {
-      id: "hot-keys",
-      title: "What consistent hashing does not fix: hot keys",
-      kicker: "Limits",
+      id: "limits-and-alternatives",
+      title: "Hot keys, and fixed hash slots",
+      kicker: "Limits and alternatives",
       blocks: [
         {
           type: "text",
-          html: `<p>Consistent hashing balances <strong>keys</strong>, not <strong>requests</strong>. If one celebrity's profile or one viral video gets a million reads a second, every one of those reads goes to the single server that owns that key, no matter how evenly the other keys are spread. Adding servers does not help, because the hot key still has exactly one home.</p>
-<p>Hot keys need a different tool: replicate the key to several servers and read from any of them, add a small in-process cache in front of the shared cache, or split the key (for example <code>video:42#0</code> to <code>video:42#7</code>) and have readers pick a suffix at random.</p>`,
-        },
-        {
-          type: "callout",
-          tone: "mistake",
-          html: `<p>"We'll use consistent hashing so no server gets overloaded." It spreads <em>data</em> evenly; it does nothing about a skewed <em>access pattern</em>. Say that distinction out loud in an interview and then name the hot-key mitigation you would use.</p>`,
-        },
-        {
-          type: "text",
-          html: `<h3>Replication on the ring</h3>
-<p>To keep data when a server dies, store each key on its owner <em>and</em> on the next <code>R&minus;1</code> distinct physical servers clockwise. When the owner fails, the next server already has a copy and simply takes over its range. With virtual nodes you skip positions that belong to a physical server you have already picked, otherwise two "replicas" could end up on the same machine.</p>`,
-        },
-      ],
-    },
-    {
-      id: "fixed-slots",
-      title: "The alternative: a fixed number of hash slots",
-      kicker: "Design choice",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>Many systems skip the ring and use a simpler indirection. Hash every key into a <strong>fixed number of slots</strong> (far more than you will ever have servers), then keep a small table that maps each slot to a server. The slot of a key never changes; only the slot-to-server table does.</p>
-<p>Adding a server means moving some whole slots to it and updating the table. Because the number of slots is fixed, the key-to-slot mapping is stable forever, and you get to choose exactly which slots move, which makes rebalancing explicit and easy to reason about.</p>`,
+          html: `<p>Consistent hashing balances <strong>keys, not requests</strong>. A viral video's million reads a second all hit the one server that owns it, and more servers don't help. Replicate the key to several servers, add an in-process cache, or split it (<code>video:42#0</code> to <code>#7</code>) and read a random suffix.</p>`,
         },
         {
           type: "compare",
           items: [
-            { title: "Hash ring with vnodes", tone: "info", html: "Placement emerges from hash positions. Any node can compute ownership from the member list. Common in leaderless, peer-to-peer stores (Dynamo, Cassandra)." },
-            { title: "Fixed hash slots", tone: "ok", html: "Placement is an explicit table, often managed by a coordinator or gossiped by the nodes. Moving a slot is a deliberate operation. Used by Redis Cluster (16,384 slots), Couchbase (1,024 vBuckets) and Elasticsearch (shards fixed at index creation)." },
+            { title: "Hash ring with vnodes", tone: "info", html: "Placement emerges from hash positions; any node computes ownership from the member list. Common in leaderless, peer-to-peer stores (Dynamo, Cassandra)." },
+            { title: "Fixed hash slots", tone: "ok", html: "Hash keys into a fixed number of slots and keep an explicit slot-to-server table; a key's slot never changes, and moving a slot is deliberate. Redis Cluster (16,384), Couchbase (1,024 vBuckets), Elasticsearch (shards fixed at index creation)." },
           ],
         },
         {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "Redis Cluster", title: "16,384 slots and hash tags", html: "Every key maps to slot <code>CRC16(key) mod 16384</code>. If a key contains <code>{...}</code>, only the part inside the braces is hashed, so <code>{user:42}:cart</code> and <code>{user:42}:profile</code> land in the same slot and can be used together in one multi-key command." },
+            "Redis Cluster maps keys to <code>CRC16(key) mod 16384</code>. A <code>{...}</code> hash tag hashes only the braced part, so <code>{user:42}:cart</code> and <code>{user:42}:profile</code> share a slot for multi-key commands.",
+            "Choose the slot count once, generously: it caps how many servers you can spread over. Hundreds to tens of thousands is typical.",
           ],
-        },
-        {
-          type: "callout",
-          tone: "tip",
-          html: `<p>Pick the slot count once, generously: it caps how many servers you can ever spread over, because a slot cannot be split later without re-hashing. Hundreds to tens of thousands of slots is typical.</p>`,
         },
       ],
     },
@@ -204,20 +152,21 @@ DEEP.ch16 = {
       kicker: "Interview angle",
       blocks: [
         {
-          type: "text",
-          html: `<p>Consistent hashing belongs in any design with a sharded cache or storage layer that grows over time: a distributed cache, a key-value store, a URL shortener's storage, chat servers that own user connections. Bring it up when you discuss how keys are assigned to machines and what happens when a machine is added or lost.</p>`,
+          type: "callout",
+          tone: "interview",
+          html: `<p>Bring it up for any sharded cache or storage layer that grows. A strong answer covers, in about a minute:</p>
+<ol>
+<li>Why not <code>mod N</code>: one membership change remaps almost every key.</li>
+<li>The ring: servers and keys share one hash space; keys go to the next server clockwise, so a change moves about 1/N of keys.</li>
+<li>Virtual nodes for even load and to spread a failed node's keys across everyone.</li>
+<li>The limit: it balances keys, not traffic, so hot keys need replication or splitting.</li>
+<li>Replication to the next distinct nodes, and fixed hash slots as a simpler alternative.</li>
+</ol>`,
         },
         {
           type: "callout",
-          tone: "interview",
-          html: `<p>A strong answer covers four points in about a minute:</p>
-<ol>
-<li>Why not <code>mod N</code>: one membership change remaps almost every key.</li>
-<li>The ring: servers and keys share one hash space; keys go to the next server clockwise, so a change moves about 1/N of the keys.</li>
-<li>Virtual nodes for even load and for spreading a failed node's keys across everyone.</li>
-<li>The limit: it balances keys, not traffic, so hot keys need replication or key splitting.</li>
-</ol>
-<p>If you have time, mention replication to the next distinct nodes clockwise, and that fixed hash slots (Redis Cluster) are a common, simpler alternative.</p>`,
+          tone: "mistake",
+          html: `<p>"We'll use consistent hashing so no server gets overloaded." It spreads <em>data</em>, not a skewed <em>access pattern</em>; name your hot-key mitigation too.</p>`,
         },
         {
           type: "quiz",
@@ -235,11 +184,10 @@ DEEP.ch16 = {
     },
   ],
   takeaways: [
-    "<code>hash(key) % N</code> remaps about N/(N+1) of all keys whenever N changes, which is a cache wipe or a full data reshuffle.",
-    "Consistent hashing puts servers and keys on one ring; each key goes to the next server clockwise, so a membership change moves only about 1/N of the keys.",
-    "Virtual nodes give each server many small arcs: the load evens out, a failed server's keys spread over all survivors, and bigger machines can take more vnodes.",
-    "It balances keys, not requests. Hot keys still need replication, local caching or key splitting.",
-    "Replicate each key to the next R&minus;1 distinct physical servers clockwise.",
+    "<code>hash(key) % N</code> remaps about N/(N+1) of all keys whenever N changes: a cache wipe or a full data reshuffle.",
+    "Consistent hashing puts servers and keys on one ring; each key goes to the next server clockwise, so a membership change moves about 1/N of keys.",
+    "Virtual nodes even out load, spread a failed server's keys over all survivors and allow weighting; replicate to the next R&minus;1 distinct servers.",
+    "It balances keys, not requests: hot keys still need replication, local caching or key splitting.",
     "Fixed hash slots with an explicit slot-to-server table (Redis Cluster's 16,384) are a simpler, widely used alternative.",
   ],
   furtherReading: [

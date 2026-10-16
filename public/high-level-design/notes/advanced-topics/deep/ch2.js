@@ -1,22 +1,16 @@
 // Deep dive: Chapter 2, Encoded keys: geohash, S2 and H3. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch2 = {
-  hook: `<p>Two million drivers are on the road, and each phone reports its position every four seconds. That is half a million location writes per second, around the clock, before a single rider has asked for anything. An R-tree would have to adjust bounding rectangles on every write; a search engine would be drowning in new segments.</p>
-<p>What you want instead is boring: a driver moves, you overwrite one small value, done. The trick that makes this possible is to turn "latitude 40.7484, longitude -73.9857" into a <strong>single key</strong>, such as <code>dr5ru6</code>, that an ordinary index, a Redis sorted set or a key-value store already knows how to handle, and to make sure that nearby places get similar keys. This chapter is about the three popular ways to do that: geohash, S2 and H3.</p>`,
+  hook: `<p>This chapter covers how geohash, S2 and H3 turn a location into a single key that ordinary indexes and key-value stores can handle, so a moving point costs one small overwrite. That is what makes live-location systems with hundreds of thousands of writes per second practical.</p>`,
   sections: [
     {
-      id: "encoded-keys",
-      title: "Encoded keys: one sortable value for two coordinates",
+      id: "geohash",
+      title: "Encoded keys and geohash",
       kicker: "The key idea",
       blocks: [
         {
           type: "idea",
-          html: `<p>Divide the world into a hierarchy of cells and give every cell an ID. Store each point with the ID of the cell it falls in. A proximity query becomes "fetch the points in these few cell IDs", which is a range scan or a handful of exact lookups on infrastructure you already run.</p>`,
-        },
-        {
-          type: "text",
-          html: `<p>The previous chapter showed that sorting by latitude alone destroys locality. Encoded keys get around that with a <strong>space-filling curve</strong>: a single line that visits every cell of a grid exactly once. Number the cells in the order the curve visits them, and you have a one-dimensional order in which points that are close on the line are usually close on the map.</p>
-<p>"Usually" is doing real work in that sentence. No curve can keep <em>every</em> pair of neighbours close in one dimension; somewhere it has to jump. Curves differ in how often and how far they jump, and that difference is the main technical gap between geohash and S2.</p>`,
+          html: `<p>Divide the world into a hierarchy of cells with IDs, store each point with its cell ID, and a proximity query becomes "fetch these few cell IDs". A <strong>space-filling curve</strong> orders cells so points close on the line are <em>usually</em> close on the map; curves differ in how often they jump.</p>`,
         },
         {
           type: "diagram",
@@ -52,47 +46,15 @@ DEEP.ch2 = {
 </svg>`,
         },
         {
-          type: "tradeoffs",
-          title: "Encoded keys compared with spatial trees",
-          pros: [
-            "No spatial extension needed: any B-tree, sorted set or key-value store will do",
-            "A location update is one small overwrite, so write rates in the hundreds of thousands per second are routine",
-            "Easy to shard: partition by cell or by a coarser parent cell",
-          ],
-          cons: [
-            "Mostly suited to points; shapes must be approximated by sets of cells",
-            "Cells have hard edges, so every query must also fetch neighbouring cells",
-            "A fixed precision doesn't adapt to density the way a quadtree does",
-          ],
-        },
-      ],
-    },
-    {
-      id: "geohash",
-      title: "Geohash: interleaved bits written in base 32",
-      kicker: "How it works",
-      blocks: [
-        {
           type: "text",
-          html: `<p>Geohash, published by Gustavo Niemeyer in 2008, is the simplest encoding to compute by hand. It halves the world over and over, alternating between longitude and latitude, and records one bit per halving: 1 if the point is in the upper half, 0 if it is in the lower half. Every five bits become one character from a 32-symbol alphabet (<code>0-9</code> and <code>b-z</code> without <code>a</code>, <code>i</code>, <code>l</code> and <code>o</code>).</p>`,
+          html: `<p><strong>Geohash</strong> (Niemeyer, 2008) halves the world repeatedly, alternating longitude and latitude, writing 1 for the upper half and 0 for the lower, then encodes every five bits as a base-32 character (<code>0-9</code>, <code>b-z</code> without a, i, l, o). The Empire State Building (40.7484, -73.9857) starts with bits <code>01100</code> = <code>d</code>, and 30 bits give <code>dr5ru6</code>, about 0.93 km by 0.61 km in New York.</p>`,
         },
         {
-          type: "steps",
-          title: "Encoding the Empire State Building (40.7484, -73.9857)",
+          type: "keypoints",
           items: [
-            "Longitude range [-180, 180], midpoint 0. -73.99 is below it: bit <strong>0</strong>, keep [-180, 0].",
-            "Latitude range [-90, 90], midpoint 0. 40.75 is above it: bit <strong>1</strong>, keep [0, 90].",
-            "Longitude [-180, 0], midpoint -90. -73.99 is above: bit <strong>1</strong>, keep [-90, 0].",
-            "Latitude [0, 90], midpoint 45. 40.75 is below: bit <strong>0</strong>, keep [0, 45].",
-            "Longitude [-90, 0], midpoint -45. -73.99 is below: bit <strong>0</strong>, keep [-90, -45].",
-            "The five bits <code>01100</code> are 12 in decimal, which is the character <code>d</code>. The point lies in the cell latitude 0 to 45, longitude -90 to -45.",
-            "Keep going: 30 bits give six characters, <code>dr5ru6</code>, a cell about 0.93 km wide and 0.61 km tall in New York.",
+            "Each character splits a cell 32 ways, so consecutive precisions alternate between square-ish and 2:1 cells.",
+            "Bits are interleaved most-significant first (Z-order), so <strong>a prefix is a parent cell</strong>: <code>WHERE geohash LIKE 'dr5ru%'</code> is a B-tree prefix scan; as a 64-bit integer, a numeric range.",
           ],
-        },
-        {
-          type: "text",
-          html: `<p>Each character adds five bits, which split the cell 32 ways: two or three halvings in each direction. That is why every extra character shrinks the cell area by about 32 times, and why consecutive precisions alternate between square-ish and 2:1 rectangular cells.</p>
-<p>Because the bits are interleaved most-significant first, the encoding follows the Z-order curve, and a geohash prefix <em>is</em> a parent cell. Every point inside <code>dr5ru</code> has a geohash starting with <code>dr5ru</code>, so <code>WHERE geohash LIKE 'dr5ru%'</code> is an ordinary B-tree prefix scan over one cell. Stored as a 64-bit integer instead of text, the same cell is a contiguous numeric range.</p>`,
         },
         {
           type: "table",
@@ -121,13 +83,8 @@ DEEP.ch2 = {
       kicker: "The classic bug",
       blocks: [
         {
-          type: "problem",
-          html: `<p>Shared prefixes imply closeness, but closeness does not imply shared prefixes. Two points a few metres apart can sit on opposite sides of a cell edge, and if that edge is a high-level split, their geohashes may share almost nothing.</p>`,
-        },
-        {
           type: "text",
-          html: `<p>The Empire State Building is in cell <code>dr5ru6</code>, but only about 12 m from its southern edge. A driver 20 m further south is in <code>dr5ru3</code>. A query that scans only the rider's own cell would miss the closest driver in the city.</p>
-<p>It gets worse at big boundaries. Two points in Greenwich, 70 m apart on either side of the prime meridian, encode as <code>gcpuzgr</code> and <code>u10hb52</code>: not a single character in common, because the very first bit already split them. The same happens along the equator.</p>`,
+          html: `<p>Shared prefixes imply closeness, but not the reverse. The Empire State Building is about 12 m inside <code>dr5ru6</code>; a driver 20 m south is in <code>dr5ru3</code>. At big boundaries it's worse: two Greenwich points 70 m apart across the prime meridian are <code>gcpuzgr</code> and <code>u10hb52</code>, with nothing in common.</p>`,
         },
         {
           type: "diagram",
@@ -163,16 +120,11 @@ DEEP.ch2 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<h3>Choosing the precision</h3>
-<p>The 3x3 block only covers the circle if a cell is at least as large as the search radius in both directions: then a circle centred anywhere in the middle cell cannot reach past the outer ring. For a 1 km radius, length 6 cells (about 1.2 km &times; 0.6 km at the equator) are too short in one direction, so use length 5 (about 4.9 km) and accept more candidates, or stay at length 6 and fetch two rings of neighbours (25 cells).</p>
-<p>The cost runs the other way too. Length 5 cells are 25 km&sup2; each; nine of them cover 220 km&sup2; to answer a 3 km&sup2; question. In a dense city that is a lot of candidates. Systems often pick the precision per query from the radius, or start fine and widen when too few results come back.</p>`,
-        },
-        {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "Redis", title: "GEOADD and GEOSEARCH", html: "Redis stores each member's position as a 52-bit interleaved geohash used as its score in a sorted set. <code>GEOSEARCH</code> (Redis 6.2+) computes the cells covering the radius, scans their score ranges and filters by distance, so the 3x3 trick is built in." },
-            { org: "Elasticsearch", title: "geohash_grid aggregation", html: "Buckets documents by geohash cell at a chosen precision, which is how map heat-maps and clustered markers are often drawn." },
+            "<strong>Precision:</strong> the 3x3 block covers the circle only if a cell is at least the radius in both directions. For 1 km, use length 5 (more candidates) or length 6 with two rings (25 cells).",
+            "Coarse cells cost candidates: nine length-5 cells cover 220 km&sup2; to answer a 3 km&sup2; question. Pick precision per query, or start fine and widen when results are few.",
+            "Redis stores a 52-bit geohash as each sorted-set score, and <code>GEOSEARCH</code> (6.2+) scans the covering cells and filters by distance: the 3x3 trick built in.",
           ],
         },
         {
@@ -191,13 +143,12 @@ DEEP.ch2 = {
     },
     {
       id: "sphere-and-s2",
-      title: "Geohash's flat map, and how S2 models the sphere",
+      title: "Geohash's flat map, and S2 on the sphere",
       kicker: "Going global",
       blocks: [
         {
           type: "text",
-          html: `<p>Geohash treats latitude and longitude as a flat rectangle and cuts it into equal <em>degree</em> ranges. Degrees of latitude are always about 111 km, but a degree of longitude is 111.32 &times; cos(latitude) km. A geohash cell therefore narrows as you move away from the equator.</p>
-<p>Worked example: Singapore sits at 1.3&deg; north, where cos(latitude) &asymp; 1.00. Oslo sits at 59.9&deg; north, where cos(latitude) &asymp; 0.50. The same five-character geohash cell is about 4.9 km wide in Singapore and about 2.4 km wide in Oslo, while both are 4.9 km tall. Near the poles cells become slivers. And the antimeridian at 180&deg; longitude is a hard edge where neighbours get completely different hashes.</p>`,
+          html: `<p>Geohash cuts equal <em>degree</em> ranges, and a degree of longitude is 111.32 &times; cos(latitude) km. A length-5 cell is about 4.9 km wide in Singapore (1.3&deg;N) but 2.4 km in Oslo (59.9&deg;N), both 4.9 km tall; near the poles cells are slivers, and the antimeridian is a hard edge.</p>`,
         },
         {
           type: "lab",
@@ -205,20 +156,12 @@ DEEP.ch2 = {
           caption: "Slide the latitude from the equator toward the pole and watch a geohash cell's width collapse while its height stays fixed. The comparable S2 cell stays roughly square.",
         },
         {
-          type: "text",
-          html: `<h3>S2: a cube around the Earth</h3>
-<p>Google's S2 library avoids the flat-map distortion by projecting the sphere onto the six faces of a surrounding cube. Each face is then divided like a quadtree: level 0 is the face, and every level splits each cell into four, down to level 30, where cells are around a centimetre across. A non-linear projection keeps cells of the same level within roughly a factor of two of each other in area anywhere on Earth.</p>
-<p>Within each face, cells are numbered along a <strong>Hilbert curve</strong>, which avoids the long jumps of Z-order. A cell ID is one 64-bit integer: three bits for the face, two bits per level of the path down the quadtree, then a marker bit. Clearing the low bits gives the parent, and all the leaf cells inside a cell form a single contiguous range of IDs. That last property is what makes S2 range-scannable.</p>`,
-        },
-        {
-          type: "text",
-          html: `<p>For a search area, S2's region coverer returns a small set of cells, possibly at mixed levels, that together cover a circle or polygon. Each cell is one ID range, so a query becomes a few range scans over a sorted integer column, followed by the usual exact filter. Because the library works on the sphere, poles, the antimeridian and polygons that cross them are handled correctly.</p>`,
-        },
-        {
-          type: "realworld",
+          type: "keypoints",
           items: [
-            { org: "MongoDB", title: "2dsphere indexes", html: "MongoDB's <code>2dsphere</code> index type computes S2 cell coverings for GeoJSON points and shapes and stores those cells in an ordinary B-tree index." },
-            { org: "Google BigQuery", title: "S2 functions", html: "BigQuery exposes S2 directly, for example <code>S2_CELLIDFROMPOINT</code>, so points can be bucketed into S2 cells for joins and aggregation." },
+            "<strong>S2</strong> (Google) projects the sphere onto a cube's six faces, each split like a quadtree down to level 30 (about a centimetre); same-level cells stay within about 2x in area anywhere.",
+            "Cells are numbered along a <strong>Hilbert curve</strong>. A 64-bit ID holds 3 face bits, 2 bits per level and a marker bit; clearing low bits gives the parent, and a cell's descendants are one contiguous ID range.",
+            "The region coverer returns a few mixed-level cells covering any circle or polygon, so a query is a few range scans then the exact filter, correct at poles and the antimeridian.",
+            "MongoDB <code>2dsphere</code> stores S2 coverings in a B-tree; BigQuery exposes functions such as <code>S2_CELLIDFROMPOINT</code>.",
           ],
         },
       ],
@@ -229,8 +172,8 @@ DEEP.ch2 = {
       kicker: "Uber's grid",
       blocks: [
         {
-          type: "problem",
-          html: `<p>A ride-hailing marketplace constantly asks "how much supply and demand is near here?" and answers it by counting drivers and requests per cell, then smoothing over the cells around each one. On a square grid, "the cells around this one" have two different distances: four edge neighbours and four corner neighbours that are about 41% farther away. Rings of squares are squares, not circles.</p>`,
+          type: "text",
+          html: `<p>Marketplaces smooth supply and demand over "the cells around this one", but square grids have two neighbour distances: corner neighbours are about 41% farther than edge neighbours. <strong>H3</strong> (Uber, open-sourced 2018) uses hexagons, whose six neighbours are equidistant.</p>`,
         },
         {
           type: "diagram",
@@ -269,15 +212,13 @@ DEEP.ch2 = {
 </svg>`,
         },
         {
-          type: "text",
-          html: `<p>Uber built <strong>H3</strong> for exactly this and open-sourced it in 2018. It covers the globe with hexagons at 16 resolutions (0 to 15). Resolution 0 has 122 base cells; each finer resolution has about seven times as many cells as the one above. Resolution 9, a common choice for city-level work, has hexagons of roughly 0.1 km&sup2; with edges around 175 m.</p>
-<p>A sphere cannot be tiled with hexagons alone, so every resolution also contains exactly 12 pentagons, placed over the oceans by the choice of projection. And because seven small hexagons cannot exactly fill one large one, H3's hierarchy is only approximate: a cell's children cover its parent closely but not perfectly, unlike S2's exact quadtree.</p>`,
-        },
-        {
-          type: "text",
-          html: `<h3>Rings instead of ranges</h3>
-<p>H3's core query is <code>gridDisk(cell, k)</code>: every cell within k steps. A disk of k rings holds 1 + 3k(k+1) hexagons, so 7 cells for k = 1, 19 for k = 2 and 37 for k = 3. The equivalent square block holds (2k+1)&sup2;: 9, 25 and 49. The hexagon disk is both smaller and closer to a circle.</p>
-<p>The price is that H3 IDs do <em>not</em> lie on a space-filling curve in a way that makes neighbours contiguous. You cannot sweep up a neighbourhood with one range scan; you compute the list of cell IDs and look each one up, with <code>WHERE h3_r9 = ANY(...)</code> or a batch of key-value gets. That is fine for a few dozen cells, and the cell-per-key model shards nicely.</p>`,
+          type: "keypoints",
+          items: [
+            "16 resolutions (0-15): 122 base cells, about 7x more per level. Resolution 9 hexagons are roughly 0.1 km&sup2; with edges around 175 m.",
+            "Every resolution has exactly 12 pentagons (placed over oceans), and the hierarchy is approximate: children don't exactly fill a parent.",
+            "<code>gridDisk(cell, k)</code> returns 1 + 3k(k+1) cells (7, 19, 37 for k = 1-3) versus (2k+1)&sup2; squares (9, 25, 49): smaller and rounder.",
+            "IDs aren't range-contiguous for neighbours, so you compute the cell list and look each up (<code>= ANY(...)</code> or batched gets). Fine for dozens of cells, and it shards nicely.",
+          ],
         },
         {
           type: "lab",
@@ -300,18 +241,17 @@ DEEP.ch2 = {
     },
     {
       id: "moving-points",
-      title: "Moving points and choosing an approach",
+      title: "Moving points, choosing, and the interview",
       kicker: "Putting it together",
       blocks: [
         {
           type: "text",
-          html: `<p>The reason encoded keys dominate live-location systems is the write path. When a driver moves, compute the new cell (a few microseconds of arithmetic) and overwrite one value: a sorted-set score in Redis, or one row keyed by driver ID with the cell as an indexed column. Nothing needs rebalancing.</p>
-<p>Worked numbers: 2 million active drivers reporting every 4 seconds is 500,000 writes per second. A single Redis node handles on the order of a hundred thousand simple commands per second, so a handful of nodes sharded by city or by a coarse parent cell carries the load, with room for reads. Riders in one city only ever query their own shard.</p>`,
+          html: `<p>A driver move is one cell computation and one overwrite (a sorted-set score, or a row keyed by driver ID); nothing rebalances. 2 million drivers every 4 seconds is 500,000 writes per second; with a Redis node handling on the order of a hundred thousand commands per second, a handful of nodes sharded by city or coarse cell carries it.</p>`,
         },
         {
           type: "callout",
           tone: "warning",
-          html: `<p>Plan for drivers who go offline without saying so. Members of a Redis sorted set cannot expire individually, so a <code>GEOADD</code> set keeps dead drivers forever unless you clean it. Common fixes: keep a second sorted set of last-seen timestamps and periodically remove stale members from both, or write positions into short-lived per-cell keys with a TTL.</p>`,
+          html: `<p>Sorted-set members can't expire individually, so a <code>GEOADD</code> set keeps vanished drivers forever. Keep a second set of last-seen timestamps and prune both, or write positions into short-lived per-cell keys with a TTL.</p>`,
         },
         {
           type: "table",
@@ -328,65 +268,25 @@ DEEP.ch2 = {
           ],
         },
         {
-          type: "compare",
-          title: "The one-line decision",
-          items: [
-            { title: "Spatial tree", tone: "info", html: "Shapes, containment and intersection; data that changes slowly; geo combined with text search. PostGIS, Elasticsearch." },
-            { title: "Encoded cells", tone: "ok", html: "Points that move constantly and very high write rates. Geohash in Redis for the simplest path, S2 for global correctness, H3 for ring-based aggregation." },
-          ],
-        },
-      ],
-    },
-    {
-      id: "interview",
-      title: "Using encoded keys in a design interview",
-      kicker: "Interview angle",
-      blocks: [
-        {
-          type: "text",
-          html: `<p>"Find drivers near a rider" is the canonical prompt, and the same shape appears in food delivery, scooter rental, dating apps and fleet tracking. Interviewers want to hear how the write path stays cheap, how the read path avoids the boundary bug, and how the system shards.</p>`,
-        },
-        {
           type: "callout",
           tone: "interview",
-          html: `<p>A strong answer to "design nearby drivers for millions of drivers" covers:</p>
+          html: `<p>A strong answer to "nearby drivers for millions of drivers" covers:</p>
 <ol>
-<li><strong>Writes:</strong> each location update computes a cell and overwrites one value (Redis <code>GEOADD</code>, or a row keyed by driver ID), with a staleness mechanism for drivers who disappear.</li>
-<li><strong>Reads:</strong> compute the rider's cell, fetch it plus its neighbours (<code>GEOSEARCH</code>, or <code>gridDisk</code> and an <code>IN</code> list), then filter by exact distance and availability and sort.</li>
-<li><strong>Precision:</strong> choose cells at least as large as the radius, and widen the ring if too few results come back.</li>
+<li><strong>Writes:</strong> compute a cell and overwrite one value (Redis <code>GEOADD</code> or a row per driver), plus a staleness mechanism.</li>
+<li><strong>Reads:</strong> fetch the rider's cell and neighbours (<code>GEOSEARCH</code>, or <code>gridDisk</code> and an <code>IN</code> list), then filter by exact distance and availability, and sort.</li>
+<li><strong>Precision:</strong> cells at least as large as the radius; widen the ring if results are few.</li>
 <li><strong>Scale:</strong> shard by region or coarse parent cell so each query hits one shard.</li>
-</ol>
-<p>Then say why you did not choose a spatial tree: the points move every few seconds, and trees pay for every move.</p>`,
-        },
-        {
-          type: "keypoints",
-          items: [
-            "Geohash: simplest, prefix-scannable, distorted away from the equator and broken at the meridian and equator lines.",
-            "S2: sphere-correct, Hilbert-ordered 64-bit IDs, exact hierarchy, coverings for any shape.",
-            "H3: hexagons with six equidistant neighbours, ideal for rings and per-cell aggregation, but lookups are by explicit cell list.",
-          ],
-        },
-        {
-          type: "quiz",
-          q: "A global delivery app uses 5-character geohashes everywhere and notices that cells in northern Europe hold far fewer couriers than cells in Southeast Asia, even in equally busy cities. What is the most likely reason?",
-          options: [
-            "Geohash cells shrink in width with cos(latitude), so a northern cell covers less ground",
-            "Geohash precision is lower in the northern hemisphere",
-            "The base-32 alphabet favours some regions",
-            "Redis stores fewer bits for high latitudes",
-          ],
-          answer: 0,
-          explain: "Geohash cuts equal ranges of degrees. A degree of longitude at 60 degrees north is about half as long as at the equator, so the same precision covers roughly half the area there. S2 or H3 keep cell areas roughly equal worldwide.",
+<li><strong>Why not a spatial tree:</strong> points move every few seconds and trees pay for every move. Geohash is simplest, S2 is globally correct, H3 suits ring aggregation.</li>
+</ol>`,
         },
       ],
     },
   ],
   takeaways: [
-    "Encoded keys turn a location into one cell ID so an ordinary B-tree, sorted set or key-value store can index it, and a location update is a single cheap write.",
-    "Space-filling curves give one-dimensional orders that mostly keep neighbours together: Z-order for geohash, the Hilbert curve (fewer jumps) for S2.",
-    "Geohash interleaves longitude and latitude bits into base 32; each character shrinks the cell about 32 times, and a prefix is a parent cell.",
-    "Cells have hard edges, so always fetch the cell plus its neighbours, pick cells at least as large as the radius, and post-filter by exact distance.",
-    "S2 models the sphere with a cube and Hilbert-ordered 64-bit IDs; H3 uses hexagons with equidistant neighbours but needs explicit cell lists instead of range scans.",
+    "Encoded keys turn a location into one cell ID for an ordinary index or key-value store, so a location update is a single cheap write.",
+    "Space-filling curves mostly keep neighbours together: Z-order for geohash, the Hilbert curve (fewer jumps) for S2.",
+    "Cells have hard edges: fetch the cell plus neighbours, pick cells at least as large as the radius, and post-filter by exact distance.",
+    "Geohash distorts away from the equator; S2 models the sphere with Hilbert-ordered 64-bit IDs; H3 hexagons have equidistant neighbours but need explicit cell lists.",
     "Spatial trees for shapes and slow-changing data; encoded cells for points that move constantly.",
   ],
   furtherReading: [
