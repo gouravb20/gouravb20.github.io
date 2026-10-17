@@ -9,12 +9,12 @@
     brutalist: "https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,100,400;0,100,600;0,100,700;0,100,800;0,125,800;1,100,400&family=IBM+Plex+Mono:wght@400;500;700&display=swap",
     terminal: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700;800&display=swap",
   };
-  const DEFAULT_SKIN = "editorial";
+  const DEFAULT_SKIN = "terminal";
   const SKINS = [
+    { id: "terminal", name: "Ops console", note: "tmux and Grafana", sw: ["#0b0d0c", "#d3dbd5", "#4be38a"] },
     { id: "editorial", name: "Editorial", note: "Paper and ink", sw: ["#f7f3ea", "#24211c", "#c2371d"] },
     { id: "blueprint", name: "Blueprint", note: "Drafting sheet", sw: ["#0d2c56", "#e8f1fc", "#7fdcff"] },
     { id: "brutalist", name: "Swiss", note: "Bold poster type", sw: ["#f4f1e8", "#111111", "#ffd60a"] },
-    { id: "terminal", name: "Ops console", note: "tmux and Grafana", sw: ["#0b0d0c", "#d3dbd5", "#4be38a"] },
     { id: "classic", name: "Classic", note: "Teal and slate", sw: ["#0a0f1c", "#e2e8f0", "#14b8a6"] },
   ];
   const THEMES = [

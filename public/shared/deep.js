@@ -53,7 +53,7 @@
       case "lab": {
         const lab = opts.labInfo(b.id);
         if (!lab) return "";
-        return `<figure class="lab-card deep-lab"><div class="lab-head"><span class="lab-tag">Try it</span><h3>${lab.title}</h3></div>` +
+        return `<figure class="lab-card deep-lab"${opts.labAnchors ? ` id="lab-${esc(b.id)}"` : ""}><div class="lab-head"><span class="lab-tag">Try it</span><h3>${lab.title}</h3></div>` +
           `<div class="lab-blurb">${b.caption || lab.blurb}</div><div class="lab-body" data-lab="${esc(b.id)}"></div></figure>`;
       }
       default:
@@ -67,6 +67,8 @@
    *   sectionHref: (id: string) => string,
    *   labInfo: (id: string) => { title: string, blurb: string } | undefined,
    *   done?: (id: string) => boolean,
+   *   tocTitle?: string,
+   *   labAnchors?: boolean,
    * }} opts
    */
   function render(deep, opts) {
@@ -83,12 +85,31 @@
     const reading = (deep.furtherReading || []).map(r =>
       `<li>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${r.title}</a> &#8599;` : `<strong>${r.title}</strong>`}${r.note ? ` <span class="muted">${r.note}</span>` : ""}</li>`).join("");
     return `<div class="deep">
-      <nav class="deep-toc" aria-label="Sections"><div class="deep-toc-title">In this deep dive <span class="deep-toc-count"></span></div><ol>${toc}</ol></nav>
+      <nav class="deep-toc" aria-label="Sections"><div class="deep-toc-title">${opts.tocTitle || "In this deep dive"} <span class="deep-toc-count"></span></div><ol>${toc}</ol></nav>
       <div class="deep-hook">${deep.hook}</div>
       ${sections}
       ${deep.takeaways.length ? `<div class="deep-takeaways"><h2>Key takeaways</h2><ol>${deep.takeaways.map(t => `<li>${t}</li>`).join("")}</ol></div>` : ""}
       ${reading ? `<div class="deep-reading"><h2>Further reading</h2><ul>${reading}</ul></div>` : ""}
     </div>`;
+  }
+
+  /**
+   * Plain sections (a problem breakdown's Problem, Solution and Levels tabs): no progress buttons, ids are `${prefix}-${section id}`.
+   * @param {DeepSection[]} sections
+   * @param {{ prefix: string, tocTitle?: string, labInfo: (id: string) => { title: string, blurb: string } | undefined, labAnchors?: boolean }} opts
+   */
+  function article(sections, opts) {
+    const id = s => `${opts.prefix}-${esc(s.id)}`;
+    const toc = sections.length > 2
+      ? `<nav class="deep-toc" aria-label="Sections"><div class="deep-toc-title">${opts.tocTitle || "On this tab"}</div><ol>${sections.map((s, i) =>
+        `<li><a href="#${id(s)}"><span class="toc-num">${i + 1}</span><span class="toc-title">${s.title}</span></a></li>`).join("")}</ol></nav>`
+      : "";
+    return `<div class="deep deep-article">${toc}${sections.map(s => `
+      <section class="deep-section" id="${id(s)}">
+        ${s.kicker ? `<div class="deep-kicker">${s.kicker}</div>` : ""}
+        <h2 class="deep-h2">${s.title}</h2>
+        ${s.blocks.map(b => block(b, opts)).join("\n")}
+      </section>`).join("")}</div>`;
   }
 
   /** Plain text of a section, for search. */
@@ -105,5 +126,5 @@
     return parts.join(" ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   }
 
-  window.DeepRender = { render, sectionText };
+  window.DeepRender = { render, article, sectionText };
 })();
