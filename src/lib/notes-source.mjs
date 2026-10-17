@@ -95,7 +95,7 @@ export function loadApp(app) {
   return { DATA: ctx.DATA, DEMOS: ctx.DEMOS || {}, DEEP: ctx.DEEP, deepFiles, errors };
 }
 
-/** @type {{ render: (deep: any, opts: any) => string, sectionText: (section: any) => string } | undefined} */
+/** @type {{ render: (deep: any, opts: any) => string, article: (sections: any[], opts: any) => string, sectionText: (section: any) => string } | undefined} */
 let renderer;
 /**
  * The browser's deep dive renderer (public/shared/deep.js), run once in a sandbox.

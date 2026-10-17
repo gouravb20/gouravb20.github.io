@@ -1,7 +1,7 @@
 ---
 import { getCollection } from "astro:content";
 import NotesLayout from "../../../../layouts/NotesLayout.astro";
-import { SITE_NAME, TRACKS, appPath, chapterPath, plain, summary, url, type Notes } from "../../../../lib/site";
+import { SITE_NAME, TRACKS, appPath, chapterPath, plain, summary, unitNoun, url, type Notes } from "../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -12,6 +12,7 @@ const { notes } = Astro.props as { notes: Notes };
 const { book, chapters } = notes;
 const sum = (f: (c: Notes["chapters"][number]) => number) => chapters.reduce((s, c) => s + f(c), 0);
 const totals = { concepts: sum(c => c.concepts.length), qa: sum(c => c.interview.length), labs: sum(c => c.labs.length) };
+const problems = chapters.every(c => c.problem);
 
 const path = appPath(notes);
 const title = plain(book.title);
@@ -90,10 +91,10 @@ const structuredData = [
   <h2 class="dash-section-title" set:html={book.takeawaysTitle} />
   <div class="takeaways"><ol>{notes.takeaways.map(t => <li set:html={t} />)}</ol></div>
 
-  <h2 class="dash-section-title">Chapters</h2>
+  <h2 class="dash-section-title">{problems ? "Problems" : "Chapters"}</h2>
   <div class="dash-chapters">
     {chapters.map(ch => (
-      <a class="dash-chapter-card" href={url(chapterPath(notes, ch))} data-chapter-card={ch.id} data-total={ch.concepts.length + ch.interview.length} data-number={ch.number} data-title={plain(ch.title)} data-concepts={ch.concepts.length} data-qa={ch.interview.length}>
+      <a class="dash-chapter-card" href={url(chapterPath(notes, ch))} data-chapter-card={ch.id} data-total={ch.concepts.length + ch.interview.length} data-noun={unitNoun(ch)} data-number={ch.number} data-title={plain(ch.title)} data-concepts={ch.concepts.length} data-qa={ch.interview.length}>
         <div class="dcc-head"><div class="dcc-num">{ch.number}</div><div class="dcc-title" set:html={ch.title} /></div>
         <div class="dcc-meta"><span>{ch.concepts.length} concepts &middot; {ch.labs.length} labs &middot; {ch.interview.length} Q&amp;A</span><span class="dcc-pct">0%</span></div>
         <div class="dcc-prog-bar"><div class="dcc-prog-fill" style="width:0%"></div></div>
@@ -102,10 +103,14 @@ const structuredData = [
   </div>
   <div class="chapter-footer" style="margin-top:30px;">
     <div style="color:var(--text-muted);font-size:13px;">
-      <strong>How to use:</strong> every chapter opens on Core Concepts. Deep Dive explains the ideas step by step, with diagrams, real-world examples and quick self-checks, then come Interactive Labs, Interview Q&amp;A and a Cheatsheet. To test yourself, hide the definitions on the Concepts tab, or try each interview question before opening its answer.
+      {problems ? (
+        <Fragment><strong>How to use:</strong> every problem opens on the Problem tab: requirements, scale and what is in scope. Try sketching your own design before opening Solution, which walks through the entities, the API and a high-level design. Core Concepts lists the ideas the design leans on, Deep Dives works through the hard parts from a weak answer to a strong one, with interactive labs inline, and Interview Q&amp;A, By Level and Cheatsheet help you rehearse.</Fragment>
+      ) : (
+        <Fragment><strong>How to use:</strong> every chapter opens on Core Concepts. Deep Dive explains the ideas step by step, with diagrams, real-world examples and quick self-checks, then come Interactive Labs, Interview Q&amp;A and a Cheatsheet. To test yourself, hide the definitions on the Concepts tab, or try each interview question before opening its answer.</Fragment>
+      )}
       Concept cards with a <span style="color:var(--accent-3)">&#9654; See it live</span> button jump straight to the lab that demonstrates them.
       Progress is saved in this browser.
-      Keys: <kbd>/</kbd> search (<kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Enter</kbd> to pick a result), <kbd>j</kbd> / <kbd>k</kbd> next / previous chapter.
+      Keys: <kbd>/</kbd> search (<kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Enter</kbd> to pick a result), <kbd>j</kbd> / <kbd>k</kbd> next / previous {problems ? "problem" : "chapter"}.
     </div>
   </div>
 </NotesLayout>

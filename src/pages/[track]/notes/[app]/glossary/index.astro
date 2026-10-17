@@ -1,7 +1,7 @@
 ---
 import { getCollection } from "astro:content";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
-import { SITE_NAME, TRACKS, appPath, chapterPath, plain, shortLabel, summary, url, type Notes } from "../../../../../lib/site";
+import { SITE_NAME, TRACKS, appPath, chapterPath, plain, shortLabel, summary, unitNoun, url, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -61,7 +61,7 @@ const structuredData = [
       <input type="search" class="tool-filter" id="glFilter" placeholder="Filter…" aria-label="Filter glossary" autocomplete="off">
       <select class="sel" id="glChapter" aria-label="Only show one chapter">
         <option value="">All chapters</option>
-        {chapters.filter(ch => ch.concepts.length).map(ch => <option value={ch.id}>Ch {ch.number}: {plain(ch.title)}</option>)}
+        {chapters.filter(ch => ch.concepts.length).map(ch => <option value={ch.id}>{unitNoun(ch, true)} {ch.number}: {plain(ch.title)}</option>)}
       </select>
       <span id="glCount" data-total={terms.length}>{terms.length}</span>
     </div>

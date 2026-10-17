@@ -18,6 +18,8 @@ export function url(path = ""): string {
 
 export const appPath = (n: Notes) => `${n.track}/notes/${n.slug}/`;
 export const chapterPath = (n: Notes, ch: Chapter) => `${appPath(n)}${ch.id}/`;
+/** What one page of an app is called: problem breakdowns have problems, everything else has chapters. */
+export const unitNoun = (ch: Chapter, short = false) => (ch.problem ? "Problem" : short ? "Ch" : "Chapter");
 
 const ENTITIES: Record<string, string> = {
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", middot: "·", mdash: "—", ndash: "–",
@@ -61,7 +63,7 @@ export function summary(html: string, max = 158): string {
 /** JSON for an inline <script type="application/ld+json">, safe against "</script>" in the data. */
 export const jsonLd = (data: unknown) => JSON.stringify(data).replace(/</g, "\\u003c");
 
-/** One row of an app's search.json; `text` is lower-cased plain text to match against. */
-export interface SearchItem { n: string | number; kind: string; title: string; snippet: string; href: string; text: string }
+/** One row of an app's search.json; `where` is e.g. "Ch 3", `text` is lower-cased plain text to match against. */
+export interface SearchItem { where: string; kind: string; title: string; snippet: string; href: string; text: string }
 
 export const sortedParts = (n: Notes) => Object.keys(n.parts).map(Number).sort((a, b) => a - b);

@@ -51,11 +51,18 @@ function publicDirectoryIndex() {
   };
 }
 
+// Problem breakdowns used to be split into five chapters per problem (ch1-ch5 Top K, ch6-ch10 Flash Sale).
+const breakdowns = "/high-level-design/notes/problem-breakdowns";
+const redirects = Object.fromEntries(
+  Array.from({ length: 10 }, (_, i) => [`${breakdowns}/ch${i + 1}`, `${base}${breakdowns}/${i < 5 ? "top-k" : "flash-sale"}/`]),
+);
+
 export default defineConfig({
   site,
   base,
   trailingSlash: "ignore",
   build: { format: "directory" },
+  redirects,
   integrations: [sitemap({ customPages: publicPages() })],
   vite: { plugins: [publicDirectoryIndex()] },
 });

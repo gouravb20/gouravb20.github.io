@@ -4,13 +4,13 @@
 window.DATA = {
   book: {
     title: `System Design Problem Breakdowns`,
-    subtitle: `Classic system design interview problems, worked through from requirements to a final design, with labs that let you poke at each decision. Part I: <strong>YouTube Top K</strong>, the most-viewed videos for the last hour, day, month and all time at ~70 billion views a day. Part II: <strong>Flash Sale</strong>, 20,000 consoles for 10 million buyers without overselling. The problems follow Hello Interview's <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k" target="_blank" rel="noopener" style="color:var(--accent)">Top K</a> and <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/flash-sale" target="_blank" rel="noopener" style="color:var(--accent)">Flash Sale</a> breakdowns; these notes and labs are written independently, so read the original walkthroughs there.`,
+    subtitle: `Classic system design interview problems, each worked through on one page: the problem, a solution from a simple design to a scalable one, the deep dives an interviewer pushes on, and what is expected at each level, with labs embedded where each decision comes up. Part I: <strong>YouTube Top K</strong>, the most-viewed videos for the last hour, day, month and all time at ~70 billion views a day. Part II: <strong>Flash Sale</strong>, 20,000 consoles for 10 million buyers without overselling. The problems follow Hello Interview's <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k" target="_blank" rel="noopener" style="color:var(--accent)">Top K</a> and <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/flash-sale" target="_blank" rel="noopener" style="color:var(--accent)">Flash Sale</a> breakdowns; these notes and labs are written independently, so read the original walkthroughs there.`,
     storageKey: `problem_breakdowns_notes_v1`,
     appId: `problem-breakdowns-notes`,
     exportPrefix: `problem-breakdowns-progress`,
     pillarsTitle: `Four habits for any breakdown`,
     takeawaysTitle: `Ten things to remember`,
-    labsIntro: `Each lab models one decision in the design. The numbers come from simple, stated assumptions rather than production measurements, so read them as shapes and ratios, not benchmarks. Labs reset when you leave the tab.`,
+    labsIntro: `Each lab models one decision in the design and sits in the section where that decision comes up. The numbers come from simple, stated assumptions rather than production measurements, so read them as shapes and ratios, not benchmarks.`,
     mono: `PB`,
     shortTitle: `Problem Breakdowns`,
     tagline: `Interactive interview prep`
@@ -19,279 +19,493 @@ window.DATA = {
     1: `Part I &middot; YouTube Top K`
   },
   fourQuestions: [
-    { cls: `what`, q: `Pin down the contract`, text: `Top-K problems hide their difficulty in the requirements: which windows, sliding or tumbling, exact or approximate, how fresh, how large K can be. Propose concrete defaults and let the interviewer push back; every later choice depends on them.`, answer: `Ch 1: requirements, windows and estimates.` },
-    { cls: `where`, q: `Let the numbers choose`, text: `70 billion views a day is roughly 800K events per second. That one number rules out "a counter row per video in one database" and points you at partitioning, sharding and aggregating in the stream before anything is written.`, answer: `Ch 1 (estimates), Ch 3 (the write path).` },
-    { cls: `when`, q: `Start with something that works`, text: `A consumer incrementing counters in Postgres, plus an ORDER BY ... LIMIT query, is a complete answer. Draw it, then name its bottlenecks out loud before fixing them one at a time.`, answer: `Ch 2: the baseline and its bottlenecks.` },
-    { cls: `how`, q: `Move work to write time`, text: `There are only a handful of distinct questions (four windows), asked millions of times. Precompute each answer, keep running totals per window, and serve from a cache, so a read never aggregates anything.`, answer: `Ch 2 (caching), Ch 4 (per-window totals), Ch 5 (final design).` }
+    { cls: `what`, q: `Pin down the contract`, text: `Both problems hide their difficulty in the requirements. For Top K: which windows, sliding or tumbling, exact or approximate, how fresh, how large K can be. For a flash sale: never oversell, how long a hold lasts, and what "fair" means. Propose concrete defaults and let the interviewer push back.`, answer: `Top K: Problem tab &middot; Flash Sale: Problem tab.` },
+    { cls: `where`, q: `Let the numbers choose`, text: `70 billion views a day is ~800K events per second, which rules out one database write per view. 10 million buyers for 20,000 consoles is ~1M requests per second aimed at a single stock row that takes ~1,000 locked updates a second. One number each, and the hard part is obvious.`, answer: `Top K: Problem tab (estimates) &middot; Flash Sale: Problem tab.` },
+    { cls: `when`, q: `Start with something that works`, text: `A consumer incrementing counters in Postgres plus ORDER BY ... LIMIT is a complete Top K answer. A conditional decrement and a reservations table in one transaction is a complete flash sale answer. Draw the simple version, then name its bottlenecks before fixing them.`, answer: `Top K: Solution tab &middot; Flash Sale: Solution tab.` },
+    { cls: `how`, q: `Take work off the hot path`, text: `Top K aggregates views in the stream and precomputes every answer, so a read never sums anything. A flash sale keeps the stock gate tiny and atomic, and puts a waiting room in front of it so only as many buyers arrive as the gate can serve.`, answer: `Top K: Deep Dives &middot; Flash Sale: Deep Dives.` }
   ],
   takeaways: [
-    `Clarify windows first. <strong>Tumbling</strong> windows (10:00-11:00) put each event in exactly one bucket; <strong>sliding</strong> windows (the trailing 60 minutes) must add events and later remove them.`,
-    `Write down the non-functional numbers: a <strong>lateness budget</strong> (e.g. 1 minute), <strong>exact vs approximate</strong>, read latency in <strong>tens of milliseconds</strong>, and a cap on K (e.g. 1,000).`,
-    `Estimate with round numbers: ~10<sup>5</sup> seconds per day, so 70B views/day is ~700-800K writes per second; billions of videos at 16 bytes per counter is tens of GB.`,
-    `A <strong>B-tree index on the count column</strong> makes all-time top K a short index walk, but windowed top K must sum every video in the window before sorting, which is a scan.`,
-    `Reads are the easy half: a few distinct answers, refreshed by a scheduled job and served from <strong>Redis</strong>. Precomputing beats TTL caching because there's no expiry cliff.`,
-    `<strong>Partition the event log and shard the counters by video ID.</strong> Each video then lives on one shard, so the global top K is guaranteed to be among the per-shard top Ks.`,
-    `<strong>Aggregate in the stream</strong> (Flink, Kafka Streams): popularity is so skewed that summing per video per minute or hour cuts database writes by one to two orders of magnitude.`,
-    `Keep <strong>running totals per window</strong> with an index on views, so top K is an index walk. Sliding windows update as "add the newest minute, subtract the minute that fell out".`,
-    `A sliding month at minute granularity needs 43,200 buckets per video. Offer a hybrid: <strong>sliding last hour, tumbling day and month</strong>, or a lagged consumer that replays events to subtract them.`,
-    `If "approximately right" is acceptable, a <strong>Count-Min Sketch plus a bounded heap</strong> finds heavy hitters in fixed memory. Generic time series databases fail here because every video ID is a separate series.`
+    `Clarify the scope before drawing boxes. Top K: <strong>tumbling</strong> windows put each view in one bucket, <strong>sliding</strong> windows must subtract it later. Flash sale: a unit is either free, held until an expiry time, or sold.`,
+    `Estimate with round numbers: ~10<sup>5</sup> seconds per day, so 70B views/day is ~800K writes/s; 10M buyers arriving in a minute is ~1M requests/s for 20,000 units.`,
+    `Few distinct questions, asked constantly, should be <strong>precomputed</strong>: Top K publishes four answers to Redis every minute, and the flash sale page and sold-out flag come from a CDN.`,
+    `<strong>Partition and shard by the key you rank or lock on.</strong> With counters sharded by video ID, merging each shard's top K is exact.`,
+    `<strong>Aggregate before writing.</strong> Popularity is skewed, so summing views per video per minute cuts database writes by one to two orders of magnitude.`,
+    `Keep <strong>running totals per window</strong> with an index on views, and update a sliding hour as "add the newest minute, subtract the one that left". Slide the hour; tumble the day and month.`,
+    `<strong>Never oversell</strong>: decrement stock with one atomic conditional operation (a conditional UPDATE, or a Redis script) and record the hold in the same step. Read-then-write oversells.`,
+    `A single <strong>hot row</strong> serialises every buyer. Move the gate to an in-memory atomic counter, or split stock into buckets, and keep the database as the record of who holds what.`,
+    `<strong>Reservations expire</strong>: give holds a short TTL, release them lazily or with a sweeper, and make payment idempotent so webhooks, retries and late payments can't double-sell.`,
+    `<strong>Admission control beats raw capacity</strong>: a virtual waiting room lets buyers in at the rate the backend can serve and is where fairness (arrival order, random draw or raffle) and bot limits are enforced.`
   ],
   chapters: [
-    // ------------------------------------------------------------------
     {
-      id: `ch1`, part: 1, number: 1,
-      title: `Scoping Top K: requirements, windows and the numbers`,
-      overview: `"Show the most viewed videos" sounds like one sorted query, but almost every word in it hides a decision: over what time window, measured how, how exactly, how fresh, how many results, at what scale. In this problem those answers change the architecture more than usual, so the first minutes go into turning vague words into numbers and proposing sensible defaults. We settle on top K (K ≤ 1,000) for the last hour, day and month as <strong>tumbling</strong> windows plus all time, exact counts, at most a minute of lag, reads in tens of milliseconds, and a firehose of roughly 70 billion views a day.`,
-      concepts: [
-        { term: `Top-K query`, def: `Return the K items with the highest score within some scope, sorted. Here the items are videos, the score is view count and the scope is a time window.`, why: `The answer is tiny (at most K rows) and there are only a few scopes, so it can be computed ahead of time. What makes the problem hard is the scope: counting over a moving window for billions of videos.`, demo: `topkEstimator` },
-        { term: `View event stream`, def: `Assume another part of the platform already emits a view event (video ID, event time, perhaps user ID) to a durable log such as Kafka whenever playback counts as a view. Our system consumes that log rather than exposing a "record view" API.`, why: `It skips boilerplate ingestion and gives you replay for free: if a consumer crashes or a bug corrupts counts, rewind the log and recompute.` },
-        { term: `Tumbling window`, def: `Fixed-size, non-overlapping windows aligned to clock boundaries: 10:00-11:00, 11:00-12:00. "Last hour" means the most recent complete hour.`, why: `Every event belongs to exactly one window and the answer only changes when a window closes. That makes aggregation and precomputation simple, so it's the right default to propose first.`, demo: `windowTypes` },
-        { term: `Sliding window`, def: `A trailing interval that ends now: at 10:06 "last hour" means 09:06-10:06. In practice it advances in small steps (for example every minute).`, why: `Fresher and what users intuitively expect for "trending now", but each event must be added when it arrives and removed when it ages out, so state has to remember when views happened.`, demo: `windowTypes` },
-        { term: `Event time and the lateness budget`, def: `A view happens at its event time but may reach the pipeline seconds or minutes later. A lateness budget says how long a window waits for stragglers before its result is final, for example one minute.`, why: `It is the knob between freshness and completeness. It also tells the stream processor how far its watermark should trail the newest events.`, demo: `windowTypes` },
-        { term: `Exact vs approximate`, def: `Exact means every view is counted and ties are resolved correctly. Approximate allows small, bounded errors in counts or ordering in exchange for far less memory and work.`, why: `A "trending" shelf doesn't care whether a video has 4,812,331 or 4,812,900 views; a creator payout does. Start exact (it's the harder constraint), then offer approximation as an optimisation.` },
-        { term: `Bounded K`, def: `Cap how many results a client can ask for, typically 1,000.`, why: `A bounded answer can be precomputed, cached as one value and returned without pagination. A request for the top million is really a request for the dataset and belongs to an analytics export.` },
-        { term: `Latency target drives precomputation`, def: `A read budget of tens of milliseconds rules out aggregating anything at query time; the answer must already exist when the request arrives.`, why: `This one requirement decides the shape of the read path: precomputed answers in a cache, refreshed in the background.` },
-        { term: `Parking arbitrary time ranges`, def: `Supporting any historical range ("top videos for 3-17 June 2024") needs a general analytical store, because nothing can be precomputed for every possible range.`, why: `Explicitly marking it out of scope keeps the problem tractable and shows you know where the cliff is. Fixed windows ending now are what product features need.` },
-        { term: `Back-of-the-envelope numbers`, def: `Use ~10<sup>5</sup> seconds per day: 70B views/day ≈ 700K-800K views per second on average, more at peak. With about an hour of video uploaded per second and videos averaging a few minutes, that's roughly a million new videos a day, billions over a decade. A video ID plus a count is ~16 bytes, so one counter per video is tens of GB.`, why: `These numbers settle the big questions: one database node can't absorb the writes, but one set of counters fits in memory on a large machine.`, demo: `topkEstimator` }
+      id: `top-k`, part: 1, number: 1,
+      title: `YouTube Top K: the most-viewed videos per time window`,
+      overview: `Return the top K most-viewed videos for the last hour, day, month and all time, with exact counts, at most a minute of lag and reads in tens of milliseconds, while roughly 70 billion views a day stream in. The answer itself is tiny; the difficulty is keeping counts that are fit to rank over moving windows for billions of videos. The design that works partitions the view stream by video ID, aggregates in a stream processor before writing, keeps a running total per window, and publishes precomputed answers to a cache.`,
+      source: { title: `Hello Interview: Top K (YouTube) problem breakdown`, url: `https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k` },
+      problem: [
+        {
+          id: `requirements`,
+          title: `What we are building`,
+          kicker: `Functional requirements`,
+          blocks: [
+            { type: `problem`, html: `<p>Build the service behind a "most viewed" shelf: given a time window, return the K videos with the most views in it. It sounds like one <code>ORDER BY</code>, but the windows keep moving and the counts change roughly 800,000 times a second.</p>` },
+            { type: `list`, title: `Functional requirements`, items: [
+              `Return the <strong>top K videos by view count</strong> for the <strong>last hour, last day, last month and all time</strong>.`,
+              `The client chooses K, <strong>up to 1,000</strong>. Each entry carries the video ID and its view count.`,
+              `Each answer says which window it describes (an <code>asOf</code> time), because answers are computed slightly behind real time.`
+            ] },
+            { type: `text`, html: `<p>Decide where the system starts. Whether a playback counts as a view (watch time, bot filtering, replays) is someone else's hard problem. Assume every counted view is already published as an event with a video ID and an event time to a durable log such as a Kafka topic. We <em>consume</em> that log rather than exposing a "record a view" API, and we get replay for free: if a bug corrupts counts, fix it, rewind and recompute.</p>` },
+            { type: `diagram`, title: `Where our system starts and stops`, caption: `Upstream decides what a view is and publishes it. We design the middle box: consume the stream, keep counts per window and serve a small, precomputed answer.`, svg: `<svg viewBox="0 0 640 210" role="img" aria-label="Playback service publishes view events to Kafka; the top-K system consumes them and serves a read API">
+<defs><marker id="tk-arrow-ctx" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill: var(--dg-muted)"/></marker></defs>
+<text x="145" y="45" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">upstream (given)</text>
+<text x="395" y="45" text-anchor="middle" font-size="12" font-weight="700">what we design</text>
+<text x="570" y="45" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">clients read</text>
+<rect x="10" y="85" width="120" height="50" rx="8" style="fill: var(--dg-panel); stroke: var(--dg-line)" stroke-width="1.5"/>
+<text x="70" y="106" text-anchor="middle" font-size="13" font-weight="700">Playback</text>
+<text x="70" y="123" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">decides a view</text>
+<rect x="160" y="85" width="120" height="50" rx="8" style="fill: var(--dg-1-soft); stroke: var(--dg-1)" stroke-width="1.5"/>
+<text x="220" y="106" text-anchor="middle" font-size="13" font-weight="700">Kafka topic</text>
+<text x="220" y="123" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">view-events</text>
+<rect x="310" y="60" width="170" height="100" rx="10" style="fill: var(--dg-2-soft); stroke: var(--dg-2)" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="395" y="100" text-anchor="middle" font-size="13" font-weight="700">Top-K system</text>
+<text x="395" y="118" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">count and rank</text>
+<text x="395" y="134" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">per time window</text>
+<rect x="510" y="85" width="120" height="50" rx="8" style="fill: var(--dg-3-soft); stroke: var(--dg-3)" stroke-width="1.5"/>
+<text x="570" y="106" text-anchor="middle" font-size="13" font-weight="700">Read API</text>
+<text x="570" y="123" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">K ≤ 1,000</text>
+<line x1="130" y1="110" x2="158" y2="110" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-ctx)"/>
+<line x1="280" y1="110" x2="308" y2="110" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-ctx)"/>
+<line x1="480" y1="110" x2="508" y2="110" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-ctx)"/>
+<text x="220" y="185" text-anchor="middle" font-size="12">~800K views/s</text>
+<text x="395" y="185" text-anchor="middle" font-size="12">4 windows</text>
+<text x="570" y="185" text-anchor="middle" font-size="12">tens of ms</text>
+</svg>` },
+            { type: `list`, title: `Out of scope (say it out loud)`, items: [
+              `Deciding what counts as a view, and bot or fraud filtering.`,
+              `<strong>Arbitrary historical ranges</strong> ("top videos for 3-17 June"): nothing can precompute every range, so they need a general analytics store.`,
+              `Slices by country, category or device, and personalised ranking. Mention them as extensions.`,
+              `Video metadata (titles, thumbnails): the client fetches it from the video service using the returned IDs.`
+            ] }
+          ]
+        },
+        {
+          id: `non-functional`,
+          title: `Non-functional requirements`,
+          kicker: `The numbers that shape the design`,
+          blocks: [
+            { type: `table`, headers: [`Requirement`, `Default to propose`, `What it changes`], rows: [
+              [`Precision`, `Exact counts first`, `Whether sketches are allowed; exact is the harder constraint`],
+              [`Freshness`, `At most ~1 minute behind the view`, `Watermark delay (~30 s) and refresh interval (~1 min)`],
+              [`Read latency`, `Tens of milliseconds`, `No aggregation at read time: precompute and cache`],
+              [`Result size`, `K ≤ 1,000`, `Each answer is one small value under one key`],
+              [`Scale`, `~70B views/day, billions of videos`, `Partitioning, sharding and stream aggregation`],
+              [`Availability`, `Serve slightly stale rather than fail`, `Long cache TTLs; alert on answer age`]
+            ] },
+            { type: `text`, html: `<p><strong>Exact first.</strong> A design that counts exactly also meets a relaxed requirement, and it forces you to deal with counting at scale instead of reaching for a sketch to dodge it. Approximation is an optimisation you offer later, with its error stated.</p>
+<p><strong>A number for freshness.</strong> "Real time" with no number invites a design that re-ranks on every event. "Within a minute" sets the lateness budget, the flush interval and the refresh interval in one go.</p>
+<p><strong>Tens of milliseconds</strong> rules out summing anything when the request arrives: even one window over billions of videos takes seconds to minutes. The answer must exist before anyone asks.</p>` },
+            { type: `callout`, tone: `tip`, html: `<p>Propose, don't interrogate: "I'll assume tumbling hour, day and month plus all time, exact counts, at most a minute of lag, K up to 1,000 and reads in tens of milliseconds. Does that match?" Fifteen seconds, and it shows judgement.</p>` },
+            { type: `callout`, tone: `mistake`, html: `<p>Volunteering "approximate is fine" or "real time" unprompted. Both remove the hardest constraints, and interviewers often reply "assume it must be exact". Start strict; relaxing a design is easier than rescuing one.</p>` }
+          ]
+        },
+        {
+          id: `windows`,
+          title: `Tumbling or sliding windows`,
+          kicker: `Choosing the scope`,
+          blocks: [
+            { type: `problem`, html: `<p>It is 10:06 and a user opens "most viewed in the last hour". Is that 09:00-10:00 (the last complete hour) or 09:06-10:06 (the trailing sixty minutes)? Both are defensible, and they need very different amounts of state.</p>` },
+            { type: `text`, html: `<p>A <strong>tumbling window</strong> is a fixed, non-overlapping interval aligned to the clock. Every view lands in exactly one window, so a window is a running total that stops changing once it closes. A <strong>sliding window</strong> trails "now" and advances in small steps, say every minute. It is fresher, but every view must be <em>added</em> when it arrives and <em>removed</em> when it ages out, so the system must remember when views happened.</p>` },
+            { type: `diagram`, title: `What "last hour" means at 10:06`, caption: `Tumbling serves the last complete clock hour and ignores the six minutes since 10:00. Sliding covers the trailing sixty minutes and moves every minute.`, svg: `<svg viewBox="0 0 640 210" role="img" aria-label="Timeline comparing a tumbling last hour from 09:00 to 10:00 with a sliding last hour from 09:06 to 10:06">
+<text x="60" y="40" font-size="13" font-weight="700">Tumbling "last hour"</text>
+<rect x="60" y="50" width="216" height="30" rx="4" style="fill: var(--dg-panel); stroke: var(--dg-line)" stroke-width="1.5"/>
+<text x="168" y="70" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">08:00-09:00</text>
+<rect x="276" y="50" width="216" height="30" rx="4" style="fill: var(--dg-1-soft); stroke: var(--dg-1)" stroke-width="2"/>
+<text x="384" y="70" text-anchor="middle" font-size="12" font-weight="700">09:00-10:00 (complete)</text>
+<rect x="492" y="50" width="108" height="30" rx="4" style="fill: none; stroke: var(--dg-line)" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="556" y="70" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">still open</text>
+<text x="60" y="110" font-size="13" font-weight="700">Sliding "last hour"</text>
+<text x="178" y="140" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">moves every minute</text>
+<rect x="297.6" y="120" width="216" height="30" rx="4" style="fill: var(--dg-2-soft); stroke: var(--dg-2)" stroke-width="2"/>
+<text x="405.6" y="140" text-anchor="middle" font-size="12" font-weight="700">09:06-10:06</text>
+<line x1="60" y1="175" x2="600" y2="175" stroke-width="1.5" style="stroke: var(--dg-line)"/>
+<line x1="60" y1="170" x2="60" y2="180" stroke-width="1.5" style="stroke: var(--dg-line)"/>
+<line x1="276" y1="170" x2="276" y2="180" stroke-width="1.5" style="stroke: var(--dg-line)"/>
+<line x1="492" y1="170" x2="492" y2="180" stroke-width="1.5" style="stroke: var(--dg-line)"/>
+<text x="60" y="196" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">08:00</text>
+<text x="276" y="196" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">09:00</text>
+<text x="492" y="196" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">10:00</text>
+<line x1="513.6" y1="28" x2="513.6" y2="180" stroke-width="2" stroke-dasharray="4 3" style="stroke: var(--dg-bad)"/>
+<text x="513.6" y="20" text-anchor="middle" font-size="12" font-weight="700">now 10:06</text>
+</svg>` },
+            { type: `compare`, items: [
+              { title: `Tumbling`, tone: `ok`, html: `One running total per video per window, final once the window closes. The answer changes once per window. Ideal for daily and monthly charts, and the default to propose.` },
+              { title: `Sliding`, tone: `warn`, html: `Each view counts in many overlapping windows and must later be subtracted, so you keep recent history (for example per-minute counts). Ideal for "trending now"; covered in the Deep Dives.` }
+            ] },
+            { type: `text`, html: `<h3>Event time and the lateness budget</h3>
+<p>A view stamped 09:59:58 may arrive seconds or minutes later (network hops, phones offline). Count by <strong>event time</strong>, and give each window a <strong>lateness budget</strong>: how long it waits for stragglers before its result is final. Stream processors implement this with a <strong>watermark</strong> that trails the newest event time by a fixed delay. Against a one-minute freshness target, ~30 seconds is reasonable; very late views are dropped (and counted) or sent to a side output.</p>` },
+            { type: `lab`, id: `windowTypes`, caption: `Move "now" and switch between tumbling and sliding to see the ranking change. Then drag the watermark delay: a few seconds catches network delay, but nothing inside a one-minute budget catches devices that were offline for minutes.` },
+            { type: `callout`, tone: `interview`, html: `<p>Propose <strong>tumbling hour, day and month plus all time</strong> (all time never closes and never subtracts). It gets a complete design on the board fast. Keep sliding as a deliberate deep dive, and when you get there, offer a hybrid: slide the hour, tumble the rest.</p>` }
+          ]
+        },
+        {
+          id: `estimates`,
+          title: `Back-of-the-envelope numbers`,
+          kicker: `Estimation`,
+          blocks: [
+            { type: `text`, html: `<p>The estimates exist to rule designs out. Two questions matter: can one machine absorb the writes, and can one set of counters fit in memory? Use 10<sup>5</sup> seconds per day; the real 86,400 never changes a decision.</p>
+<ul>
+<li><strong>Writes:</strong> <span class="formula">70 × 10<sup>9</sup> views/day ÷ 10<sup>5</sup> s ≈ 700-800K views/s</span>, roughly double at peak.</li>
+<li><strong>Catalogue:</strong> ~1 hour of video uploaded per second at ~6 minutes per video is <span class="formula">~10 videos/s ≈ 1M/day ≈ 3.6B over 10 years</span>.</li>
+<li><strong>Counters:</strong> 8-byte ID plus 8-byte count: <span class="formula">3.6B × 16 B ≈ 58 GB</span> raw, ~220 GB as indexed database rows.</li>
+<li><strong>One database node:</strong> assume ~10K indexed single-row updates/s, so per-view writes need <span class="formula">~80 nodes</span> on average, ~150 at peak.</li>
+</ul>` },
+            { type: `lab`, id: `topkEstimator`, caption: `Change daily views, upload rate and video length, and watch how many database nodes per-view writes would need. Switch to 86,400 seconds per day to see that the shortcut barely matters.` },
+            { type: `keypoints`, title: `Two verdicts`, items: [
+              `<span class="hl-bad">One write per view into a database is out</span>: the rate is about two orders of magnitude beyond one node. Views must be aggregated before they reach storage.`,
+              `<span class="hl-good">The state is not enormous</span>: tens of GB per set of counters fits in RAM on a large machine, and hour or day windows only hold videos actually watched in them. The problem is throughput, not storage.`,
+              `Few distinct questions (four windows, every K a prefix of the top 1,000) means the read side can be precomputed.`
+            ] },
+            { type: `quiz`, q: `Your estimate says one set of all-time counters is about 58 GB. Which conclusion follows?`, options: [
+              `We need a distributed database just to store the counts`,
+              `The counts could live in memory on one large machine; the hard part is the write rate`,
+              `We must use approximation because 58 GB is too large`,
+              `Four windows make the total too large for any design`
+            ], answer: 1, explain: `58 GB fits in one large server's RAM, and shorter windows need far less. What forces distribution is ~800K updates per second.` }
+          ]
+        }
       ],
-      cheatsheet: [
-        { title: `Requirement decisions`, type: `table`, headers: [`Question`, `Default to propose`, `What it changes`], rows: [
-          [`Which windows?`, `Last hour, day, month, all time`, `How many sets of counters you maintain`],
-          [`Tumbling or sliding?`, `Tumbling, sliding as a deep dive`, `Whether you must subtract old views`],
-          [`Exact or approximate?`, `Exact first`, `Whether sketches are allowed`],
-          [`How fresh?`, `≤ 1 minute after the view`, `Watermark delay and refresh interval`],
-          [`How big can K be?`, `≤ 1,000`, `Size of each precomputed answer`],
-          [`Read latency?`, `Tens of ms`, `Precompute and cache; no query-time aggregation`],
-          [`Arbitrary ranges?`, `Out of scope`, `Avoids a general OLAP store`]
-        ] },
-        { title: `Tumbling vs sliding windows`, type: `table`, headers: [``, `Tumbling`, `Sliding`], rows: [
-          [`"Last hour" at 10:06`, `09:00-10:00`, `09:06-10:06`],
-          [`Events per window`, `Each in exactly one`, `Each in many overlapping windows`],
-          [`State to keep`, `One running total per window`, `Recent buckets, to subtract later`],
-          [`Answer changes`, `Once per window`, `Every step (e.g. each minute)`],
-          [`Good for`, `Day and month charts`, `"Trending right now"`]
-        ] },
-        { title: `API and estimates`, type: `code`, body: `GET /v1/top-videos?window=hour|day|month|all&k=100
-200 OK
-{ "window": "day", "asOf": "2026-10-13T10:00:00Z",
-  "videos": [ { "videoId": "v_8f2c", "views": 48213377 }, ... ] }
+      solution: [
+        {
+          id: `entities`,
+          title: `Core entities`,
+          kicker: `Data model`,
+          blocks: [
+            { type: `text`, html: `<p>The model is small. Name the entities quickly and move on; the interesting decisions are in how counts are stored and refreshed.</p>` },
+            { type: `table`, headers: [`Entity`, `Fields`, `Notes`], rows: [
+              [`View event`, `videoId, eventTime (userId optional)`, `Immutable, arrives on the Kafka topic keyed by videoId`],
+              [`Video`, `videoId`, `Only the ID matters here; metadata lives in the video service`],
+              [`Window`, `type (hour, day, month, all), start`, `Tumbling windows are identified by their start`],
+              [`View count`, `videoId, window, views`, `One per video per window; what we rank on`],
+              [`Top-K list`, `window, asOf, [(videoId, views)] × ≤ 1,000`, `The precomputed answer the API serves`]
+            ] }
+          ]
+        },
+        {
+          id: `api`,
+          title: `API and the input stream`,
+          kicker: `Interface`,
+          blocks: [
+            { type: `code`, title: `The one read endpoint`, lang: `http`, code: `GET /views/top?window=hour&k=100        window = hour | day | month | all, k <= 1000
 
-writes:   70e9 views/day / 1e5 s/day      ~ 700K/s (peak 2x)
-videos:   3,600 s uploaded/s / 360 s avg  ~ 10 videos/s ~ 1M/day
-catalog:  1M/day * 365 * 10 years         ~ 3.6B videos
-counters: 3.6B * (8 B id + 8 B count)     ~ 58 GB` }
-      ],
-      interview: [
-        { q: `What would you ask before designing a top-K system?`, a: `Which windows (hour, day, month, all time), and whether they're tumbling or sliding; exact or approximate; the freshness budget; the maximum K; read latency and query volume; the scale of events and items; and whether arbitrary historical ranges are needed. Each answer changes the design, so I'd propose defaults (tumbling, exact, 1 minute, K ≤ 1,000, tens of ms) and check them.`, diff: `easy` },
-        { q: `Why propose tumbling windows first?`, a: `Each view lands in exactly one window, so a window is a running total that's final once the window closes and the lateness budget passes. Sliding windows need every view to be subtracted later, which means remembering per-minute history. Starting tumbling gets a working design quickly, and sliding becomes a deliberate deep dive.`, diff: `easy` },
-        { q: `Estimate the write rate and storage.`, a: `70B views/day over ~10<sup>5</sup> seconds is ~700K writes per second on average, maybe 1.5M at peak. New videos: about an hour of content per second divided by a few minutes per video is ~10 videos per second, ~1M per day, a few billion over ten years. At 16 bytes per (ID, count), one set of all-time counters is ~60 GB. So the counts fit in memory, but the write rate is far beyond one database node.`, diff: `medium` },
-        { q: `What does a one-minute lateness budget buy you?`, a: `Permission to close a window a minute after it ends and treat it as final, which bounds how long state stays open and lets the stream processor's watermark trail event time by a fixed amount. It also gives the read path a refresh budget: recomputing each answer every minute is enough.`, diff: `medium` },
-        { q: `Why cap K?`, a: `So each answer is a small, fixed-size value that can be precomputed, cached under one key and returned without pagination. Anyone asking for millions of results wants the dataset, which should come from a warehouse export, not a low-latency API.`, diff: `easy` }
-      ],
-      labs: [`topkEstimator`, `windowTypes`]
-    },
-    // ------------------------------------------------------------------
-    {
-      id: `ch2`, part: 1, number: 2,
-      title: `A first working design: counters, hour buckets and cached answers`,
-      overview: `Begin with something correct, however slow. A consumer reads view events and increments a counter row per video in Postgres; an index on the count column turns all-time top K into reading the first K index entries. For windows, store one row per video per hour and sum the buckets at query time: correct, but it aggregates hundreds of millions of rows per query. Then fix the cheap half first. There are only a few distinct questions, so cache their answers, and better still precompute them on a schedule so no request ever waits on the database.`,
-      concepts: [
-        { term: `Counter table with an index on views`, def: `A table (video_id, views) with a B-tree index on views. All-time top K is ORDER BY views DESC LIMIT K, answered by walking the first K entries of the index.`, why: `Reads are O(K). The price is on writes: every increment also moves the row's entry in the index (O(log n)), and there are hundreds of thousands per second.` },
-        { term: `Hour-bucket rows`, def: `One row per (video_id, hour) holding that hour's views. A window query sums the buckets in range per video, then sorts.`, why: `Simple and correct for any of our windows. But the row count grows with every hour each video is watched, and the query can't use the views index.`, demo: `windowQueryCost` },
-        { term: `Why windowed top K is expensive`, def: `To rank videos by views over a day you must first add up every video's 24 hourly buckets; only then can you sort. Sorted inputs don't help, because the sum of several sorted lists isn't sorted.`, why: `This is the core difficulty of the problem. Any design that aggregates at read time scans data proportional to the window, so the fix is to aggregate ahead of time.` },
-        { term: `Naming the bottlenecks`, def: `Say them as you draw: one database write per view, a fast-growing bucket table, and scan-heavy window queries, plus every client request reaching the database.`, why: `Interviewers want to see you know where the design breaks before you fix it. It also gives you the agenda for the deep dives.` },
-        { term: `Caching the answer`, def: `Put each window's result in Redis under a key such as topk:day:2026-10-13 with a TTL. A hit returns in well under a millisecond.`, why: `Reads are massively repetitive (four windows, a few K values), so even a short TTL removes almost all database reads.`, demo: `servingStrategy` },
-        { term: `The expiry cliff`, def: `When a cached answer expires, or a new window starts with an empty key, every request in the next few seconds misses and fires the expensive query.`, why: `Coalescing (one in-flight query per key) protects the database, but the requests waiting on it still miss the latency target. TTL caching alone can't meet "tens of ms, always".`, demo: `servingStrategy` },
-        { term: `Precomputing on a schedule`, def: `A refresher job computes every window's top K, say once a minute (inside the freshness budget), and writes the results into the cache. The API only ever reads the cache.`, why: `The slow query moves off the request path entirely, so latency is flat. The job also gets ahead of window boundaries instead of reacting to them.`, demo: `servingStrategy` },
-        { term: `Serving stale rather than nothing`, def: `Keep each answer with a TTL much longer than the refresh interval, and alert on refresher lag.`, why: `If the job is slow or down, users see a list that's a few minutes old instead of errors. For a "most viewed" shelf that's the right trade.` },
-        { term: `Read/write asymmetry`, def: `There are a handful of distinct read questions but hundreds of thousands of writes per second.`, why: `It tells you where to spend your time: the read path is solved by precomputation, and the real engineering is in counting and aggregating writes.` }
-      ],
-      cheatsheet: [
-        { title: `Baseline schema and queries`, type: `code`, body: `CREATE TABLE video_views (video_id text PRIMARY KEY, views bigint NOT NULL);
+200 OK
+{ "window": "hour",
+  "asOf":   "2026-10-13T10:00:00Z",
+  "videos": [ { "videoId": "v_8f2c", "views": 48213377 }, ... ] }` },
+            { type: `code`, title: `The input: one message per counted view`, lang: `text`, code: `topic: view-events      key: videoId      retention: >= 30 days
+value: { "videoId": "v_8f2c", "eventTime": "2026-10-13T09:59:58.412Z", "userId": "u_77" }` },
+            { type: `keypoints`, items: [
+              `There is no write API: views arrive on the log, which gives buffering and replay.`,
+              `Keying messages by <code>videoId</code> sends every view of a video to one partition; the whole design builds on that.`,
+              `<code>asOf</code> tells clients which window the answer describes. Reject <code>k</code> above 1,000; slice the stored top 1,000 for smaller K.`
+            ] }
+          ]
+        },
+        {
+          id: `simple-design`,
+          title: `A simple design that works`,
+          kicker: `Baseline`,
+          blocks: [
+            { type: `idea`, html: `<p>Start with something complete and obviously correct, however slow: one consumer, one database, one API. Its flaws become the agenda for the deep dives, and you get to name them before the interviewer does.</p>` },
+            { type: `diagram`, title: `The baseline`, caption: `Every view becomes a database write and every request becomes a database query. The red notes are the two bottlenecks.`, svg: `<svg viewBox="0 0 640 230" role="img" aria-label="Baseline: Kafka to a consumer that updates Postgres; clients query Postgres through an API">
+<defs><marker id="tk-arrow-base" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill: var(--dg-muted)"/></marker></defs>
+<rect x="20" y="40" width="110" height="50" rx="8" style="fill: var(--dg-1-soft); stroke: var(--dg-1)" stroke-width="1.5"/>
+<text x="75" y="61" text-anchor="middle" font-size="13" font-weight="700">Kafka</text>
+<text x="75" y="78" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">view-events</text>
+<rect x="180" y="40" width="120" height="50" rx="8" style="fill: var(--dg-panel); stroke: var(--dg-line)" stroke-width="1.5"/>
+<text x="240" y="61" text-anchor="middle" font-size="13" font-weight="700">Consumer</text>
+<text x="240" y="78" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">+1 per view</text>
+<rect x="340" y="25" width="170" height="190" rx="10" style="fill: var(--dg-2-soft); stroke: var(--dg-2)" stroke-width="1.5"/>
+<text x="425" y="47" text-anchor="middle" font-size="13" font-weight="700">Postgres</text>
+<rect x="352" y="60" width="146" height="44" rx="6" style="fill: var(--dg-panel); stroke: var(--dg-line)" stroke-width="1"/>
+<text x="425" y="78" text-anchor="middle" font-size="12" font-weight="700">video_views</text>
+<text x="425" y="95" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">(id, views)</text>
+<rect x="352" y="120" width="146" height="44" rx="6" style="fill: var(--dg-panel); stroke: var(--dg-line)" stroke-width="1"/>
+<text x="425" y="138" text-anchor="middle" font-size="12" font-weight="700">video_views_hourly</text>
+<text x="425" y="155" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">(id, hour, views)</text>
+<rect x="20" y="160" width="110" height="50" rx="8" style="fill: var(--dg-panel); stroke: var(--dg-line)" stroke-width="1.5"/>
+<text x="75" y="190" text-anchor="middle" font-size="13" font-weight="700">Clients</text>
+<rect x="180" y="160" width="120" height="50" rx="8" style="fill: var(--dg-3-soft); stroke: var(--dg-3)" stroke-width="1.5"/>
+<text x="240" y="181" text-anchor="middle" font-size="13" font-weight="700">Top-K API</text>
+<text x="240" y="198" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">SQL per request</text>
+<line x1="130" y1="65" x2="178" y2="65" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-base)"/>
+<line x1="300" y1="65" x2="338" y2="65" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-base)"/>
+<line x1="130" y1="185" x2="178" y2="185" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-base)"/>
+<line x1="300" y1="185" x2="338" y2="185" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-base)"/>
+<text x="525" y="70" font-size="12" font-weight="700" style="fill: var(--dg-bad)">~800K row</text>
+<text x="525" y="86" font-size="12" font-weight="700" style="fill: var(--dg-bad)">updates/s</text>
+<text x="525" y="180" font-size="12" font-weight="700" style="fill: var(--dg-bad)">scan and sum</text>
+<text x="525" y="196" font-size="12" font-weight="700" style="fill: var(--dg-bad)">per request</text>
+</svg>` },
+            { type: `code`, title: `Schema and queries`, lang: `sql`, code: `CREATE TABLE video_views (video_id text PRIMARY KEY, views bigint NOT NULL);
 CREATE INDEX ON video_views (views DESC);
--- all time: index walk, O(K)
+-- all time: walk the first K index entries
 SELECT video_id, views FROM video_views ORDER BY views DESC LIMIT 100;
 
 CREATE TABLE video_views_hourly (video_id text, hour timestamptz, views bigint,
                                  PRIMARY KEY (video_id, hour));
--- last day: sums every video's buckets before sorting (a scan)
+-- last day: sum every video's 24 buckets, then sort (a scan)
 SELECT video_id, SUM(views) AS views FROM video_views_hourly
 WHERE hour >= :day_start AND hour < :day_end
 GROUP BY video_id ORDER BY views DESC LIMIT 100;` },
-        { title: `Serving strategies`, type: `table`, headers: [`Strategy`, `DB queries`, `Latency at expiry`, `Staleness`, `Moving parts`], rows: [
-          [`Query on every request`, `One per request`, `Always slow`, `None`, `None`],
-          [`Cache with TTL`, `Burst at each expiry`, `Slow spike`, `≤ TTL`, `Cache`],
-          [`TTL + coalescing`, `One per key per server`, `Still slow for waiters`, `≤ TTL`, `Cache, locks`],
-          [`Scheduled precompute`, `Windows × refreshes`, `Flat`, `≤ refresh interval`, `Cache, job, lag alert`]
-        ] },
-        { title: `Bottlenecks to call out`, type: `list`, items: [
-          `~800K single-row writes per second, each also updating an index.`,
-          `Hour-bucket rows: one per video per active hour, growing without bound.`,
-          `Window queries that aggregate every video in the window before sorting.`,
-          `Every client request hitting the database (fixed by caching / precompute).`
-        ] }
+            { type: `text`, html: `<p><strong>All time is cheap.</strong> A B-tree on <code>views</code> keeps videos sorted, so the top K is a walk of K index entries. The price is on writes: every increment moves the video's index entry (and in Postgres writes a new row version), and popular videos queue on their own row lock.</p>
+<p><strong>Windows are expensive.</strong> No index can give you the order of a <em>sum</em>. To rank a day you must add up every video's 24 buckets first. With ~20M videos active per hour that is ~480M rows per day query (tens of seconds) and ~14B rows for a month (minutes).</p>` },
+            { type: `table`, title: `A video can win the day without leading any hour`, headers: [`Video`, `Hour 1`, `Hour 2`, `Hour 3`, `Total`], rows: [
+              [`A`, `<strong>900</strong>`, `100`, `100`, `1,100`],
+              [`B`, `500`, `500`, `500`, `<strong>1,500</strong>`],
+              [`C`, `100`, `<strong>950</strong>`, `50`, `1,100`],
+              [`D`, `50`, `60`, `<strong>980</strong>`, `1,090`]
+            ], note: `Merging each hour's leaders (A, C, D) misses B, the real winner. Ranking a sum needs every addend.` },
+            { type: `list`, title: `Bottlenecks to name before fixing anything`, items: [
+              `<strong>One database write per view</strong>: ~800K indexed updates/s, ~80× one node. (Deep Dives: the write path)`,
+              `<strong>Every request hits the database</strong>: thousands of identical expensive queries per second. (Deep Dives: serving reads)`,
+              `<strong>Window queries scan</strong>: each answer aggregates every video in the window before sorting. (Deep Dives: windowed counts)`,
+              `<strong>The bucket table grows forever</strong>: one row per video per active hour.`
+            ] }
+          ]
+        },
+        {
+          id: `high-level-design`,
+          title: `The improved high-level design`,
+          kicker: `Final design`,
+          blocks: [
+            { type: `text`, html: `<p>Four changes fix the baseline, each aimed at one bottleneck:</p>
+<ol>
+<li><strong>Partition the log and shard the counters by video ID</strong>, so each video has one owner and per-shard top-K lists merge exactly.</li>
+<li><strong>Aggregate in a stream processor</strong> (Flink, Kafka Streams) into per-minute sums before writing; writes then scale with distinct videos, not views.</li>
+<li><strong>Keep a running total per window</strong> (hour, day, month, all time), each indexed by views, so every window's top K is an index walk.</li>
+<li><strong>Precompute the answers</strong>: a refresher writes each window's top 1,000 into Redis every minute, and a stateless query service reads only Redis.</li>
+</ol>` },
+            { type: `diagram`, title: `The complete Top K design`, caption: `Write path along the top: Kafka keyed by video, a stream job with a 30-second watermark aggregating into minute panes, and per-window totals sharded by video. Read path along the bottom: a refresher merges each shard's top 1,000 into Redis every minute; the query service reads only Redis.`, svg: `<svg viewBox="0 0 640 290" role="img" aria-label="View events to Kafka to stream job to sharded per-window totals; refresher to Redis; clients read through a stateless query service">
+<defs><marker id="tk-arrow-final" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill: var(--dg-muted)"/></marker></defs>
+<text x="10" y="26" font-size="12" font-weight="700" style="fill: var(--dg-muted)">write path</text>
+<text x="10" y="180" font-size="12" font-weight="700" style="fill: var(--dg-muted)">read path</text>
+<rect x="10" y="40" width="100" height="56" rx="8" style="fill: var(--dg-panel); stroke: var(--dg-line)" stroke-width="1.5"/>
+<text x="60" y="64" text-anchor="middle" font-size="13" font-weight="700">View</text>
+<text x="60" y="81" text-anchor="middle" font-size="13" font-weight="700">events</text>
+<rect x="150" y="40" width="120" height="56" rx="8" style="fill: var(--dg-1-soft); stroke: var(--dg-1)" stroke-width="1.5"/>
+<text x="210" y="64" text-anchor="middle" font-size="13" font-weight="700">Kafka</text>
+<text x="210" y="81" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">key = videoId</text>
+<rect x="310" y="40" width="140" height="56" rx="8" style="fill: var(--dg-4-soft); stroke: var(--dg-4)" stroke-width="1.5"/>
+<text x="380" y="64" text-anchor="middle" font-size="13" font-weight="700">Stream job</text>
+<text x="380" y="81" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">watermark 30 s</text>
+<rect x="490" y="40" width="140" height="56" rx="8" style="fill: var(--dg-2-soft); stroke: var(--dg-2)" stroke-width="1.5"/>
+<text x="560" y="64" text-anchor="middle" font-size="13" font-weight="700">Per-window totals</text>
+<text x="560" y="81" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">sharded, indexed</text>
+<rect x="490" y="190" width="140" height="56" rx="8" style="fill: var(--dg-5-soft); stroke: var(--dg-5)" stroke-width="1.5"/>
+<text x="560" y="214" text-anchor="middle" font-size="13" font-weight="700">Refresher</text>
+<text x="560" y="231" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">every 60 s</text>
+<rect x="310" y="190" width="140" height="56" rx="8" style="fill: var(--dg-1-soft); stroke: var(--dg-1)" stroke-width="1.5"/>
+<text x="380" y="214" text-anchor="middle" font-size="13" font-weight="700">Redis</text>
+<text x="380" y="231" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">topk:{window}</text>
+<rect x="150" y="190" width="120" height="56" rx="8" style="fill: var(--dg-3-soft); stroke: var(--dg-3)" stroke-width="1.5"/>
+<text x="210" y="214" text-anchor="middle" font-size="13" font-weight="700">Query service</text>
+<text x="210" y="231" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">stateless</text>
+<rect x="10" y="190" width="100" height="56" rx="8" style="fill: var(--dg-panel); stroke: var(--dg-line)" stroke-width="1.5"/>
+<text x="60" y="223" text-anchor="middle" font-size="13" font-weight="700">Clients</text>
+<line x1="110" y1="68" x2="148" y2="68" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-final)"/>
+<line x1="270" y1="68" x2="308" y2="68" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-final)"/>
+<line x1="450" y1="68" x2="488" y2="68" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-final)"/>
+<line x1="560" y1="96" x2="560" y2="188" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-final)"/>
+<line x1="490" y1="218" x2="452" y2="218" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-final)"/>
+<line x1="270" y1="218" x2="308" y2="218" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-final)"/>
+<line x1="110" y1="218" x2="148" y2="218" stroke-width="2" style="stroke: var(--dg-muted)" marker-end="url(#tk-arrow-final)"/>
+<text x="210" y="116" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">replay, 30+ days</text>
+<text x="380" y="116" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">minute panes, checkpoints</text>
+<text x="552" y="140" text-anchor="end" font-size="12">top 1,000 per shard,</text>
+<text x="552" y="156" text-anchor="end" font-size="12">merged per window</text>
+<text x="380" y="268" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">long TTL, serve stale</text>
+<text x="210" y="268" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">reads cache only</text>
+<text x="560" y="268" text-anchor="middle" font-size="12" style="fill: var(--dg-muted)">idempotent writes</text>
+</svg>` },
+            { type: `table`, title: `Every component traces back to a requirement`, headers: [`Component`, `Requirement it serves`], rows: [
+              [`Kafka keyed by video, 30+ days retention`, `Absorb ~800K events/s; one owner per video; replay after bugs or crashes`],
+              [`Stream job: watermark, minute panes, checkpoints`, `Lateness budget inside the 1-minute target; writes cut to distinct videos per interval`],
+              [`Per-window totals sharded by video, indexed by views`, `Exact top K for every window without scanning; exact shard merge`],
+              [`Refresher + Redis with a long TTL`, `Reads in tens of ms; stale rather than broken if the refresher lags`],
+              [`Stateless query service behind a load balancer`, `Scales horizontally; never touches the counters`]
+            ] },
+            { type: `callout`, tone: `insight`, html: `<p>A leaner variant keeps the per-window counts in the stream processor's own state and has the job write each window's top K straight to Redis, removing the counter database and the refresher. It is elegant but leans on framework internals; present it after the primitives-based design.</p>` }
+          ]
+        },
+        {
+          id: `walkthrough`,
+          title: `Walking a view and a request through it`,
+          kicker: `Request flow`,
+          blocks: [
+            { type: `steps`, title: `Write path: one view`, items: [
+              `Playback publishes <code>{ videoId: v_8f2c, eventTime: 09:59:58 }</code> to <code>view-events</code> with key <code>v_8f2c</code>; it lands in that video's partition.`,
+              `The stream task that owns the partition adds 1 to v_8f2c's 09:59 minute pane in keyed state. The watermark (newest event time minus 30 s) decides when that pane is complete.`,
+              `When the pane closes, the task bulk-upserts the minute's sums into the shard that owns v_8f2c: add to the hour, day, month and all-time totals (and, for a sliding hour, subtract the minute that just left).`,
+              `State and Kafka offsets are checkpointed together every ~30 s. After a crash the job restores and replays; writes are idempotent, so nothing is counted twice.`
+            ] },
+            { type: `steps`, title: `Read path: one request`, items: [
+              `Every minute the refresher asks each shard for the top 1,000 of each window (an index walk), merges the lists, and publishes each window to Redis with an atomic swap and a long TTL.`,
+              `A client calls <code>GET /views/top?window=hour&amp;k=100</code>. The load balancer picks any query-service instance.`,
+              `The service reads the first 100 entries of <code>topk:hour</code> (about a millisecond) and returns them with <code>asOf</code>. Nothing on this path sums or sorts.`
+            ] },
+            { type: `quiz`, q: `A user requests the top 50 for the last day. Which components does that request touch?`, options: [
+              `Query service, Redis, the counter shards and the stream job`,
+              `Only the query service and Redis`,
+              `The query service and the counter shards`,
+              `The query service and Kafka`
+            ], answer: 1, explain: `The read path reads one precomputed list from Redis and slices it to 50. Counting, aggregation and merging all happen off the request path, which is how reads stay in the low milliseconds.` }
+          ]
+        }
+      ],
+      levels: [
+        {
+          id: `mid`,
+          title: `Mid-level`,
+          kicker: `What is expected`,
+          blocks: [
+            { type: `keypoints`, title: `You should drive`, items: [
+              `Clear functional requirements (four windows, K ≤ 1,000) and a rough write-rate estimate.`,
+              `A complete, correct baseline: Kafka consumer, counter tables, an API, and an explanation of the data flow end to end.`,
+              `Spotting the obvious bottlenecks: per-view writes and expensive window queries.`,
+              `Putting a cache in front of reads and explaining keys and TTLs.`
+            ] },
+            { type: `list`, title: `The interviewer will likely lead`, items: [
+              `Pushing you from "add database shards" towards aggregating before writing.`,
+              `Asking what happens when a cached answer expires, and nudging you to precompute.`,
+              `Sliding windows and approximation are bonus territory at this level.`
+            ] },
+            { type: `callout`, tone: `mistake`, html: `<p>Jumping to Flink, sketches and five boxes you can't explain; or a design that silently re-sorts billions of rows per request. A working, honest baseline with named bottlenecks beats an impressive diagram.</p>` }
+          ]
+        },
+        {
+          id: `senior`,
+          title: `Senior`,
+          kicker: `What is expected`,
+          blocks: [
+            { type: `keypoints`, title: `You should drive`, items: [
+              `Propose window semantics, exactness, freshness and latency defaults yourself, and use the numbers to rule out per-view writes.`,
+              `Reach something close to the final design largely unprompted: partition by video, aggregate in the stream, per-window totals, precomputed answers in Redis.`,
+              `Explain <em>why</em> the per-shard merge is exact, and why windowed top K can't use an index on raw buckets.`,
+              `Argue tumbling vs sliding with product reasons and offer the hybrid.`
+            ] },
+            { type: `list`, title: `Deep dives you should reach`, items: [
+              `Scaling the write path (sharding, pre-aggregation, hot keys).`,
+              `Serving reads (precompute vs TTL cache, serve stale).`,
+              `Windowed counts without scanning, and at least the shape of sliding windows.`,
+              `Recovery basics: checkpoints, replay and idempotent upserts.`
+            ] },
+            { type: `callout`, tone: `mistake`, html: `<p>Treating "Redis" as the end of the read story (the refresher still has to compute each window), or naming a stream processor without being able to say what watermarks and checkpoints do.</p>` }
+          ]
+        },
+        {
+          id: `staff`,
+          title: `Staff and above`,
+          kicker: `What is expected`,
+          blocks: [
+            { type: `keypoints`, title: `You should drive`, items: [
+              `The whole solution space, with a clear choice: database totals vs stream-processor state, exact vs sketch, build vs adopt an OLAP store, each tied to requirements and team context.`,
+              `Failure and operations: late data policy, replay and backfill after a bad deploy, hot-key detection, consumer-lag and answer-age alerts.`,
+              `Cost awareness: Kafka retention for a lagged subtractor, terabytes for a sliding month, what approximation saves.`,
+              `Extensions without redesign: slices by country or category, larger K, per-creator counts.`
+            ] },
+            { type: `list`, title: `How the interview usually runs`, items: [
+              `The interviewer gives little direction; you set the agenda and spend time where the risk is.`,
+              `Expect probes beyond the standard deep dives: "how would you verify the counts are right?", "what does a schema change to the event cost?"`
+            ] },
+            { type: `callout`, tone: `mistake`, html: `<p>Listing options without committing, or over-engineering every window to slide by the minute. Staff signal is judgement: say what you would build first, what you would defer, and why.</p>` }
+          ]
+        }
+      ],
+      concepts: [
+        { term: `Top-K query`, def: `Return the K items with the highest score in some scope, sorted. Here the items are videos, the score is views and the scope is a time window.`, why: `The answer is tiny and there are only four scopes, so it can be computed ahead of time. The hard part is keeping scores correct for billions of videos over moving windows.`, demo: `topkEstimator` },
+        { term: `View event stream`, def: `Counted views arrive on a durable, partitioned log (Kafka) with a video ID and event time. The system consumes it instead of exposing a write API.`, why: `It decouples us from playback, buffers bursts and allows replay: rewind and recompute after a crash or bug.` },
+        { term: `Tumbling window`, def: `Fixed, non-overlapping windows aligned to the clock (10:00-11:00, 11:00-12:00).`, why: `Each view lands in exactly one window and a window is final once it closes, so it is the simple default to propose.`, demo: `windowTypes` },
+        { term: `Sliding window`, def: `A trailing interval ending now (at 10:06, "last hour" is 09:06-10:06), advancing in small steps.`, why: `Fresher, but every view must later be subtracted, so you keep history (per-minute counts or the log itself).`, demo: `windowTypes` },
+        { term: `Event time and lateness budget`, def: `Count views by when they happened, and let each window wait a bounded time (e.g. 30 s via a watermark) for stragglers before it is final.`, why: `It is the knob between freshness and completeness, and it must fit inside the freshness target.`, demo: `windowTypes` },
+        { term: `Exact vs approximate`, def: `Exact counts every view; approximate allows small, bounded errors in counts or in the order near position K.`, why: `Approximation unlocks fixed-memory structures, but only for trend features. Start exact; offer approximation with its error stated.`, demo: `cmsTopK` },
+        { term: `Precomputed answers`, def: `A refresher computes each window's top 1,000 on a schedule (every minute) and writes it to a cache; the API only reads the cache.`, why: `Few distinct questions, asked constantly. Precomputing removes the slow query from the request path and avoids the TTL expiry cliff.`, demo: `servingStrategy` },
+        { term: `Redis as the serving layer`, def: `Each window's answer lives in Redis (a sorted set or a serialised list), published with an atomic rename and a TTL much longer than the refresh interval.`, why: `Reads take about a millisecond, and a slow or dead refresher means slightly stale answers, not errors.`, demo: `servingStrategy` },
+        { term: `Why windowed top K is expensive`, def: `Ranking by a window's total needs every video's buckets summed first; no index orders a sum, and merging per-bucket leaders misses steady performers.`, why: `It is the core difficulty: any design that aggregates at read time scans data proportional to the window.`, demo: `windowQueryCost` },
+        { term: `Partitioning by video ID`, def: `Use the video ID as the Kafka key so all views of a video go to one partition and one consumer, and shard counters on the same key.`, why: `One owner per counter: no contention between consumers, no lost updates, and a clean seam for everything downstream.`, demo: `shardMerge` },
+        { term: `Shard-and-merge`, def: `Ask each shard for its own top K and merge the lists.`, why: `Exact only because each video's full count lives on one shard. With round-robin placement, partial counts can keep the true winner off every local list.`, demo: `shardMerge` },
+        { term: `Hot keys and two-stage aggregation`, def: `A viral video can overload its partition. Count locally wherever events land, then re-key the partial sums by video and add them up (or salt known hot keys).`, why: `Keeps load even without giving up exact, keyed final counts.`, demo: `shardMerge` },
+        { term: `Stream aggregation (micro-batching)`, def: `A stream processor sums views per video per interval in memory and flushes the sums as bulk upserts.`, why: `Popularity is skewed, so distinct videos per minute are far fewer than views: writes drop 10-100×.`, demo: `batchingWrites` },
+        { term: `Idempotent upserts and replay`, def: `Checkpoint state with Kafka offsets; after a crash, restore and replay. Sinks write the full value for a (video, window) key, never "+37".`, why: `Replay repeats writes; full-value upserts make repeats harmless, turning at-least-once processing into correct counts.` },
+        { term: `Running window totals with an index`, def: `One table per window (last hour, day, month, all time) holding each video's current total, indexed by views.`, why: `Every window's top K becomes an index walk of K entries. The cost moves to writes, which are already batched.`, demo: `windowQueryCost` },
+        { term: `Sliding window by bucket add/subtract`, def: `Every minute: total += the minute that just closed − the minute that just left the window.`, why: `Work is proportional to recent activity, but you must keep minute counts for the whole window (60 per video for an hour, 43,200 for a month).`, demo: `slidingCounter` },
+        { term: `Count-Min Sketch + heap`, def: `A d × w grid of counters estimates any video's count (minimum over d hashed cells, never under); a min-heap a few times larger than K remembers which IDs look heavy.`, why: `Finds heavy hitters in megabytes regardless of catalogue size, if small errors near position K are acceptable.`, demo: `cmsTopK` },
+        { term: `Why not a generic time series DB`, def: `InfluxDB or Prometheus store one series per tag combination; with video ID as a tag that is billions of series.`, why: `Great for one video's view graph, poor at ranking all of them. TimescaleDB continuous aggregates or Druid/Pinot/ClickHouse fit better, at an operational cost.` }
       ],
       interview: [
-        { q: `Why is all-time top K cheap but last-day top K expensive in the baseline?`, a: `All-time counts live in one row per video with an index on views, so the top K are the first K index entries. Last-day counts must be built by summing 24 hourly buckets for every video viewed that day, and only then sorted. No index on the buckets can give you the order of their sums, so the database scans and hash-aggregates hundreds of millions of rows.`, diff: `medium` },
-        { q: `Cache with a TTL or precompute?`, a: `Precompute. With a TTL, every expiry and every new window creates a burst of misses that run the expensive query and break the latency target; coalescing protects the database but not the waiting requests. A scheduled job that writes each answer before it's needed keeps reads flat, and a long TTL lets you serve slightly stale data if the job falls behind.`, diff: `medium` },
-        { q: `How would you choose cache keys?`, a: `By window type and window start, for example topk:hour:2026-10-13T09 and topk:all. Store the largest K you support (1,000) and slice for smaller requests, so one key serves every K.`, diff: `easy` },
-        { q: `What happens if the refresher job dies?`, a: `Readers keep getting the last computed answer until its long TTL runs out, so the product degrades to "a bit stale" rather than failing. Alert on the age of the newest answer, run the job with a leader lock or on a scheduler that restarts it, and make each run idempotent so a retry is harmless.`, diff: `medium` },
-        { q: `Why start with a deliberately naive design?`, a: `It's complete and obviously correct, it gives the interviewer a shared picture, and its flaws define the deep dives. Jumping straight to a streaming architecture risks spending the interview defending components before you've shown you understand the data flow.`, diff: `easy` }
-      ],
-      labs: [`servingStrategy`]
-    },
-    // ------------------------------------------------------------------
-    {
-      id: `ch3`, part: 1, number: 3,
-      title: `The write path: partitioning, sharding and aggregating in the stream`,
-      overview: `Around 800K view events per second is far more than one relational node can apply as indexed updates (think ~10K per second). There are three levers. <strong>Partition</strong> the event log by video ID so each video's events go to one consumer. <strong>Shard</strong> the counters the same way, which keeps the top-K merge correct. Most importantly, <strong>aggregate before writing</strong>: views are so concentrated on popular videos that summing per video per minute or per hour in a stream processor turns hundreds of thousands of writes per second into a periodic batch of upserts.`,
-      concepts: [
-        { term: `Partition the log by video ID`, def: `Use the video ID as the Kafka message key, so all views of a video land in the same partition and are handled by the same consumer instance.`, why: `One owner per counter means no cross-consumer contention or double counting, and it creates a clean seam to split everything downstream.` },
-        { term: `Shard the counters the same way`, def: `Split the counter tables across database shards by hash of video ID, aligned with the partitions, so each consumer writes to one shard.`, why: `It divides the write load. Writing per event at ~10K writes per second per node would still take ~80 shards, so sharding alone is a blunt instrument.`, demo: `shardMerge` },
-        { term: `Merging per-shard top K`, def: `Ask each shard for its own top K and merge the lists.`, why: `This is exact only because each video's whole count lives on one shard: a video in the global top K must be in its own shard's top K. If one video's views were spread across shards, partial counts could keep it out of every local list.`, demo: `shardMerge` },
-        { term: `Hot keys and skew`, def: `A viral video can send a large share of all events to one partition and one shard.`, why: `Keyed partitioning trades even load for correctness. Mitigate it by pre-aggregating before the keyed stage, or by splitting a known hot key into sub-keys (video#1..video#8) and adding them back together at the end.`, demo: `shardMerge` },
-        { term: `Two-stage aggregation`, def: `First count locally in whatever partition an event happens to land in, then re-key the partial sums by video ID and add them up.`, why: `This is how stream processors and MapReduce combiners handle skew: the hot video's millions of events become a few partial sums before they reach its single owner.`, demo: `shardMerge` },
-        { term: `Pre-aggregating in the stream`, def: `Count views per (video, window) in memory and flush the sums periodically, for example every minute or at the end of each hour.`, why: `Popularity follows a power law, so the number of distinct videos in an interval is far smaller than the number of events. Writes drop by one to two orders of magnitude, and bulk upserts are much cheaper per row than single updates.`, demo: `batchingWrites` },
-        { term: `Stream processor`, def: `A framework such as Flink, Kafka Streams or Spark Structured Streaming that provides keyed state, event-time windows, watermarks and checkpointing over a log.`, why: `You get correct windowed aggregation and failure recovery without building them yourself. Be ready to explain what each of those features does, because interviewers will ask.` },
-        { term: `Watermarks and allowed lateness`, def: `A watermark is the processor's estimate that no older events are still coming. With a bounded-out-of-orderness watermark of, say, 30 seconds, a window closes once the watermark passes its end; later stragglers are dropped, sent to a side output, or used to update the result.`, why: `This is how the lateness budget from the requirements becomes code. Set it below the freshness target (e.g. 30 seconds against a 1-minute budget).` },
-        { term: `Checkpoints, replay and idempotent sinks`, def: `The processor periodically snapshots its state together with the Kafka offsets it has consumed. After a crash it restores the snapshot and replays the log from those offsets.`, why: `Replay means some aggregates are emitted twice, so sinks must be idempotent: upsert keyed by (video, window) with the full value, not "add 37".` },
-        { term: `Bulk upserts`, def: `Write each flush as large batches (multi-row INSERT ... ON CONFLICT, or COPY into a staging table followed by a merge).`, why: `Per-row overhead (round trips, transaction commits, WAL flushes) dominates single-row writes; batching amortises it.` }
+        { q: `What would you clarify before designing a top-K system?`, a: `Which windows and whether they tumble or slide; exact or approximate; the freshness budget; the maximum K; read latency and volume; event scale; and whether arbitrary historical ranges are needed. I'd propose defaults (tumbling hour/day/month plus all time, exact, ≤ 1 minute, K ≤ 1,000, tens of ms) and confirm them.`, diff: `easy` },
+        { q: `Why propose tumbling windows first?`, a: `Each view lands in exactly one window, so a window is a running total that is final once it closes and the lateness budget passes. Sliding windows require subtracting every view later, which means keeping per-minute history. Tumbling gets a working design on the board; sliding becomes a deliberate deep dive.`, diff: `easy` },
+        { q: `Estimate the write rate and storage.`, a: `70B views/day over ~10<sup>5</sup> s is ~700-800K writes/s, ~1.5M at peak. About 1M new videos a day gives ~3.6B over ten years; at 16 bytes per (ID, count) that is ~58 GB per set of counters. The counts fit in memory; the write rate is ~80× one database node.`, diff: `med` },
+        { q: `Why cap K?`, a: `So each answer is a small, fixed-size value that can be precomputed and cached under one key: store the top 1,000 and slice it. A request for millions of rows is a data export, not a low-latency query.`, diff: `easy` },
+        { q: `Why is all-time top K cheap but last-day top K expensive in the baseline?`, a: `All-time totals are one row per video with an index on views, so the top K is the first K index entries. A day's totals must be built by summing every active video's 24 hourly buckets before sorting; no index orders a sum, so it is a scan of hundreds of millions of rows.`, diff: `med` },
+        { q: `Cache with a TTL, or precompute?`, a: `Precompute. With a TTL, every expiry and every new window causes a burst of misses that run the slow query; coalescing protects the database but the waiting requests still take seconds. A refresher that writes each answer every minute keeps reads flat, and a long TTL serves stale data if it falls behind.`, diff: `med` },
+        { q: `What happens if the refresher dies?`, a: `Readers keep getting the last answers until their long TTL runs out, so the shelf goes slightly stale rather than failing. Alert on answer age, run the job under a scheduler or leader lock, and make each run idempotent so retries are harmless. Don't fall back to querying the database per request; that recreates the thundering herd.`, diff: `med` },
+        { q: `Is merging per-shard top K lists exact?`, a: `Yes, if counters are sharded by video ID. Each video's full count is on one shard; a video in the global top K is beaten by fewer than K videos overall, so by fewer than K on its own shard, so it appears in that shard's top K. With round-robin placement a video's views are split, and partial counts can keep the true winner off every list.`, diff: `med` },
+        { q: `How much does pre-aggregation save, and what does it cost?`, a: `Writes per flush equal distinct videos per interval. With skewed popularity a minute's ~48M views touch a few million videos, and longer intervals fold more repeats, so writes drop 10-100×. The cost is state in memory and up to one flush interval of delay, so keep minute panes for freshness and fold them into hour and day totals.`, diff: `med` },
+        { q: `A video goes viral. What breaks and how do you fix it?`, a: `Its partition, consumer and shard take a disproportionate share of events, so that consumer lags and holds back the watermark. Pre-aggregate in an earlier stage (count anywhere, then re-key partial sums) or salt the hot key into sub-keys and recombine. Alert on per-partition consumer lag.`, diff: `hard` },
+        { q: `How do you avoid double counting after a crash?`, a: `Checkpoint state together with consumed offsets, restore and replay from there, and make writes idempotent: upsert the full aggregate for (video, window) instead of incrementing. For running totals updated by deltas, record the last applied pane per shard in the same transaction and skip replays.`, diff: `med` },
+        { q: `Rollups or per-window running totals?`, a: `Rollups (daily, monthly rows) reduce rows per video but the refresher still aggregates every active video each time. Per-window totals with an index on views make every window an index walk, at the cost of updating several tables per flush. With batched upserts from the stream job, per-window totals win.`, diff: `med` },
+        { q: `How do you support a sliding last hour, and should the month slide too?`, a: `Aggregate per minute; every minute add the newest minute to the hour total and subtract the minute that left, keeping an hour of minute buckets (a few GB). A month sliding by the minute needs 43,200 buckets per video (terabytes) for a ranking that barely moves, so slide the hour and tumble or step hourly the day and month.`, diff: `med` },
+        { q: `Explain the lagged-consumer trick.`, a: `A second consumer group reads the same topic but trails the live one by exactly the window length, subtracting each event as it ages out. The log is the history, so no bucket table is needed. It requires retention of at least the longest window (tens of TB for a month) and the same event-time and lateness rules as the adder.`, diff: `hard` },
+        { q: `Why not keep all the state in Flink and skip the database?`, a: `You can: keyed per-window counts in RocksDB-backed state, a second stage merging local top-K lists, results written straight to Redis. It removes the database and refresher and recovers consistently from checkpoints. The cost is depth: state size, checkpoint duration, rescaling and harder debugging. Offer it after the primitives-based design.`, diff: `hard` },
+        { q: `How does a Count-Min Sketch give you the top K, and what errors does it make?`, a: `It doesn't alone; it forgets IDs. Add each event to the sketch, read back the estimate and offer the video to a min-heap a few times larger than K. Estimates never undercount and overcount by at most εN with probability 1 − δ (w = e/ε, d = ln 1/δ). Items near position K can swap or drop out; a wider sketch and larger heap shrink that.`, diff: `hard` },
+        { q: `Would you use InfluxDB or Druid for this?`, a: `Not InfluxDB: with video ID as a tag there are billions of series and ranking touches all of them. Druid, Pinot or ClickHouse can work, since they roll up on ingest and answer group-by-limit queries quickly, but they're heavy to operate and, e.g., Druid's TopN is approximate because segments are partitioned by time. Pick one if the organisation already runs it or needs many ad hoc slices.`, diff: `med` },
+        { q: `Walk through the final design end to end.`, a: `Views go to Kafka keyed by video. A stream job with a 30 s watermark aggregates per video per minute, checkpoints with offsets and bulk-upserts idempotently into per-window totals sharded by video (sliding hour, tumbling day and month, all time). Every minute a refresher merges each shard's top 1,000 per window into Redis. A stateless query service reads only Redis.`, diff: `hard` }
       ],
       cheatsheet: [
-        { title: `Write-path levers`, type: `table`, headers: [`Lever`, `Effect`, `Cost`], rows: [
-          [`Partition log by video ID`, `One owner per counter`, `Hot partitions for viral videos`],
-          [`Shard counters by video ID`, `Divides writes; merge stays exact`, `Many nodes; scatter-gather reads`],
-          [`Aggregate per minute / hour`, `10-100× fewer writes`, `State in memory; lag up to the flush interval`],
-          [`Two-stage aggregation`, `Absorbs skew`, `Extra shuffle stage`],
-          [`Bulk upserts`, `Cheaper per row`, `Bursty write pattern`]
+        { title: `Requirements and defaults`, type: `table`, headers: [`Question`, `Default`, `What it changes`], rows: [
+          [`Which windows?`, `Last hour, day, month, all time`, `How many sets of totals you maintain`],
+          [`Tumbling or sliding?`, `Tumbling; slide the hour as a deep dive`, `Whether old views must be subtracted`],
+          [`Exact or approximate?`, `Exact first`, `Whether sketches are allowed`],
+          [`How fresh?`, `≤ 1 minute`, `Watermark ~30 s, refresh every minute`],
+          [`How big is K?`, `≤ 1,000`, `Size of each precomputed answer`],
+          [`Read latency?`, `Tens of ms`, `Precompute; no read-time aggregation`],
+          [`Arbitrary ranges?`, `Out of scope`, `Avoids a general OLAP store`]
         ] },
-        { title: `Stream job sketch`, type: `code`, body: `source  = kafka("view-events")                 # keyed by videoId
-            .watermark(maxOutOfOrder = 30s)        # lateness budget < 1 min
-counts  = source.keyBy(videoId)
-            .window(tumbling(1 hour))              # or 1-minute panes
-            .count()                               # state: videoId -> count
-counts.sink(upsert("video_views_hourly",           # idempotent: full value
-                   key = (videoId, windowStart)))
-checkpoint(every = 30s)                            # state + Kafka offsets` },
-        { title: `Failure questions to expect`, type: `list`, items: [
-          `Consumer crash: restore the last checkpoint, replay from its offsets, rely on idempotent upserts.`,
-          `Late events beyond the watermark: drop and count them, or emit corrections.`,
-          `Viral video: pre-aggregate or salt the hot key; watch per-partition lag.`,
-          `Database shard down: the stream processor buffers (backpressure) and Kafka retains events until it recovers.`
+        { title: `Numbers`, type: `code`, body: `writes:   70e9 views/day / 1e5 s/day      ~ 700-800K/s (peak ~2x)
+videos:   3,600 s uploaded/s / 360 s avg  ~ 10/s ~ 1M/day
+catalog:  1M/day * 365 * 10 years         ~ 3.6B videos
+counters: 3.6B * (8 B id + 8 B count)     ~ 58 GB per set
+one node: ~10K indexed updates/s          -> ~80 nodes for per-view writes
+sliding:  minute buckets per video        60 (hour) / 1,440 (day) / 43,200 (month)
+CMS:      w = e/eps, d = ln(1/delta)      eps=1e-5, delta=1e-3 -> ~15 MB` },
+        { title: `Final design`, type: `code`, body: `view events --> Kafka "view-events" (key = videoId, retention >= 30 days)
+                    |
+      stream job: watermark 30 s, minute panes, checkpoints (state + offsets)
+                    |  idempotent bulk upserts per flush
+      per-window totals (hour, day, month, all time)
+      sharded by videoId, index on views
+                    |  every minute: top 1,000 per shard, merged per window
+                Redis topk:{window}  (atomic swap, long TTL, serve stale)
+                    ^
+      clients --> LB --> query service (stateless, reads cache only)
+      GET /views/top?window=hour&k=100` },
+        { title: `Deep-dive decisions`, type: `table`, headers: [`Question`, `Weak`, `Better`, `Best`], rows: [
+          [`Absorb ~800K writes/s`, `One DB write per view`, `Shard counters by video ID`, `Partition by video + aggregate in the stream + bulk upserts`],
+          [`Serve in tens of ms`, `Query per request`, `Cache with a TTL (+ coalescing)`, `Scheduled precompute into Redis, long TTL`],
+          [`Windowed top K`, `Sum hour buckets at read time`, `Hour + day + month rollups`, `Running total per window, indexed by views`],
+          [`Sliding windows`, `Engine-native sliding window`, `Minute buckets, add/subtract`, `Hybrid: slide the hour, tumble day and month`],
+          [`Hot videos`, `Ignore skew`, `Salt known hot keys`, `Two-stage aggregation + per-partition lag alerts`],
+          [`Crash recovery`, `Increment deltas`, `Checkpoint + replay`, `Checkpoint + replay + idempotent full-value upserts`]
+        ] },
+        { title: `Exact vs approximate`, type: `table`, headers: [``, `Exact (per-window totals)`, `Approximate (Count-Min Sketch + heap)`], rows: [
+          [`Memory`, `Grows with active videos (GB per window)`, `Fixed by error bound (MB per window)`],
+          [`Errors`, `None`, `Overcounts ≤ εN w.p. 1 − δ; swaps near position K`],
+          [`Lists IDs?`, `Yes`, `Only via the candidate heap (3-5× K)`],
+          [`Combine windows`, `Sum totals`, `Add sketches cell by cell`],
+          [`Fits`, `Payouts, official counters, default answer`, `Trending shelves, when the product agrees`]
         ] }
       ],
-      interview: [
-        { q: `Is merging the per-shard top K lists exact?`, a: `Yes, if the data is sharded by video ID. Every view of a video is on one shard, so its full count is there; any video in the global top K beats all but at most K−1 videos overall, so it beats all but at most K−1 on its own shard and appears in that shard's top K. If views of one video were spread across shards (round-robin), the merge could miss videos whose partial counts never make a local list.`, diff: `medium` },
-        { q: `How much does pre-aggregation actually save?`, a: `It depends on how many distinct videos are watched per interval. With a power-law popularity curve, a minute's ~50M views might touch a few million distinct videos, and an hour's views far fewer per event, so writes per second drop by 10-100×. Longer flush intervals save more but delay results and keep more state in memory.`, diff: `medium` },
-        { q: `A video goes viral. What breaks and how do you fix it?`, a: `Its partition and its counter's owner receive a disproportionate share of events, so that consumer lags. Pre-aggregate in an earlier stage so the owner receives a few partial sums instead of millions of events, or split the hot key into sub-keys and recombine. Monitor consumer lag per partition to spot it.`, diff: `hard` },
-        { q: `How do you avoid double counting after a crash?`, a: `Checkpoint state together with consumed offsets, restore and replay from there, and make every write idempotent: upsert the full aggregate for (video, window) rather than incrementing. Replayed windows then overwrite themselves with the same value.`, diff: `medium` },
-        { q: `Why not just add database shards until the writes fit?`, a: `At ~10K indexed writes per second per node that's around 80 shards for a counter table, which is costly and still fragile at peaks. Aggregating first attacks the cause: most writes are to the same popular videos, and summing them in memory makes a few shards enough.`, diff: `easy` }
-      ],
-      labs: [`shardMerge`, `batchingWrites`]
-    },
-    // ------------------------------------------------------------------
-    {
-      id: `ch4`, part: 1, number: 4,
-      title: `The read path: rollups, per-window totals and sliding windows`,
-      overview: `Caching hides query cost from users, but the refresher still has to compute each window's top K, and summing hourly buckets across a month for billions of videos is batch-job sized. Three ways out: keep <strong>coarser rollups</strong> so long windows sum fewer rows; keep a <strong>running total per window</strong> with an index on views, so top K is an index walk again; or keep all of that state <strong>inside the stream processor</strong> and emit top K directly to the cache. Sliding windows add one more twist: every view must eventually be subtracted, which costs either minute-level history or a second, delayed pass over the log.`,
-      concepts: [
-        { term: `Rollup tables`, def: `Besides hourly buckets, maintain daily and monthly totals per video, written by the stream job or by a periodic job.`, why: `A month query sums ~30 daily rows per video instead of ~720 hourly ones. It still aggregates every video at query time, just over fewer rows.`, demo: `windowQueryCost` },
-        { term: `Per-window running totals`, def: `One table per window (views_last_hour, views_last_day, views_last_month, views_all_time) holding each video's current total, each with an index on views.`, why: `Top K becomes an index walk for every window, so the refresher is trivial. The cost moves to writes: each flush updates four tables instead of one.`, demo: `windowQueryCost` },
-        { term: `Swapping tumbling windows`, def: `For a tumbling window, build the next window's totals in a fresh table while the current one is served, then switch atomically (rename, or change which table the refresher reads).`, why: `Readers never see a half-built window, and expiring the old window is a cheap table drop rather than millions of deletes.` },
-        { term: `Sliding update: add the new, subtract the old`, def: `Every minute: add the counts from the minute that just finished, and subtract the counts from the minute that just left the window (60 minutes ago for "last hour").`, why: `It keeps a sliding total current with work proportional to recent activity, not the window size. But you need the old minute's counts at subtraction time.`, demo: `slidingCounter` },
-        { term: `The retention cost of sliding windows`, def: `Subtracting means keeping minute-level counts for the whole window: 60 buckets per video for an hour, 1,440 for a day, 43,200 for a month.`, why: `For a sliding month that's a huge, mostly useless table. It's the main reason to push back on "everything must slide".`, demo: `slidingCounter` },
-        { term: `Hybrid windows`, def: `Slide the last hour at minute granularity; keep day and month tumbling (or sliding in coarse hourly steps).`, why: `It matches what users notice: "trending now" should move every minute, while a monthly chart barely changes. Proposing it shows product judgement, not just technique.`, demo: `slidingCounter` },
-        { term: `Lagged consumer for subtraction`, def: `Run a second consumer group on the same Kafka topic that trails the live consumer by exactly the window length and subtracts each event as it passes.`, why: `No minute-level table is needed; the log itself is the history. The topic must retain at least one window (a month), which Kafka handles cheaply because it's sequential storage.`, demo: `slidingCounter` },
-        { term: `All state in the stream processor`, def: `Keep per-window counts in the processor's keyed state (backed by RocksDB on local disk), compute each window's top K in a second stage with a heap, and write results straight to a Redis sorted set.`, why: `It removes the counter database and the refresher. The catch is depth: you must be able to explain keyed state, checkpoints and the two-stage job, and some interviewers will steer you back to simpler primitives.` },
-        { term: `Native sliding windows multiply state`, def: `A stream engine's sliding window of one month that advances every minute keeps a separate aggregate for every overlapping window: 43,200 copies per key.`, why: `It looks like a one-liner but explodes memory. Use small tumbling panes (minute or hour sums) and combine them, which is what the add/subtract approach does.` },
-        { term: `Sorted sets for serving`, def: `Redis sorted sets keep members ordered by score: ZADD to set a score, ZINCRBY to add, ZREVRANGE 0 K-1 to read the top K in O(log n + K).`, why: `A natural home for precomputed answers, and even for live counters at small scale. Keep only the top few thousand members per window so memory stays bounded.` }
-      ],
-      cheatsheet: [
-        { title: `Ways to answer a windowed top-K query`, type: `table`, headers: [`Design`, `Work per refresh`, `Writes per flush`, `Notes`], rows: [
-          [`Hour buckets, sum at query`, `Every bucket in the window`, `1 table`, `Simple; month queries are huge scans`],
-          [`Hour + day + month rollups`, `Fewer, coarser rows`, `2-3 tables`, `Still aggregates every video`],
-          [`Per-window totals + index`, `K index entries`, `4 tables`, `Fast reads; heavier writes`],
-          [`State in the stream processor`, `Heap per window`, `Cache only`, `Least infrastructure; most expertise`]
-        ] },
-        { title: `Sliding update, per minute`, type: `code`, body: `-- new  = counts for the minute that just closed      (from the stream job)
--- old  = counts for the minute that left the window   (minute = now - 60)
-UPDATE views_last_hour t
-SET    views = t.views + COALESCE(n.views, 0) - COALESCE(o.views, 0)
-FROM   minute_counts n FULL JOIN minute_counts o USING (video_id)
-WHERE  n.minute = :just_closed AND o.minute = :just_expired
-AND    t.video_id = COALESCE(n.video_id, o.video_id);
--- all-time window: subtract nothing` },
-        { title: `Choosing a sliding-window strategy`, type: `list`, items: [
-          `Minute buckets plus add/subtract: simple, but stores 60 × window-in-hours buckets per active video.`,
-          `Lagged consumer: no bucket table; requires topic retention ≥ window and a second consumer.`,
-          `Hybrid: sliding hour, tumbling day and month. Usually the right product answer.`,
-          `Avoid engine-native sliding windows with tiny slides over long windows: state is multiplied by window ÷ slide.`
-        ] }
-      ],
-      interview: [
-        { q: `Rollups or per-window totals?`, a: `Rollups reduce how many rows a long-window query sums, but the refresher still aggregates every video each time. Per-window totals with an index on views make every window's top K an index walk, at the cost of updating several tables per flush. With batched upserts from the stream job, per-window totals win for this problem because reads must be cheap and writes are already aggregated.`, diff: `medium` },
-        { q: `How do you support a sliding last hour?`, a: `Aggregate views per minute in the stream job. Every minute, add the newest minute's counts to views_last_hour and subtract the counts from the minute that is now 61 minutes old, which means keeping an hour of minute buckets. Refresh the cached top K right after.`, diff: `medium` },
-        { q: `Why not make the month window slide every minute too?`, a: `You'd need 43,200 minute buckets per video to subtract from, and the ranking would barely change minute to minute anyway. Offer hourly steps for the month, or tumbling, and point out that users judge freshness on the hour window, not the month.`, diff: `medium` },
-        { q: `Explain the lagged-consumer trick.`, a: `A second consumer group reads the same view topic, but only processes events once they are exactly one window old, and subtracts them from the window total. The log is the history, so there is no minute table. It needs topic retention of at least the window length and careful handling of time (use event time with the same watermark as the adder).`, diff: `hard` },
-        { q: `What's the risk of keeping everything in Flink?`, a: `It's elegant (no counter database, top K written straight to Redis), but it moves the hard parts into framework internals: keyed state size, RocksDB, checkpoint duration, rescaling, a second keyed stage per window. If the interviewer doesn't know Flink, you'll spend the time explaining it, so present it as an option after the primitives-based design.`, diff: `hard` }
-      ],
-      labs: [`windowQueryCost`, `slidingCounter`]
-    },
-    // ------------------------------------------------------------------
-    {
-      id: `ch5`, part: 1, number: 5,
-      title: `Approximation, specialised stores and the final design`,
-      overview: `So far precision has forced us to keep a counter for every video in every window. If the product can live with small errors (and trending lists usually can, since the top videos are separated by large margins), a <strong>Count-Min Sketch paired with a bounded heap</strong> finds the heavy hitters in fixed memory. This chapter also asks whether a specialised store could do the job: generic time series databases fail on billions of video IDs, while TimescaleDB and real-time OLAP engines (Druid, Pinot, ClickHouse) essentially automate the rollups we built by hand. It ends with the full design and what interviewers expect at each level.`,
-      concepts: [
-        { term: `When approximation is acceptable`, def: `Errors are bounded and small relative to the gaps between top items, and the feature is about trends rather than money or contracts.`, why: `It unlocks fixed-memory structures. Errors only matter near the boundary at position K, where items with similar counts might swap.`, demo: `cmsTopK` },
-        { term: `Count-Min Sketch`, def: `A d × w grid of counters. Each item increments one counter per row (one hash per row); its estimate is the minimum of its d counters. Estimates never undercount, and with w = e/ε and d = ln(1/δ) they overcount by at most εN with probability 1 − δ.`, why: `Memory depends on the error you accept, not on how many videos exist. But a sketch forgets item IDs, so it can't list the top items by itself.`, demo: `cmsTopK` },
-        { term: `Sketch plus heap`, def: `For each event, add it to the sketch and read back its estimate. Keep a min-heap of candidates (a few times K); if the item is already there update it, otherwise insert it if its estimate beats the heap minimum, evicting the minimum.`, why: `The sketch provides counts for any item; the heap remembers which IDs are heavy. Reading the top K is reading the heap.`, demo: `cmsTopK` },
-        { term: `Counter-based heavy hitters`, def: `Misra-Gries and Space-Saving keep a fixed number of (item, count) slots and, when a new item arrives and slots are full, reuse the smallest slot.`, why: `They track IDs directly and give deterministic error bounds, a good alternative to mention if the interviewer asks what else exists.` },
-        { term: `Sketches per window`, def: `Keep one sketch and heap per tumbling window. Sketches with the same dimensions and hashes merge by adding cell by cell.`, why: `Merging means hourly sketches can be rolled up into daily ones. Sliding windows need subtraction, which a Count-Min Sketch supports only for items previously added, and which Redis's sketch commands don't offer.` },
-        { term: `Where the sketch lives`, def: `Redis (RedisBloom) offers sketch commands and sorted sets, so a consumer can increment, query and ZADD per event. Alternatively the sketch and heap live in the stream processor's checkpointed state.`, why: `Redis is simple, but an update can land in the sketch and not the sorted set, and Redis persistence can't be lined up with Kafka offsets. In the stream processor both are restored together with the offsets.` },
-        { term: `Generic time series databases`, def: `InfluxDB and Prometheus store one series per unique tag combination and query individual series quickly.`, why: `With video ID as a tag there are billions of series, far beyond what they're built for, and "top K across all series" touches every one. Good for one video's view graph, bad for ranking all of them.` },
-        { term: `TimescaleDB`, def: `Postgres with time-partitioned hypertables and continuous aggregates (incrementally maintained materialised views).`, why: `Continuous aggregates for the last hour, day and month are our per-window totals, maintained by the database. You still need caching, and likely sharding at this write rate.` },
-        { term: `Real-time OLAP`, def: `Druid, Pinot and ClickHouse ingest from Kafka and pre-aggregate on ingest: Druid rolls rows up by time bucket, Pinot uses star-tree indexes, ClickHouse uses materialised views into SummingMergeTree tables.`, why: `They answer GROUP BY video ORDER BY views LIMIT K over a window quickly. They're operationally heavy at this scale, and you must be able to explain their ingestion path when asked.` },
-        { term: `The final design`, def: `Kafka (keyed by video) → stream job (watermark, minute/hour aggregation, checkpoints) → per-window totals in sharded storage or processor state → refresher computing each window's top K every minute → Redis → stateless top-K API behind a load balancer.`, why: `Every box traces back to a requirement: the log for replay, the stream job for write volume and lateness, per-window totals for cheap ranking, the cache for latency.` },
-        { term: `Expectations by level`, def: `Mid-level: a working end-to-end design and some of its bottlenecks. Senior: a near-optimal design, proactive about bottlenecks, comfortable with streaming vs batch trade-offs. Staff+: sees the whole solution space and picks between options with clear judgement, going beyond the standard deep dives.`, why: `It tells you how to spend the time: breadth first, then depth where your experience is real.` }
-      ],
-      cheatsheet: [
-        { title: `Specialised stores for top K`, type: `table`, headers: [`Store`, `Fit`, `Why`], rows: [
-          [`InfluxDB / Prometheus`, `Poor`, `A series per video ID; ranking scans every series`],
-          [`TimescaleDB`, `Good`, `Continuous aggregates = per-window totals; still cache and shard`],
-          [`Druid / Pinot / ClickHouse`, `Good`, `Ingest-time rollups and fast top-N; heavy to run`],
-          [`Redis sorted sets`, `Serving layer`, `Precomputed answers; bounded member count`]
-        ] },
-        { title: `Final design`, type: `code`, body: `view events ──► Kafka "view-events" (key = videoId, retention ≥ 30 days)
-                    │
-                    ▼
-      stream job: watermark 30 s · minute panes · checkpoints
-                    │  idempotent bulk upserts per flush
-                    ▼
-      per-window totals (hour sliding, day, month, all time)
-      sharded by videoId, index on views   ── or processor state
-                    │  every minute: top 1,000 per window, merge shards
-                    ▼
-                Redis  topk:{window}  (long TTL, serve stale)
-                    ▲
-      clients ──► LB ──► top-K API (stateless, cache reads only)` },
-        { title: `Approximate top K checklist`, type: `list`, items: [
-          `Confirm the product tolerates small, bounded errors.`,
-          `Size the sketch from the error bound (w = e/ε, d = ln 1/δ), not from the catalogue size.`,
-          `Keep a candidate heap several times larger than K to protect the boundary.`,
-          `One sketch per tumbling window; merge sketches to roll up.`,
-          `Prefer processor state over Redis when you need recovery aligned with Kafka offsets.`
-        ] }
-      ],
-      interview: [
-        { q: `How does a Count-Min Sketch find the top K if it doesn't store IDs?`, a: `It doesn't on its own. Pair it with a heap: after adding each event to the sketch, query its estimated count and offer the item to a bounded min-heap of candidates. The heap holds the IDs; the sketch supplies counts for any item, including ones not in the heap.`, diff: `medium` },
-        { q: `What errors can the sketch-plus-heap approach make?`, a: `Counts are overestimated, never under, by at most about e·N/w with high probability. Items near the K-th position can be ordered wrongly or swapped with the next one. Rarely, an item evicted early from the heap is undercounted when it returns, because its heap entry restarts from the sketch estimate (which is still an overestimate). A larger candidate heap and wider sketch shrink both.`, diff: `hard` },
-        { q: `Would you use InfluxDB for this?`, a: `No. It keys data by series, and with video ID as a tag there would be billions of series. Ranking across all of them touches every series, which it isn't built for. It's great for plotting one video's views over time.`, diff: `medium` },
-        { q: `When would you pick Druid or ClickHouse over the custom pipeline?`, a: `When the organisation already runs one, or when the product needs many slice-and-dice queries beyond fixed windows. Their ingest-time rollups do what our stream job and per-window tables do. In an interview, only propose one if you can explain its ingestion and rollup mechanics.`, diff: `medium` },
-        { q: `Walk through the final design end to end.`, a: `View events go to Kafka keyed by video ID. A stream job with a 30-second watermark aggregates per video per minute and hour, checkpointing state with offsets, and bulk-upserts idempotent aggregates into per-window totals sharded by video ID (sliding hour, tumbling day and month, all time). A refresher reads the top 1,000 per window from each shard every minute, merges them and writes Redis. The stateless API reads Redis only, so reads stay in the low milliseconds, and stale answers are served if the refresher lags.`, diff: `hard` },
-        { q: `What separates a senior answer from a mid-level one here?`, a: `A mid-level answer gets an end-to-end design and fixes some bottlenecks with help. A senior answer gets near the final design largely unprompted: it quantifies the write rate, aggregates before writing, keeps the shard merge exact, precomputes reads, and argues tumbling vs sliding with product reasons. Staff+ adds judgement across alternatives (stream state vs database, sketches, OLAP) and failure handling.`, diff: `easy` }
-      ],
-      labs: [`cmsTopK`]
+      labs: [`topkEstimator`, `windowTypes`, `shardMerge`, `batchingWrites`, `servingStrategy`, `windowQueryCost`, `slidingCounter`, `cmsTopK`]
     }
   ]
 };

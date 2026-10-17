@@ -19,7 +19,7 @@ interface SDLooksApi {
 }
 declare global { interface Window { DEMOS?: Record<string, Lab>; SDLooks?: SDLooksApi } }
 
-const TABS = ["concepts", "learn", "labs", "interview", "cheatsheet"] as const;
+const TABS = ["problem", "solution", "concepts", "learn", "labs", "interview", "levels", "cheatsheet"] as const;
 type Tab = (typeof TABS)[number];
 const isTab = (s: string): s is Tab => (TABS as readonly string[]).includes(s);
 
@@ -114,7 +114,7 @@ function initContinue() {
     if (cp === 100) continue;
     card.href = c.href;
     $(".continue-label", card)!.textContent = state.lastChapter ? "Continue where you left off" : "Start here";
-    $(".continue-title", card)!.textContent = `Chapter ${d.number}: ${d.title}`;
+    $(".continue-title", card)!.textContent = `${d.noun} ${d.number}: ${d.title}`;
     $(".continue-meta", card)!.textContent =
       `${cp}% done \u00b7 ${countTrue(p?.conceptsLearned)}/${d.concepts} concepts \u00b7 ${countTrue(p?.qaReviewed)}/${d.qa} Q&A`;
     card.hidden = false;
@@ -147,16 +147,19 @@ function initLearn(id: string) {
   count();
 
   panel.addEventListener("click", e => {
-    const t = e.target as HTMLElement;
-    const done = t.closest<HTMLElement>(".section-done");
-    if (done) {
-      const sec = done.dataset.sec!, on = !read()[sec];
-      read()[sec] = on;
-      setDone(sec, on);
-      save(); count();
-      return;
-    }
-    const option = t.closest<HTMLButtonElement>(".dq-option");
+    const done = (e.target as HTMLElement).closest<HTMLElement>(".section-done");
+    if (!done) return;
+    const sec = done.dataset.sec!, on = !read()[sec];
+    read()[sec] = on;
+    setDone(sec, on);
+    save(); count();
+  });
+}
+
+/** Quizzes sit in deep dive sections and in a problem's Problem, Solution and Levels tabs. */
+function initQuizzes() {
+  document.addEventListener("click", e => {
+    const option = (e.target as HTMLElement).closest<HTMLButtonElement>(".dq-option");
     const quiz = option?.closest<HTMLElement>(".deep-quiz");
     if (!option || !quiz || option.disabled) return;
     const answer = Number(quiz.dataset.answer), right = Number(option.dataset.i) === answer;
@@ -331,7 +334,7 @@ function toggleQa(header: HTMLElement) {
 let currentTab: Tab | null = null;
 let labCleanups: (() => void)[] = [];
 
-/** Labs live on the labs tab and inside deep dive sections; only the visible panel's labs run. */
+/** Labs live on the labs tab and inside sections of other tabs; only the visible panel's labs run. */
 function mountLabs(panel: HTMLElement) {
   for (const el of $$(".lab-body[data-lab]", panel)) {
     const lab = window.DEMOS?.[el.dataset.lab!];
@@ -352,28 +355,30 @@ function unmountLabs() {
   for (const el of $$(".lab-body[data-lab]")) el.innerHTML = "";
 }
 
-/** `target` is the id of an element to scroll to: a lab card or a deep dive section. */
-function showTab(tab: Tab, target?: string) {
+/** `target` is an element inside the tab to scroll to, e.g. a lab card or a section. */
+function showTab(tab: Tab, target?: HTMLElement) {
   if (tab !== currentTab) {
     unmountLabs();
     for (const p of $$("[data-panel]")) p.hidden = p.dataset.panel !== tab;
     for (const t of $$(".tabs .tab")) t.classList.toggle("active", t.dataset.tab === tab);
     currentTab = tab;
     const panel = $(`[data-panel="${tab}"]`);
-    if (panel && (tab === "labs" || tab === "learn")) mountLabs(panel);
+    if (panel) mountLabs(panel);
   }
-  const el = target && document.getElementById(target);
-  if (el) {
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    target.classList.remove("flash"); void target.offsetWidth; target.classList.add("flash");
   }
 }
+/** The hash is either a tab name or the id of something inside a tab. */
 function showFromHash() {
   const h = decodeURIComponent(location.hash.slice(1));
   const first = ($(".tabs")?.dataset.firstTab ?? "concepts") as Tab;
-  if (h.startsWith("lab-")) showTab("labs", h);
-  else if (h.startsWith("learn-") && $('[data-panel="learn"]')) showTab("learn", h);
-  else showTab(isTab(h) && $(`[data-panel="${h}"]`) ? h : first);
+  if (isTab(h) && $(`[data-panel="${h}"]`)) return showTab(h);
+  const el = h ? document.getElementById(h) : null;
+  const tab = el?.closest<HTMLElement>("[data-panel]")?.dataset.panel;
+  if (el && tab && isTab(tab)) showTab(tab, el);
+  else showTab(first);
 }
 
 function initTabs() {
@@ -442,7 +447,7 @@ async function runSearch(q: string) {
   box.innerHTML = `<div class="sr-head">${results.length === 30 ? "Top 30" : results.length} result${results.length === 1 ? "" : "s"} &middot; <kbd>&uarr;</kbd> <kbd>&darr;</kbd> to move, <kbd>Enter</kbd> to open</div>` +
     results.map((r, i) => `
     <a class="sr-item${i === 0 ? " active" : ""}" href="${r.href}">
-      <div class="sr-label">Ch ${r.n} &middot; ${r.kind}</div>
+      <div class="sr-label">${r.where} &middot; ${r.kind}</div>
       <div class="sr-title">${highlight(r.title, words)}</div>
       ${r.snippet ? `<div class="sr-snippet">${highlight(r.snippet, words)}</div>` : ""}
     </a>`).join("");
@@ -546,6 +551,7 @@ if (chapterId) {
   if (state.lastChapter !== chapterId) { state.lastChapter = chapterId; save(); }
   initChapter(chapterId);
   initLearn(chapterId);
+  initQuizzes();
   initSelfTest();
   initFilters();
   initTabs();

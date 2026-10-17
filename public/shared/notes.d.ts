@@ -45,6 +45,15 @@ interface Chapter {
   labs: string[];
   cheatsheet: Cheatsheet[];
   interview: QA[];
+  /**
+   * Problem breakdowns only. A chapter with `problem` is one interview problem: its page opens on the Problem tab, then
+   * Solution, Core Concepts, Deep Dives (its deep/<id>.js), Interview Q&A, Levels and Cheatsheet, with labs embedded
+   * in the sections instead of a Labs tab. Section ids must be unique across the three arrays.
+   */
+  problem?: DeepSection[];
+  solution?: DeepSection[];
+  /** What a mid-level, senior and staff candidate is expected to cover. */
+  levels?: DeepSection[];
 }
 
 interface Concept {

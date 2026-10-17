@@ -21,19 +21,6 @@ const cheatsheet = z.discriminatedUnion("type", [
   z.strictObject({ ...sheetBase, type: z.literal("code"), body: text }),
 ]);
 
-const chapter = z.strictObject({
-  id: z.string().regex(/^[\w-]+$/),
-  part: z.number(),
-  number: z.union([z.number(), z.string()]),
-  title: text,
-  overview: text,
-  source: z.strictObject({ title: text, url: z.url() }).optional(),
-  concepts: z.array(concept),
-  labs: z.array(z.string()),
-  cheatsheet: z.array(cheatsheet),
-  interview: z.array(z.strictObject({ q: text, a: text, diff: z.enum(["easy", "med", "medium", "hard"]).optional() })),
-});
-
 const titled = { title: text.optional() };
 const block = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("text"), html: text }),
@@ -49,9 +36,27 @@ const block = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("quiz"), q: text, options: z.array(text).min(2), answer: z.number().int().min(0), explain: text }),
   z.strictObject({ type: z.literal("lab"), id: z.string(), caption: text.optional() }),
 ]);
+const section = z.strictObject({ id: z.string().regex(/^[a-z0-9-]+$/), title: text, kicker: text.optional(), blocks: z.array(block).min(1) });
+
+const chapter = z.strictObject({
+  id: z.string().regex(/^[\w-]+$/),
+  part: z.number(),
+  number: z.union([z.number(), z.string()]),
+  title: text,
+  overview: text,
+  source: z.strictObject({ title: text, url: z.url() }).optional(),
+  concepts: z.array(concept),
+  labs: z.array(z.string()),
+  cheatsheet: z.array(cheatsheet),
+  interview: z.array(z.strictObject({ q: text, a: text, diff: z.enum(["easy", "med", "medium", "hard"]).optional() })),
+  problem: z.array(section).min(1).optional(),
+  solution: z.array(section).min(1).optional(),
+  levels: z.array(section).min(1).optional(),
+});
+
 const deepDive = z.strictObject({
   hook: text,
-  sections: z.array(z.strictObject({ id: z.string().regex(/^[a-z0-9-]+$/), title: text, kicker: text.optional(), blocks: z.array(block).min(1) })).min(1),
+  sections: z.array(section).min(1),
   takeaways: z.array(text),
   furtherReading: z.array(z.strictObject({ title: text, url: z.url().optional(), note: text.optional() })).optional(),
 });
@@ -90,12 +95,25 @@ const schema = z
       if (!d.parts[ch.part]) issue(`part ${ch.part} is not in parts`);
       for (const id of ch.labs) if (!d.labInfo[id]) issue(`lab ${id} is not defined in any demos file`);
       for (const c of ch.concepts) if (c.demo && !d.labInfo[c.demo]) issue(`concept "${c.term}" links to missing lab ${c.demo}`);
+      const tabs = [ch.problem, ch.solution, ch.levels];
+      if (tabs.some(Boolean) && !tabs.every(Boolean)) issue("a problem breakdown needs problem, solution and levels");
+      checkSections(tabs.flatMap(t => t ?? []), issue);
+      // A problem has no Labs tab, so a lab it lists that no section embeds would never be shown.
+      if (ch.problem) {
+        const embedded = new Set([...tabs.flatMap(t => t ?? []), ...(d.deep[ch.id]?.sections ?? [])]
+          .flatMap(s => s.blocks.flatMap(b => (b.type === "lab" ? [b.id] : []))));
+        for (const id of ch.labs) if (!embedded.has(id)) issue(`lab ${id} is listed but no section embeds it`);
+      }
     }
     for (const [id, deep] of Object.entries(d.deep)) {
       const issue = (message: string) => ctx.addIssue({ code: "custom", message: `deep dive ${id}: ${message}` });
       if (!ids.has(id)) issue("no chapter has this id");
+      checkSections(deep.sections, issue);
+    }
+
+    function checkSections(sections: z.infer<typeof section>[], issue: (message: string) => void) {
       const seen = new Set<string>();
-      for (const s of deep.sections) {
+      for (const s of sections) {
         if (seen.has(s.id)) issue(`duplicate section id ${s.id}`);
         seen.add(s.id);
         for (const b of s.blocks) {

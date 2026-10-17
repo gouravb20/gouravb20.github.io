@@ -15,7 +15,7 @@ The site is built with [Astro](https://astro.build) as plain static HTML. The hu
 |---|---|---|---|---|---|
 | System Design Core Concepts (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials)) | [`notes/core-concepts`](public/high-level-design/notes/core-concepts/) | 18 | 228 | 31 | 116 |
 | System Design Advanced Topics (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search) and [Arpit Bhayani](https://arpitbhayani.me/blogs/morris-counter/)) | [`notes/advanced-topics`](public/high-level-design/notes/advanced-topics/) | 10 | 125 | 20 | 54 |
-| System Design Problem Breakdowns: YouTube Top K and Flash Sale (inspired by [Hello Interview](https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k)) | [`notes/problem-breakdowns`](public/high-level-design/notes/problem-breakdowns/) | 10 | 100 | 15 | 51 |
+| System Design Problem Breakdowns: YouTube Top K and Flash Sale (inspired by [Hello Interview](https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k)) | [`notes/problem-breakdowns`](public/high-level-design/notes/problem-breakdowns/) | 2 | 36 | 15 | 35 |
 
 Paths in the table are relative to `public/high-level-design/`. Also included: [`isolation-anomalies.md`](public/high-level-design/isolation-anomalies.md), a one-page map of transaction isolation anomalies.
 
@@ -54,7 +54,7 @@ Every book gets the same app:
 - A **Continue** card on the dashboard that opens the first unfinished chapter, starting from the one you read last.
 - Full-text search (press `/`; every word must match, title hits rank first, <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd> pick a result), <kbd>j</kbd> / <kbd>k</kbd> for the next / previous chapter, light and dark themes, and a mobile layout.
 - Progress is saved in `localStorage`, separately for each book. The hub pages show progress for every set of notes.
-- Bookmarkable chapters, tabs and labs with real URLs (`problem-breakdowns/ch2/#lab-servingStrategy`, `core-concepts/glossary/`). Old single-page hash links (`#/ch3/labs/btree`) redirect to the new pages, and saved progress carries over.
+- Bookmarkable chapters, tabs and labs with real URLs (`problem-breakdowns/top-k/#lab-servingStrategy`, `core-concepts/glossary/`). Old single-page hash links (`#/ch3/labs/btree`) redirect to the new pages, and saved progress carries over.
 - Astro-rendered apps also get per-page titles, descriptions, canonical URLs, Open Graph tags, structured data (Course, LearningResource, BreadcrumbList) and a sitemap. Their content is in the HTML, so it reads fine without JavaScript; only labs and progress tracking need it.
 
 ## Running locally
@@ -132,6 +132,7 @@ All of it runs in CI on pull requests and pushes to `main` (`.github/workflows/c
    - `fourQuestions`: the four "big idea" cards on the dashboard (`cls`, `q`, `text`, `answer`).
    - `takeaways`: a list of HTML strings.
    - `chapters`: each has `id`, `part`, `number`, `title`, `overview`, `concepts[{term, def, why, ex?, demo?}]`, `cheatsheet[{title, type: table|list|code, ...}]`, `interview[{q, a, diff: easy|med|hard}]` and `labs[]`.
+   - A problem breakdown is one chapter per problem that also has `problem`, `solution` and `levels`, each a list of deep dive sections (see below). Its page has the tabs Problem, Solution, Core Concepts, Deep Dives, Interview Q&A, By Level and Cheatsheet, and no Labs tab: every lab in `labs` must be embedded with a `lab` block in one of the sections.
 
    Text is raw HTML, so escape `<` as `&lt;`. Only `code` cheatsheet bodies are escaped automatically.
 3. Write labs in `demos.js` as `window.DEMOS[id] = { title, blurb, mount(el, ctx) }` and list their ids in each chapter's `labs`.

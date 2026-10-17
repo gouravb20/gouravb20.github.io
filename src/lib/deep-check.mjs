@@ -41,12 +41,9 @@ export function checkDeep(app) {
     else if (got !== want) problems.push(`${app.name}: deep/${path.basename(file)} sets DEEP["${got}"]; the file must be named after the chapter id it defines`);
   }
 
-  for (const [id, deep] of Object.entries(app.DEEP)) {
-    const where = `${app.name} deep/${id}.js`;
+  /** @param {string} where */
+  const reporter = where => {
     const p = (/** @type {string} */ msg) => problems.push(`${where}: ${msg}`);
-    if (!chapters.has(id)) p(`no chapter has id "${id}"`);
-    if (!deep || typeof deep !== "object") { p("DEEP entry is not an object"); continue; }
-    stats.chapters++;
     /** @param {any} v @param {string} at */
     const html = (v, at) => {
       if (!isText(v)) { p(`${at}: missing HTML`); return; }
@@ -54,6 +51,14 @@ export function checkDeep(app) {
       if (bad.length) p(`${at}: unbalanced HTML (${bad.join(", ")})`);
       stats.words += v.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
     };
+    return { p, html, where };
+  };
+
+  for (const [id, deep] of Object.entries(app.DEEP)) {
+    const r = reporter(`${app.name} deep/${id}.js`), { p, html } = r;
+    if (!chapters.has(id)) p(`no chapter has id "${id}"`);
+    if (!deep || typeof deep !== "object") { p("DEEP entry is not an object"); continue; }
+    stats.chapters++;
     html(deep.hook, "hook");
     if (!Array.isArray(deep.takeaways)) p("takeaways must be an array");
     else deep.takeaways.forEach((/** @type {any} */ t, /** @type {number} */ i) => html(t, `takeaways[${i}]`));
@@ -62,9 +67,24 @@ export function checkDeep(app) {
       if (r.url != null && !/^https?:\/\/\S+$/.test(r.url)) p(`furtherReading[${i}].url is not an absolute URL`);
     }
     if (!Array.isArray(deep.sections) || !deep.sections.length) { p("needs at least one section"); continue; }
+    checkSections(deep.sections, r);
+  }
 
+  // A problem breakdown's Problem, Solution and By Level tabs use the same section format.
+  for (const ch of chapters.values()) {
+    const tabs = ["problem", "solution", "levels"];
+    if (!tabs.some(t => ch[t] != null)) continue;
+    for (const t of tabs) {
+      const r = reporter(`${app.name} ${ch.id}.${t}`);
+      if (!Array.isArray(ch[t]) || !ch[t].length) r.p("a problem breakdown needs at least one section here");
+      else checkSections(ch[t], r);
+    }
+  }
+
+  /** @param {any[]} sections @param {ReturnType<typeof reporter>} r */
+  function checkSections(sections, { p, html, where }) {
     const seen = new Set();
-    for (const [si, s] of deep.sections.entries()) {
+    for (const [si, s] of sections.entries()) {
       const at = `section ${s?.id || si}`;
       stats.sections++;
       if (!s || !/^[a-z0-9-]+$/.test(s.id || "")) p(`${at}: id must be a lowercase slug`);
@@ -114,6 +134,7 @@ export function checkDeep(app) {
       }
     }
   }
+
   for (const id of chapters.keys()) if (!app.DEEP[id]) warnings.push(`${app.name}: chapter ${id} has no deep dive yet`);
   return { problems, warnings, stats };
 }

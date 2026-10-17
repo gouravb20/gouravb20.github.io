@@ -1,7 +1,7 @@
 ---
 import { getCollection } from "astro:content";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
-import { SITE_NAME, TRACKS, appPath, chapterPath, plain, url, type Notes } from "../../../../../lib/site";
+import { SITE_NAME, TRACKS, appPath, chapterPath, plain, unitNoun, url, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -40,12 +40,12 @@ const structuredData = [
   </div>
 
   <nav class="chapter-jump" aria-label="Jump to chapter">
-    {chapters.map(ch => <a href={`#cs-${ch.id}`} title={plain(ch.title)}>Ch {ch.number}</a>)}
+    {chapters.map(ch => <a href={`#cs-${ch.id}`} title={plain(ch.title)}>{unitNoun(ch, true)} {ch.number}</a>)}
   </nav>
 
   {chapters.map(ch => (
     <section class="cs-chapter" id={`cs-${ch.id}`}>
-      <h2><span class="chapter-num">{ch.number}</span><span set:html={ch.title} /><a href={`${url(chapterPath(notes, ch))}#cheatsheet`}>Open chapter &rarr;</a></h2>
+      <h2><span class="chapter-num">{ch.number}</span><span set:html={ch.title} /><a href={`${url(chapterPath(notes, ch))}#cheatsheet`}>Open {unitNoun(ch).toLowerCase()} &rarr;</a></h2>
       {ch.cheatsheet.map(cs => (
         <div class="cheatsheet-block">
           <h3 set:html={cs.title} />

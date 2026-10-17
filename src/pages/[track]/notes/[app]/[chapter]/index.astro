@@ -3,7 +3,7 @@ import { getCollection } from "astro:content";
 import path from "node:path";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
 import { deepRenderer } from "../../../../../lib/notes-source.mjs";
-import { SITE_NAME, TRACKS, appPath, chapterPath, plain, summary, url, type Chapter, type Notes } from "../../../../../lib/site";
+import { SITE_NAME, TRACKS, appPath, chapterPath, plain, summary, unitNoun, url, type Chapter, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -28,12 +28,22 @@ const DIFFS = [["easy", "Easy"], ["med", "Medium"], ["hard", "Hard"]] as const;
 const diffCounts: Record<string, number> = {};
 for (const qa of ch.interview) diffCounts[diffOf(qa.diff)] = (diffCounts[diffOf(qa.diff)] ?? 0) + 1;
 
+// A problem breakdown opens on Problem and Solution and embeds its labs in the sections instead of a Labs tab.
+const isProblem = !!ch.problem;
+const renderer = deepRenderer(path.join(process.cwd(), "public"));
+const labInfo = (id: string) => notes.labInfo[id];
 const deep = notes.deep[ch.id];
 const deepHtml = deep
-  ? deepRenderer(path.join(process.cwd(), "public")).render(deep, { sectionHref: (id: string) => `#learn-${id}`, labInfo: (id: string) => notes.labInfo[id] })
+  ? renderer.render(deep, { sectionHref: (id: string) => `#learn-${id}`, labInfo, ...(isProblem && { tocTitle: "Deep dives", labAnchors: true }) })
   : "";
-const deepLabs = deep ? deep.sections.some(s => s.blocks.some(b => b.type === "lab")) : false;
-const firstTab = "concepts";
+const article = (sections: typeof ch.problem, prefix: string, tocTitle: string) =>
+  sections ? renderer.article(sections, { prefix, tocTitle, labInfo, labAnchors: true }) : "";
+const problemHtml = article(ch.problem, "problem", "The problem");
+const solutionHtml = article(ch.solution, "solution", "The solution");
+const levelsHtml = article(ch.levels, "levels", "By level");
+const hasLab = (sections: { blocks: { type: string }[] }[] = []) => sections.some(s => s.blocks.some(b => b.type === "lab"));
+const embeddedLabs = hasLab(deep?.sections) || hasLab(ch.problem) || hasLab(ch.solution) || hasLab(ch.levels);
+const firstTab = isProblem ? "problem" : "concepts";
 
 const pagePath = chapterPath(notes, ch);
 const bookTitle = plain(book.title);
@@ -68,21 +78,40 @@ const structuredData = [
   },
 ];
 ---
-<NotesLayout notes={notes} chapter={ch.id} title={title} description={description} path={pagePath} structuredData={structuredData} labs={ch.labs.length > 0 || deepLabs}>
+<NotesLayout notes={notes} chapter={ch.id} title={title} description={description} path={pagePath} structuredData={structuredData} labs={ch.labs.length > 0 || embeddedLabs}>
   <div class="chapter-header">
-    <div class="chapter-label" set:html={`Chapter ${ch.number} &middot; ${parts[ch.part]}`} />
+    <div class="chapter-label" set:html={`${unitNoun(ch)} ${ch.number} &middot; ${parts[ch.part]}`} />
     <h1 set:html={ch.title} />
     <div class="overview-text" set:html={ch.overview} />
     {ch.source && <div class="chapter-source">Reference: <a href={ch.source.url} target="_blank" rel="noopener" set:html={ch.source.title} /> &#8599;</div>}
   </div>
 
-  <nav class="tabs" aria-label="Chapter sections" data-first-tab={firstTab}>
-    <a class="tab active" href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
-    {deep && <a class="tab learn-tab" href="#learn" data-tab="learn">Deep Dive <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
-    <a class="tab labs-tab" href="#labs" data-tab="labs">&#9654; Interactive Labs <span class="tab-count">{ch.labs.length}</span></a>
-    <a class="tab" href="#interview" data-tab="interview">Interview Q&amp;A <span class="tab-count" data-tab-count="interview">0/{ch.interview.length}</span></a>
-    <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>
-  </nav>
+  {isProblem ? (
+    <nav class="tabs" aria-label="Problem sections" data-first-tab={firstTab}>
+      <a class="tab active" href="#problem" data-tab="problem">Problem</a>
+      <a class="tab" href="#solution" data-tab="solution">Solution</a>
+      <a class="tab" href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
+      {deep && <a class="tab learn-tab" href="#learn" data-tab="learn">Deep Dives <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
+      <a class="tab" href="#interview" data-tab="interview">Interview Q&amp;A <span class="tab-count" data-tab-count="interview">0/{ch.interview.length}</span></a>
+      <a class="tab" href="#levels" data-tab="levels">By Level</a>
+      <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>
+    </nav>
+  ) : (
+    <nav class="tabs" aria-label="Chapter sections" data-first-tab={firstTab}>
+      <a class="tab active" href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
+      {deep && <a class="tab learn-tab" href="#learn" data-tab="learn">Deep Dive <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
+      <a class="tab labs-tab" href="#labs" data-tab="labs">&#9654; Interactive Labs <span class="tab-count">{ch.labs.length}</span></a>
+      <a class="tab" href="#interview" data-tab="interview">Interview Q&amp;A <span class="tab-count" data-tab-count="interview">0/{ch.interview.length}</span></a>
+      <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>
+    </nav>
+  )}
+
+  {isProblem && (
+    <>
+      <section id="problem" data-panel="problem"><Fragment set:html={problemHtml} /></section>
+      <section id="solution" data-panel="solution"><Fragment set:html={solutionHtml} /></section>
+    </>
+  )}
 
   <section id="concepts" data-panel="concepts">
     <h2 class="sr-only">Core concepts</h2>
@@ -121,23 +150,25 @@ const structuredData = [
     </section>
   )}
 
-  <section id="labs" data-panel="labs">
-    <h2 class="sr-only">Interactive labs</h2>
-    {ch.labs.length === 0 ? (
-      <div class="empty-tab">No labs for this chapter.</div>
-    ) : (
-      <>
-        <div class="labs-intro" set:html={book.labsIntro} />
-        {ch.labs.map(id => (
-          <section class="lab-card" id={`lab-${id}`}>
-            <div class="lab-head"><span class="lab-tag">Lab</span><h3 set:html={notes.labInfo[id].title} /></div>
-            <div class="lab-blurb" set:html={notes.labInfo[id].blurb} />
-            <div class="lab-body" data-lab={id}><noscript><div class="lab-note">This lab needs JavaScript.</div></noscript></div>
-          </section>
-        ))}
-      </>
-    )}
-  </section>
+  {!isProblem && (
+    <section id="labs" data-panel="labs">
+      <h2 class="sr-only">Interactive labs</h2>
+      {ch.labs.length === 0 ? (
+        <div class="empty-tab">No labs for this chapter.</div>
+      ) : (
+        <>
+          <div class="labs-intro" set:html={book.labsIntro} />
+          {ch.labs.map(id => (
+            <section class="lab-card" id={`lab-${id}`}>
+              <div class="lab-head"><span class="lab-tag">Lab</span><h3 set:html={notes.labInfo[id].title} /></div>
+              <div class="lab-blurb" set:html={notes.labInfo[id].blurb} />
+              <div class="lab-body" data-lab={id}><noscript><div class="lab-note">This lab needs JavaScript.</div></noscript></div>
+            </section>
+          ))}
+        </>
+      )}
+    </section>
+  )}
 
   <section id="interview" data-panel="interview">
     <h2 class="sr-only">Interview questions and answers</h2>
@@ -166,6 +197,8 @@ const structuredData = [
     <div class="empty-tab filter-empty" id="qaEmpty" hidden>No questions left with these filters.</div>
   </section>
 
+  {isProblem && <section id="levels" data-panel="levels"><Fragment set:html={levelsHtml} /></section>}
+
   <section id="cheatsheet" data-panel="cheatsheet">
     <h2 class="sr-only">Cheatsheet</h2>
     <div class="cheatsheet-actions"><a class="iconbtn" href={url(`${appPath(notes)}cheatsheet/`)}>&#8801; All chapters, printable</a></div>
@@ -186,7 +219,7 @@ const structuredData = [
   </section>
 
   <nav class="chapter-footer" aria-label="Chapters">
-    {prev ? <a class="nav-btn" href={chUrl(prev)} rel="prev"><div class="nav-btn-label">&larr; Previous</div>Ch {prev.number}: <Fragment set:html={prev.title} /></a> : <div></div>}
-    {next ? <a class="nav-btn right" href={chUrl(next)} rel="next"><div class="nav-btn-label">Next &rarr;</div>Ch {next.number}: <Fragment set:html={next.title} /></a> : <div></div>}
+    {prev ? <a class="nav-btn" href={chUrl(prev)} rel="prev"><div class="nav-btn-label">&larr; Previous</div>{unitNoun(prev, true)} {prev.number}: <Fragment set:html={prev.title} /></a> : <div></div>}
+    {next ? <a class="nav-btn right" href={chUrl(next)} rel="next"><div class="nav-btn-label">Next &rarr;</div>{unitNoun(next, true)} {next.number}: <Fragment set:html={next.title} /></a> : <div></div>}
   </nav>
 </NotesLayout>
