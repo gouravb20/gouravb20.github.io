@@ -471,6 +471,7 @@ body.light .deep-idea { border-left-color: #7c3aed; }
 .four-q-card { background: var(--bg-2); border: 1px solid var(--border); border-left-width: 4px; border-radius: 10px; padding: 14px 16px; font-size: 13.5px; }
 .four-q-card h4, .four-q-card h3 { font-size: 15px; margin-bottom: 4px; }
 .four-q-card .muted { color: var(--text-muted); }
+.four-q-card .q { white-space: normal; -webkit-box-decoration-break: clone; box-decoration-break: clone; line-height: 1.6; }
 .four-q-card.what { border-left-color: var(--what); }
 .four-q-card.where { border-left-color: var(--where); }
 .four-q-card.when { border-left-color: var(--when); }
