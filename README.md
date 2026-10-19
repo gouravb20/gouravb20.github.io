@@ -3,7 +3,7 @@
 Interactive system design study notes in four sections, published at [gouravb20.github.io/learn](https://gouravb20.github.io/learn/). This repository is [gouravb20/gouravb20.github.io](https://github.com/gouravb20/gouravb20.github.io). It also publishes the portfolio at the domain root from [`home/`](home/) (homepage, résumé, and `robots.txt`). A hamburger menu at the top left of every hub page opens a panel with all four:
 
 - [`high-level-design/`](public/high-level-design/index.html): chapter-wise notes for the system design core concepts, the advanced topics and worked problem breakdowns.
-- [`low-level-design/`](public/low-level-design/index.html): notes on the building blocks of well-designed programs. Coming soon.
+- [`low-level-design/`](public/low-level-design/index.html): notes for the low-level design interview (delivery framework, design principles, OOP, design patterns) and concurrency, with Java examples.
 - [`books/`](public/books/index.html): chapter-wise notes for the books behind modern data, AI and Go programs, plus a library that opens every source PDF in the browser.
 - [`slides/`](public/slides/index.html): slide decks and visual guides.
 
@@ -21,7 +21,12 @@ Paths in the table are relative to `public/high-level-design/`. Also included: [
 
 ## Low-level design
 
-Coming soon. The *Mastering Go* notes that used to live here are now in Books.
+| Book | Notes | Chapters | Concepts | Labs | Q&A |
+|---|---|---|---|---|---|
+| Low-Level Design in a Hurry (based on [Hello Interview](https://www.hellointerview.com/learn/low-level-design/in-a-hurry/introduction)) | [`notes/in-a-hurry`](public/low-level-design/notes/in-a-hurry/) | 5 | 68 | 4 | 28 |
+| Concurrency for Low-Level Design (based on [Hello Interview](https://www.hellointerview.com/learn/low-level-design/concurrency/intro)) | [`notes/concurrency`](public/low-level-design/notes/concurrency/) | 4 | 62 | 6 | 27 |
+
+Paths in the table are relative to `public/low-level-design/`. Every code example is Java 21. The *Mastering Go* notes that used to live here are now in Books.
 
 ## Books
 
@@ -87,7 +92,9 @@ public/                        served as-is under /learn/
       index.html               single-page apps only: page markup and script tags
       data.js, data-part2.js   the app's content (core-concepts also has data-part3.js)
       demos.js, demos-part2.js the app's labs (core-concepts also has demos-part3.js)
-  low-level-design/index.html  coming-soon page
+  low-level-design/
+    index.html                 hub page linking LLD in a hurry and concurrency
+    notes/<app>/               same layout as above
   books/
     index.html                 book notes, then the library / PDF viewer
     notes/<book>/              same layout as above (mastering-go has data-part1..5.js and demos-part1..5.js)
@@ -174,6 +181,7 @@ Search engines read `robots.txt` only at the domain root, so it lives in the [go
 
 - The core concepts notes follow the topics of [Hello Interview's system design core concepts](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials), and the advanced topics notes follow their [advanced topics](https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search) (proximity search, data structures for big data, vector databases, time series databases, change data capture), rewritten as original notes with labs. Read the originals there.
 - The problem breakdowns notes cover the same interview problems as [Hello Interview's problem breakdowns](https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k), starting with Top K and Flash Sale. They are written independently, with their own explanations, numbers and labs, and do not reproduce the original articles. Read the originals there.
+- The low-level design notes follow the topics of Hello Interview's [Low-Level Design in a Hurry](https://www.hellointerview.com/learn/low-level-design/in-a-hurry/introduction) and [Concurrency](https://www.hellointerview.com/learn/low-level-design/concurrency/intro) sections. They are written independently, with their own explanations, Java examples and labs, and do not reproduce the original pages. Read the originals there.
 - The Morris counter chapter in the advanced topics notes is based on Arpit Bhayani's essay [Space-Efficient Counting: Exploring Morris' Algorithm](https://arpitbhayani.me/blogs/morris-counter/) and his [Python implementation](https://github.com/arpitbbhayani/morris-counter).
 - The DDIA chapter content (concepts, cheatsheets and interview Q&A) is ported from [ddia-notes](https://github.com/tiwari1302/ddia-notes) by Shashank Tiwari, whose site also inspired the design of every notes app here.
 - The books belong to their authors and publishers. The notes are personal study material and are no substitute for reading the books.

@@ -30,7 +30,7 @@
     fold: svg(`<path d="m14 6-6 6 6 6M19 6v12"/>`)
   };
 
-  const HLD = "high-level-design/notes/", BOOKS = "books/notes/";
+  const HLD = "high-level-design/notes/", LLD = "low-level-design/notes/", BOOKS = "books/notes/";
   const MAIN = [
     { path: "", icon: "home", title: "Dashboard" },
     { group: "Learn" },
@@ -39,7 +39,10 @@
       { path: `${HLD}advanced-topics/`, icon: "advanced", title: "Advanced Topics" },
       { path: `${HLD}problem-breakdowns/`, icon: "problems", title: "Problem Breakdowns" }
     ] },
-    { path: "low-level-design/", icon: "lld", title: "Low-Level Design", soon: true },
+    { id: "lld", path: "low-level-design/", icon: "lld", title: "Low-Level Design", kids: [
+      { path: `${LLD}in-a-hurry/`, icon: "concepts", title: "LLD in a Hurry" },
+      { path: `${LLD}concurrency/`, icon: "advanced", title: "Concurrency" }
+    ] },
     { icon: "code", title: "Code", soon: true },
     { group: "" },
     { id: "books", path: "books/", icon: "books", title: "Books", kids: [

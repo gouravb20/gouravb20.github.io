@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1c">
-  <meta name="description" content="Low-level design notes: the design of classes, modules, interfaces and concurrency. Coming soon.">
+  <meta name="description" content="Low-level design interview notes with Java examples: delivery framework, design principles, OOP, design patterns and concurrency, with labs, cheatsheets and interview Q&amp;A.">
   <title>Low-Level Design · Interactive Notes</title>
   <script src="../shared/looks.js"></script>
   <script src="../shared/sitenav.js"></script>
@@ -13,7 +13,7 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="System Design Notes">
   <meta property="og:title" content="Low-Level Design · Interactive Notes">
-  <meta property="og:description" content="Low-level design notes: coming soon.">
+  <meta property="og:description" content="Low-level design interview notes with Java examples: principles, OOP, patterns and concurrency.">
   <meta property="og:url" content="https://gouravb20.github.io/learn/low-level-design/">
   <meta name="twitter:card" content="summary">
   <script type="application/ld+json">
@@ -22,7 +22,7 @@
     "@type": "CollectionPage",
     "name": "Low-Level Design",
     "url": "https://gouravb20.github.io/learn/low-level-design/",
-    "description": "Low-level design notes: the building blocks of well-designed programs. Coming soon.",
+    "description": "Low-level design interview notes with Java examples: delivery framework, design principles, OOP, design patterns and concurrency.",
     "isPartOf": { "@type": "WebSite", "name": "System Design Notes", "url": "https://gouravb20.github.io/learn/" },
     "breadcrumb": {
       "@type": "BreadcrumbList",
@@ -155,29 +155,65 @@
     </header>
 
     <section class="hero">
-      <div class="eyebrow">Low-level design</div>
-      <h1>Low-level design is coming soon</h1>
-      <p class="lede">This section is for what goes inside one box: the design of classes and modules, interfaces and patterns, concurrency, and code that stays easy to test and change. Notes for it are on the way.</p>
+      <div class="eyebrow">Low-level design &middot; interactive notes</div>
+      <h1>What goes inside one box</h1>
+      <p class="lede">Notes for the low-level design interview: how to run the 45 minutes, the principles and OOP ideas behind every class decision, the design patterns worth knowing, and what changes when many threads share your objects. Every example is Java 21, with labs, cheatsheets and interview Q&amp;A.</p>
+      <div class="totals">
+        <div class="total"><b data-count="chapters" data-src=".">9</b><span>chapters</span></div>
+        <div class="total"><b data-count="labs" data-src=".">10</b><span>interactive labs</span></div>
+        <div class="total"><b data-count="qa" data-src=".">55</b><span>interview Q&amp;A</span></div>
+      </div>
     </section>
 
-    <h2>In the meantime</h2>
-    <a class="card wide" href="../books/index.html" style="--accent:#14b8a6">
+    <h2>In a hurry</h2>
+    <a class="card wide" href="notes/in-a-hurry/index.html" style="--accent:#00add8" data-key="lld_in_a_hurry_notes_v1" data-total="96">
       <div class="body">
         <div class="card-head">
-          <div class="mono">B</div>
-          <div><h3>Books</h3><div class="by">Book notes and the source PDFs</div></div>
+          <div class="mono">LH</div>
+          <div><h3>Low-Level Design in a Hurry</h3><div class="by">Based on Hello Interview's LLD in a Hurry &middot; Java examples</div></div>
         </div>
-        <p>The chapter-wise notes on Mastering Go, with labs, cheatsheets and interview Q&amp;A, now live in the Books section alongside the notes for the other books and every source PDF.</p>
-        <span class="open">Open books &rarr;</span>
+        <p>The essentials in five chapters: what the interview scores, a five-step delivery framework with a time plan, KISS, DRY, YAGNI, the Law of Demeter and SOLID with before-and-after code, the OOP building blocks, and the design patterns that recur in LLD problems. Labs include an interview clock planner and drills for spotting principle violations and matching scenarios to patterns.</p>
+        <div class="chips"><span class="chip">Delivery framework</span><span class="chip">SOLID</span><span class="chip">OOP</span><span class="chip">Design patterns</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="notes/in-a-hurry">5</b> chapters</span><span><b data-count="concepts" data-src="notes/in-a-hurry">68</b> concepts</span><span><b data-count="labs" data-src="notes/in-a-hurry">4</b> labs</span><span><b data-count="qa" data-src="notes/in-a-hurry">28</b> Q&amp;A</span></div>
+        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
+        <span class="open">Open notes &rarr;</span>
       </div>
       <div class="side">
-        <strong style="color:var(--text)">Moved to Books</strong>
+        <strong style="color:var(--text)">Five chapters</strong>
         <ol>
-          <li>Mastering Go notes</li>
-          <li>Mastering Go PDF</li>
+          <li>Introduction</li>
+          <li>Delivery framework</li>
+          <li>Design principles</li>
+          <li>OOP concepts</li>
+          <li>Design patterns</li>
         </ol>
       </div>
     </a>
+
+    <h2>Concurrency</h2>
+    <a class="card wide" href="notes/concurrency/index.html" style="--accent:#a78bfa" data-key="lld_concurrency_notes_v1" data-total="89">
+      <div class="body">
+        <div class="card-head">
+          <div class="mono">CX</div>
+          <div><h3>Concurrency for Low-Level Design</h3><div class="by">Based on Hello Interview's concurrency section &middot; Java examples</div></div>
+        </div>
+        <p>What to do when many threads share your objects: spotting shared mutable state, race conditions, locks, atomics and deadlock; handing off work with blocking queues, executors and futures; and sharing scarce resources with semaphores, pools, bounded executors and rate limiters. Labs simulate lost updates, double bookings, deadlock cycles, producer-consumer buffers, connection pools and token buckets.</p>
+        <div class="chips"><span class="chip">Race conditions</span><span class="chip">Locks &amp; atomics</span><span class="chip">Deadlock</span><span class="chip">Producer-consumer</span><span class="chip">Semaphores</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="notes/concurrency">4</b> chapters</span><span><b data-count="concepts" data-src="notes/concurrency">62</b> concepts</span><span><b data-count="labs" data-src="notes/concurrency">6</b> labs</span><span><b data-count="qa" data-src="notes/concurrency">27</b> Q&amp;A</span></div>
+        <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
+        <span class="open">Open notes &rarr;</span>
+      </div>
+      <div class="side">
+        <strong style="color:var(--text)">Four parts</strong>
+        <ol>
+          <li>Introduction</li>
+          <li>Correctness</li>
+          <li>Coordination</li>
+          <li>Scarcity</li>
+        </ol>
+      </div>
+    </a>
+
     <footer>
       <span>Progress is saved in this browser, separately for each set of notes.</span>
       <a href="../high-level-design/index.html">High-level design notes</a>
