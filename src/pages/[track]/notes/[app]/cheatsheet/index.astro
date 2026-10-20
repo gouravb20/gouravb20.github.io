@@ -3,7 +3,7 @@ import { getCollection } from "astro:content";
 import nodePath from "node:path";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
 import { deepRenderer } from "../../../../../lib/notes-source.mjs";
-import { CODE_LANG_NAMES, SITE_NAME, TRACKS, appPath, chapterPath, codeLanguages, plain, unitNoun, url, type Notes } from "../../../../../lib/site";
+import { SITE_NAME, TRACKS, appPath, chapterPath, codeLanguages, plain, unitNoun, url, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -35,19 +35,12 @@ const structuredData = [
   },
 ];
 ---
-<NotesLayout notes={notes} view="cheatsheet" title={title} description={description} path={path} structuredData={structuredData}>
+<NotesLayout notes={notes} view="cheatsheet" title={title} description={description} path={path} structuredData={structuredData} codeLangs={codeLangs}>
   <div class="chapter-header">
     <div class="chapter-label">Reference</div>
     <h1>Every cheatsheet</h1>
     <div class="overview-text">All {chapters.length} chapters' cheatsheets on one page. Printing it (or saving it as a PDF) gives a compact black-on-white version.</div>
     <div class="ref-tools" hidden><button class="iconbtn" id="printBtn">&#9113; Print / save as PDF</button></div>
-    {codeLangs.length > 1 && (
-      <label class="code-lang-picker">Code in
-        <select data-code-lang-select aria-label="Programming language for code examples">
-          {codeLangs.map(l => <option value={l}>{CODE_LANG_NAMES[l] ?? l}</option>)}
-        </select>
-      </label>
-    )}
   </div>
 
   <nav class="chapter-jump" aria-label="Jump to chapter">

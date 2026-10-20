@@ -1,5 +1,5 @@
 ---
-import { LEVEL_LABEL, SITE_NAME, appPath, chapterPath, jsonLd, plain, sortedParts, url, type Notes } from "../lib/site";
+import { CODE_LANG_NAMES, LEVEL_LABEL, SITE_NAME, appPath, chapterPath, jsonLd, plain, shortName, sortedParts, url, usesShortNames, type Notes } from "../lib/site";
 
 interface Props {
   notes: Notes;
@@ -14,9 +14,11 @@ interface Props {
   structuredData: object[];
   /** Load the lab scripts (labkit.js and the app's demos*.js). */
   labs?: boolean;
+  /** Languages the page's code can be shown in; with two or more, the top bar gets a "Code in" menu. */
+  codeLangs?: string[];
 }
 
-const { notes, chapter, view, title, description, path, structuredData, labs = false } = Astro.props;
+const { notes, chapter, view, title, description, path, structuredData, labs = false, codeLangs = [] } = Astro.props;
 const { book } = notes;
 const canonical = new URL(url(path), Astro.site).href;
 const brand = book.shortTitle ?? plain(book.title);
@@ -97,6 +99,15 @@ const ring = 2 * Math.PI * 8;
       <div class="progress-pill-bar"><div class="progress-pill-fill" id="overallProgressFill" style="width:0%"></div></div>
     </div>
 
+    {codeLangs.length > 1 && (
+      <label class="code-lang-picker" title="Language for code examples on this site">
+        <span class="code-lang-label">Code</span>
+        <select data-code-lang-select aria-label="Programming language for code examples">
+          {codeLangs.map(l => <option value={l}>{CODE_LANG_NAMES[l] ?? l}</option>)}
+        </select>
+      </label>
+    )}
+
     <div class="search-wrap">
       <input type="search" class="search-box" id="searchBox" placeholder="Search concepts, labs, questions... (press /)" aria-label="Search these notes">
       <div class="search-results" id="searchResults"></div>
@@ -133,14 +144,15 @@ const ring = 2 * Math.PI * 8;
             <div class="part-header" set:html={notes.parts[part]} />
             {notes.chapters.filter(ch => ch.part === part).map(ch => (
               <a
-                class={`chapter-item${ch.id === chapter ? " active" : ""}`}
+                class={`chapter-item${ch.id === chapter ? " active" : ""}${ch.difficulty ? ` level-row level-row-${ch.difficulty}` : ""}`}
+                title={usesShortNames(notes, ch) ? plain(ch.title) : undefined}
                 href={url(chapterPath(notes, ch))}
                 data-chapter={ch.id}
                 data-total={ch.concepts.length + ch.interview.length}
                 aria-current={ch.id === chapter ? "page" : undefined}
               >
                 <div class="chapter-num">{ch.number}</div>
-                <div class="chapter-title" set:html={ch.title} />
+                {usesShortNames(notes, ch) ? <div class="chapter-title">{shortName(ch.title)}</div> : <div class="chapter-title" set:html={ch.title} />}
                 {ch.difficulty && <span class={`level-pill level-${ch.difficulty}`} title={`Difficulty: ${ch.difficulty}`}>{LEVEL_LABEL[ch.difficulty]}</span>}
                 <div class="chapter-ring">
                   <svg viewBox="0 0 20 20"><circle class="bg" cx="10" cy="10" r="8" /><circle class="fg" cx="10" cy="10" r="8" stroke-dasharray={ring} stroke-dashoffset={ring} /></svg>

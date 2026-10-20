@@ -38,6 +38,12 @@ export function codeLanguages(chapters: Chapter[], deep: Record<string, { sectio
   return [...langs];
 }
 
+/** Short sidebar name: the title before the colon ("Logging Service: levels, ..." -> "Logging Service"). */
+export const shortName = (title: string) => plain(title).split(":")[0].trim();
+
+/** Problem breakdowns and the low-level design track list chapters by short name; other notes keep full titles. */
+export const usesShortNames = (n: Notes, ch: Chapter) => !!ch.problem || n.track === "low-level-design";
+
 /** Labels for a chapter's difficulty badge. */
 export const LEVEL_LABEL = { easy: "Easy", medium: "Medium", hard: "Hard" } as const;
 

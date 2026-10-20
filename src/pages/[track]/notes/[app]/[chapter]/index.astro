@@ -3,7 +3,7 @@ import { getCollection } from "astro:content";
 import path from "node:path";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
 import { deepRenderer } from "../../../../../lib/notes-source.mjs";
-import { CODE_LANG_NAMES, LEVEL_LABEL, SITE_NAME, TRACKS, appPath, chapterPath, codeLanguages, plain, summary, unitNoun, url, type Chapter, type Notes } from "../../../../../lib/site";
+import { LEVEL_LABEL, SITE_NAME, TRACKS, appPath, chapterPath, codeLanguages, plain, summary, unitNoun, url, type Chapter, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -81,19 +81,14 @@ const structuredData = [
   },
 ];
 ---
-<NotesLayout notes={notes} chapter={ch.id} title={title} description={description} path={pagePath} structuredData={structuredData} labs={ch.labs.length > 0 || embeddedLabs}>
+<NotesLayout notes={notes} chapter={ch.id} title={title} description={description} path={pagePath} structuredData={structuredData} labs={ch.labs.length > 0 || embeddedLabs} codeLangs={codeLangs}>
   <div class="chapter-header">
-    <div class="chapter-label"><Fragment set:html={`${unitNoun(ch)} ${ch.number} &middot; ${parts[ch.part]}`} />{ch.difficulty && <span class={`level-pill level-${ch.difficulty}`}>{LEVEL_LABEL[ch.difficulty]}</span>}</div>
+    <div class="chapter-label">{ch.difficulty
+      ? <>{unitNoun(ch)} {ch.number}<span class={`level-pill level-${ch.difficulty}`}>{LEVEL_LABEL[ch.difficulty]}</span></>
+      : <Fragment set:html={`${unitNoun(ch)} ${ch.number} &middot; ${parts[ch.part]}`} />}</div>
     <h1 set:html={ch.title} />
     <div class="overview-text" set:html={ch.overview} />
     {ch.source && <div class="chapter-source">Reference: <a href={ch.source.url} target="_blank" rel="noopener" set:html={ch.source.title} /> &#8599;</div>}
-    {codeLangs.length > 1 && (
-      <label class="code-lang-picker">Code in
-        <select data-code-lang-select aria-label="Programming language for code examples">
-          {codeLangs.map(l => <option value={l}>{CODE_LANG_NAMES[l] ?? l}</option>)}
-        </select>
-      </label>
-    )}
   </div>
 
   {isProblem ? (
