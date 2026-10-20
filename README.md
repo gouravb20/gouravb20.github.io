@@ -25,7 +25,7 @@ Paths in the table are relative to `public/high-level-design/`. Also included: [
 |---|---|---|---|---|---|
 | Low-Level Design in a Hurry (based on [Hello Interview](https://www.hellointerview.com/learn/low-level-design/in-a-hurry/introduction)) | [`notes/in-a-hurry`](public/low-level-design/notes/in-a-hurry/) | 5 | 68 | 4 | 28 |
 | Concurrency for Low-Level Design (based on [Hello Interview](https://www.hellointerview.com/learn/low-level-design/concurrency/intro)) | [`notes/concurrency`](public/low-level-design/notes/concurrency/) | 4 | 62 | 6 | 27 |
-| Low-Level Design Problem Breakdowns: Rate Limiter and File System (inspired by [Hello Interview](https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/rate-limiter)) | [`notes/problem-breakdowns`](public/low-level-design/notes/problem-breakdowns/) | 2 | 31 | 5 | 17 |
+| Low-Level Design Problem Breakdowns: Rate Limiter, File System and a practice set of six more (Rate Limiter and File System inspired by [Hello Interview](https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/rate-limiter)) | [`notes/problem-breakdowns`](public/low-level-design/notes/problem-breakdowns/) | 8 | 69 | 5 | 46 |
 
 Paths in the table are relative to `public/low-level-design/`. Every code example is Java 21. The *Mastering Go* notes that used to live here are now in Books.
 
