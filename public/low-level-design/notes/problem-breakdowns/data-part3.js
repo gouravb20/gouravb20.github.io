@@ -1,6 +1,5 @@
 // LLD problem breakdowns, part 3: Connect Four, Logging Service, Movie Ticket Booking and Inventory Management, written
-// independently with Java solutions; each links the Hello Interview breakdown it follows. The end of this file orders
-// every problem by difficulty (easy, medium, hard) and numbers them.
+// independently with Java solutions; each links the Hello Interview breakdown it follows.
 // Imports are omitted in the code: java.util.*, java.util.concurrent.*, java.util.concurrent.locks.*, java.time.*.
 (function () {
 /** @param {string[]} mid @param {string[]} senior @param {string[]} staff @returns {DeepSection[]} */
@@ -793,13 +792,4 @@ final class InventoryManager {
   }
 );
 
-// Order every problem by difficulty (easy, medium, hard) and number them in that order.
-const ORDER = [
-  `connect-four`, `vending-machine`, `parking-lot`,
-  `lru-cache`, `file-system`, `elevator`, `splitwise`, `logging-service`, `movie-ticket-booking`, `pub-sub`,
-  `rate-limiter`, `inventory-management`
-];
-const rank = (/** @type {string} */ id) => { const i = ORDER.indexOf(id); return i < 0 ? ORDER.length : i; };
-window.DATA.chapters.sort((a, b) => rank(a.id) - rank(b.id));
-window.DATA.chapters.forEach((ch, i) => { ch.number = i + 1; });
 })();

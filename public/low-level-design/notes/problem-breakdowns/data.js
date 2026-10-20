@@ -5,7 +5,7 @@
 window.DATA = {
   book: {
     title: `Low-Level Design Problem Breakdowns`,
-    subtitle: `Classic low-level design interview problems, each worked through on one page: the <strong>problem</strong> and its requirements, a <strong>solution</strong> from entities to working Java code, the <strong>deep dives</strong> an interviewer pushes on, and what is expected at each level, with labs embedded where each decision comes up. Problems are grouped and ordered by difficulty, <strong style="color:var(--level-easy)">easy</strong>, <strong style="color:var(--level-medium)">medium</strong> and <strong style="color:var(--level-hard)">hard</strong>: Connect Four, Vending Machine and Parking Lot to warm up; LRU Cache, File System, Elevator, Splitwise, Logging Service, Movie Ticket Booking and Pub-Sub in the middle; Rate Limiter and Inventory Management at the top. To practise, read only a problem's requirements, build it yourself in 45 minutes (clarify 5, entities 5, public API 5, core code 20, follow-ups 10), compare with the solution, and redo it from a blank file a few days later. Several problems follow Hello Interview's <a href="https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/connect-four" target="_blank" rel="noopener" style="color:var(--accent)">LLD problem breakdowns</a> (each page links its original); these notes, code and labs are written independently, so read the original walkthroughs there.`,
+    subtitle: `Classic low-level design interview problems, each worked through on one page: the <strong>problem</strong> and its requirements, a <strong>solution</strong> from entities to working Java code, the <strong>deep dives</strong> an interviewer pushes on, and what is expected at each level, with labs embedded where each decision comes up. Problems are grouped and ordered by difficulty, <strong style="color:var(--level-easy)">easy</strong>, <strong style="color:var(--level-medium)">medium</strong> and <strong style="color:var(--level-hard)">hard</strong>: Connect Four, Tic-Tac-Toe, Snake and Ladders, Vending Machine and Parking Lot to warm up; LRU Cache, File System, Elevator, ATM, Splitwise, Circuit Breaker, Logging Service, Meeting Room Scheduler, Movie Ticket Booking and Pub-Sub in the middle; Rate Limiter, Ride Sharing and Inventory Management at the top. To practise, read only a problem's requirements, build it yourself in 45 minutes (clarify 5, entities 5, public API 5, core code 20, follow-ups 10), compare with the solution, and redo it from a blank file a few days later. Several problems follow Hello Interview's <a href="https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/connect-four" target="_blank" rel="noopener" style="color:var(--accent)">LLD problem breakdowns</a> (each page links its original); these notes, code and labs are written independently, so read the original walkthroughs there.`,
     storageKey: `lld_problem_breakdowns_notes_v1`,
     appId: `lld-problem-breakdowns-notes`,
     exportPrefix: `lld-problem-breakdowns-progress`,
@@ -16,7 +16,7 @@ window.DATA = {
     shortTitle: `LLD Problem Breakdowns`,
     tagline: `LLD interview prep`
   },
-  // Problems are grouped by difficulty; data-part3.js orders them easiest first and numbers them.
+  // Problems are grouped by difficulty; data-part4.js orders them easiest first and numbers them.
   parts: {
     1: `Easy`,
     2: `Medium`,
@@ -50,7 +50,7 @@ window.DATA = {
     `Put variable behaviour behind an interface: pricing, allocation, splitting, delivery, dispatch, limiting algorithms.`,
     `Say how it stays thread-safe: a lock per key or per object, atomic claim operations, concurrent collections.`,
     `Handle invalid input and edge cases explicitly, say what you would test, and keep follow-ups ready: a new rule type, persistence, scale, monitoring.`,
-    `<strong>Next problems to practise:</strong> Tic-Tac-Toe and Connect Four (board modelling, O(1) win check); library management, ATM, movie ticket booking (seat locking with a timeout); task and meeting room schedulers; a text editor with undo and redo (Command); a logging framework (Chain of Responsibility, appenders).`
+    `<strong>Next problems to practise:</strong> library management (search, holds and fines); a text editor with undo and redo (Command); a task scheduler with priorities and retries; a food delivery order flow (state machine plus matching); a chess game (piece moves as polymorphism, check detection).`
   ],
   chapters: [
     {
