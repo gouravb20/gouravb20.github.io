@@ -18,6 +18,29 @@ export function url(path = ""): string {
 
 export const appPath = (n: Notes) => `${n.track}/notes/${n.slug}/`;
 export const chapterPath = (n: Notes, ch: Chapter) => `${appPath(n)}${ch.id}/`;
+/** Display names for code languages in the language menu. */
+export const CODE_LANG_NAMES: Record<string, string> = { java: "Java", go: "Go" };
+
+/**
+ * Languages a reader can switch between on these chapters: each translated block's main language plus its alternatives,
+ * main languages first. Empty when nothing is translated, so no menu is shown.
+ */
+export function codeLanguages(chapters: Chapter[], deep: Record<string, { sections: { blocks: any[] }[] }>): string[] {
+  const langs = new Set<string>();
+  for (const ch of chapters) {
+    const sections = [...(ch.problem ?? []), ...(ch.solution ?? []), ...(ch.levels ?? []), ...(deep[ch.id]?.sections ?? [])];
+    const codes: { lang?: string; alt?: Record<string, string> }[] = [
+      ...sections.flatMap(s => s.blocks.filter((b: any) => b.type === "code")),
+      ...ch.cheatsheet.filter(cs => cs.type === "code"),
+    ];
+    for (const c of codes) if (c.alt && Object.keys(c.alt).length) { if (c.lang) langs.add(c.lang); Object.keys(c.alt).forEach(l => langs.add(l)); }
+  }
+  return [...langs];
+}
+
+/** Labels for a chapter's difficulty badge. */
+export const LEVEL_LABEL = { easy: "Easy", medium: "Medium", hard: "Hard" } as const;
+
 /** What one page of an app is called: problem breakdowns have problems, everything else has chapters. */
 export const unitNoun = (ch: Chapter, short = false) => (ch.problem ? "Problem" : short ? "Ch" : "Chapter");
 

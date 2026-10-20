@@ -279,6 +279,26 @@ function initPrint() {
   btn.parentElement!.hidden = false;
 }
 
+// ------------------------------------------------------------------ code language menu
+
+const CODE_LANG_KEY = "learn_code_lang";
+
+/** One choice for the whole site: the layout applies it to <html data-code-lang> before paint, CSS shows matching code. */
+function initCodeLanguage() {
+  const selects = [...document.querySelectorAll<HTMLSelectElement>("[data-code-lang-select]")];
+  if (!selects.length) return;
+  const set = (lang: string) => {
+    document.documentElement.setAttribute("data-code-lang", lang);
+    for (const s of selects) if ([...s.options].some(o => o.value === lang)) s.value = lang;
+  };
+  const saved = document.documentElement.getAttribute("data-code-lang");
+  if (saved) set(saved);
+  for (const s of selects) s.addEventListener("change", () => {
+    set(s.value);
+    try { localStorage.setItem(CODE_LANG_KEY, s.value); } catch { /* private mode: the choice lasts for this page */ }
+  });
+}
+
 // ------------------------------------------------------------------ chapter: concepts and Q&A
 
 function setLearned(btn: HTMLElement, on: boolean) {
@@ -560,3 +580,4 @@ refreshProgress();
 initContinue();
 initGlossary();
 initPrint();
+initCodeLanguage();

@@ -5,7 +5,7 @@
 window.DATA = {
   book: {
     title: `Low-Level Design Problem Breakdowns`,
-    subtitle: `Classic low-level design interview problems, each worked through on one page: the <strong>problem</strong> and its requirements, a <strong>solution</strong> from entities to working Java code, the <strong>deep dives</strong> an interviewer pushes on, and what is expected at each level, with labs embedded where each decision comes up. Part I: <strong>Rate Limiter</strong>, an in-memory, config-driven limiter for an API gateway. Part II: <strong>File System</strong>, an in-memory, Unix-style tree of folders and files. Parts III to VIII are a <strong>practice set</strong> of six more classics with working Java solutions: <strong>Parking Lot</strong>, <strong>Elevator</strong>, <strong>LRU Cache</strong>, <strong>Splitwise</strong>, <strong>Vending Machine</strong> and <strong>Pub-Sub</strong>. To practise, read only a problem's requirements, build it yourself in 45 minutes (clarify 5, entities 5, public API 5, core code 20, follow-ups 10), compare with the solution, and redo it from a blank file a few days later. Rate Limiter and File System follow Hello Interview's <a href="https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/rate-limiter" target="_blank" rel="noopener" style="color:var(--accent)">Rate Limiter</a> and <a href="https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/file-system" target="_blank" rel="noopener" style="color:var(--accent)">File System</a> breakdowns; these notes, code and labs are written independently, so read the original walkthroughs there.`,
+    subtitle: `Classic low-level design interview problems, each worked through on one page: the <strong>problem</strong> and its requirements, a <strong>solution</strong> from entities to working Java code, the <strong>deep dives</strong> an interviewer pushes on, and what is expected at each level, with labs embedded where each decision comes up. Problems are grouped and ordered by difficulty, <strong style="color:var(--level-easy)">easy</strong>, <strong style="color:var(--level-medium)">medium</strong> and <strong style="color:var(--level-hard)">hard</strong>: Connect Four, Vending Machine and Parking Lot to warm up; LRU Cache, File System, Elevator, Splitwise, Logging Service, Movie Ticket Booking and Pub-Sub in the middle; Rate Limiter and Inventory Management at the top. To practise, read only a problem's requirements, build it yourself in 45 minutes (clarify 5, entities 5, public API 5, core code 20, follow-ups 10), compare with the solution, and redo it from a blank file a few days later. Several problems follow Hello Interview's <a href="https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/connect-four" target="_blank" rel="noopener" style="color:var(--accent)">LLD problem breakdowns</a> (each page links its original); these notes, code and labs are written independently, so read the original walkthroughs there.`,
     storageKey: `lld_problem_breakdowns_notes_v1`,
     appId: `lld-problem-breakdowns-notes`,
     exportPrefix: `lld-problem-breakdowns-progress`,
@@ -16,15 +16,17 @@ window.DATA = {
     shortTitle: `LLD Problem Breakdowns`,
     tagline: `LLD interview prep`
   },
+  // Problems are grouped by difficulty; data-part3.js orders them easiest first and numbers them.
   parts: {
-    1: `Part I &middot; Rate Limiter`,
-    2: `Part II &middot; File System`
+    1: `Easy`,
+    2: `Medium`,
+    3: `Hard`
   },
   fourQuestions: [
-    { cls: `what`, q: `Turn the prompt into a contract`, text: `Find out exactly what goes in, what comes out and what fails. Rate limiter: a client ID and an endpoint in; allowed, remaining and retry-after out. File system: absolute paths in; nodes, listings and content out; a specific exception for every invalid request.`, answer: `Both problems: Problem tab.` },
-    { cls: `where`, q: `Find the shape of the problem`, text: `Most LLD problems have one central idea. In the rate limiter it is an axis of variation (the algorithm) behind one interface. In the file system it is a recursive structure (folders containing folders) modelled as a Composite tree with parent pointers.`, answer: `Both problems: Solution tab (entities, class design).` },
-    { cls: `when`, q: `Get the core flow working first`, text: `Build the single-threaded version end to end: limiters that decide, or a tree that resolves, creates, moves and deletes. Add thread safety, eviction, symlinks or search only when the interviewer asks.`, answer: `Both problems: Solution tab (implementation).` },
-    { cls: `how`, q: `Answer the follow-ups with small changes`, text: `"Make it thread-safe", "add an algorithm", "support relative paths", "compute folder sizes". A good design absorbs each one in a single class or a few lines, and you can say which.`, answer: `Both problems: Deep Dives.` }
+    { cls: `what`, q: `Turn the prompt into a contract`, text: `Find out exactly what goes in, what comes out and what fails. Rate limiter: a client ID and an endpoint in; allowed, remaining and retry-after out. File system: absolute paths in; nodes, listings and content out; a specific exception for every invalid request.`, answer: `Every problem: Problem tab.` },
+    { cls: `where`, q: `Find the shape of the problem`, text: `Most LLD problems have one central idea. In the rate limiter it is an axis of variation (the algorithm) behind one interface. In the file system it is a recursive structure (folders containing folders) modelled as a Composite tree with parent pointers.`, answer: `Every problem: Solution tab (entities, class design).` },
+    { cls: `when`, q: `Get the core flow working first`, text: `Build the single-threaded version end to end: limiters that decide, or a tree that resolves, creates, moves and deletes. Add thread safety, eviction, symlinks or search only when the interviewer asks.`, answer: `Every problem: Solution tab (implementation).` },
+    { cls: `how`, q: `Answer the follow-ups with small changes`, text: `"Make it thread-safe", "add an algorithm", "support relative paths", "compute folder sizes". A good design absorbs each one in a single class or a few lines, and you can say which.`, answer: `Every problem: Deep Dives.` }
   ],
   takeaways: [
     `The rate limiter's contract: <strong>check(clientId, endpoint)</strong> returns <strong>allowed</strong>, <strong>remaining</strong> and <strong>retryAfterMs</strong> (null when allowed). Unknown endpoints use a <strong>default rule</strong>.`,
@@ -52,7 +54,7 @@ window.DATA = {
   ],
   chapters: [
     {
-      id: `rate-limiter`, part: 1, number: 1,
+      id: `rate-limiter`, part: 3, number: 1, difficulty: `hard`,
       title: `Rate Limiter: config-driven, per endpoint, in memory`,
       overview: `Build the in-memory rate limiter inside an API gateway. Each endpoint is configured with an algorithm (token bucket, sliding window log, fixed window...) and that algorithm's parameters; every request arrives as a client ID and an endpoint, and the limiter answers whether it may proceed, how much quota is left and when to retry. The design that works puts each algorithm behind one <code>Limiter</code> interface, builds one limiter per endpoint from typed configuration through a factory, keeps per-client state inside each limiter, and leaves thread safety, eviction and reloading as clean extensions.`,
       source: { title: `Hello Interview: Rate Limiter (LLD) problem breakdown`, url: `https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/rate-limiter` },
@@ -517,7 +519,7 @@ final class RateLimiter {
     },
     // ------------------------------------------------------------------
     {
-      id: `file-system`, part: 2, number: 2,
+      id: `file-system`, part: 2, number: 2, difficulty: `medium`,
       title: `File System: an in-memory, Unix-style tree`,
       overview: `Build an in-memory file system with one root, folders that contain files and folders, and files that hold text. It must create, delete, list, rename and move entries, resolve absolute paths like <code>/home/ana/notes.txt</code>, and give the full path of any node, staying fast with tens of thousands of entries and deep hierarchies. The design that works is a <strong>Composite</strong> tree: an abstract <code>Node</code> with <code>File</code> and <code>Directory</code>, children kept in a map by name, a <strong>parent pointer</strong> on every node, a <code>FileSystem</code> facade that parses paths in one place, and a small family of specific exceptions.`,
       source: { title: `Hello Interview: File System (LLD) problem breakdown`, url: `https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/file-system` },

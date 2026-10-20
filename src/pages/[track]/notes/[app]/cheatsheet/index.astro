@@ -3,7 +3,7 @@ import { getCollection } from "astro:content";
 import nodePath from "node:path";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
 import { deepRenderer } from "../../../../../lib/notes-source.mjs";
-import { SITE_NAME, TRACKS, appPath, chapterPath, plain, unitNoun, url, type Notes } from "../../../../../lib/site";
+import { CODE_LANG_NAMES, SITE_NAME, TRACKS, appPath, chapterPath, codeLanguages, plain, unitNoun, url, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -13,7 +13,8 @@ export async function getStaticPaths() {
 const { notes } = Astro.props as { notes: Notes };
 const { book } = notes;
 const chapters = notes.chapters.filter(ch => ch.cheatsheet.length);
-const { highlight } = deepRenderer(nodePath.join(process.cwd(), "public"));
+const { codeHtml } = deepRenderer(nodePath.join(process.cwd(), "public"));
+const codeLangs = codeLanguages(notes.chapters, notes.deep);
 
 const path = `${appPath(notes)}cheatsheet/`;
 const bookTitle = plain(book.title);
@@ -40,6 +41,13 @@ const structuredData = [
     <h1>Every cheatsheet</h1>
     <div class="overview-text">All {chapters.length} chapters' cheatsheets on one page. Printing it (or saving it as a PDF) gives a compact black-on-white version.</div>
     <div class="ref-tools" hidden><button class="iconbtn" id="printBtn">&#9113; Print / save as PDF</button></div>
+    {codeLangs.length > 1 && (
+      <label class="code-lang-picker">Code in
+        <select data-code-lang-select aria-label="Programming language for code examples">
+          {codeLangs.map(l => <option value={l}>{CODE_LANG_NAMES[l] ?? l}</option>)}
+        </select>
+      </label>
+    )}
   </div>
 
   <nav class="chapter-jump" aria-label="Jump to chapter">
@@ -59,7 +67,7 @@ const structuredData = [
             </table>
           )}
           {cs.type === "list" && <ul>{cs.items.map(it => <li set:html={it} />)}</ul>}
-          {cs.type === "code" && <pre data-lang={cs.lang}><code set:html={highlight(cs.body, cs.lang)} /></pre>}
+          {cs.type === "code" && <Fragment set:html={codeHtml(cs.body, cs.lang, cs.alt)} />}
           {cs.note && <div class="cs-note" set:html={cs.note} />}
         </div>
       ))}

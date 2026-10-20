@@ -159,9 +159,9 @@
       <h1>What goes inside one box</h1>
       <p class="lede">Notes for the low-level design interview: how to run the 45 minutes, the principles and OOP ideas behind every class decision, the design patterns worth knowing, and what changes when many threads share your objects. Every example is Java 21, with labs, cheatsheets and interview Q&amp;A.</p>
       <div class="totals">
-        <div class="total"><b data-count="chapters" data-src=".">17</b><span>chapters</span></div>
+        <div class="total"><b data-count="chapters" data-src=".">21</b><span>chapters</span></div>
         <div class="total"><b data-count="labs" data-src=".">15</b><span>interactive labs</span></div>
-        <div class="total"><b data-count="qa" data-src=".">101</b><span>interview Q&amp;A</span></div>
+        <div class="total"><b data-count="qa" data-src=".">122</b><span>interview Q&amp;A</span></div>
       </div>
     </section>
 
@@ -215,30 +215,23 @@
     </a>
 
     <h2>Problem breakdowns</h2>
-    <a class="card wide" href="notes/problem-breakdowns/index.html" style="--accent:#a3e635" data-key="lld_problem_breakdowns_notes_v1" data-total="115">
+    <a class="card wide" href="notes/problem-breakdowns/index.html" style="--accent:#a3e635" data-key="lld_problem_breakdowns_notes_v1" data-total="162">
       <div class="body">
         <div class="card-head">
           <div class="mono">LP</div>
           <div><h3>Low-Level Design Problem Breakdowns</h3><div class="by">Classic LLD problems worked end to end &middot; inspired by Hello Interview's breakdowns</div></div>
         </div>
-        <p>One page per interview problem, with tabs for the problem and its requirements, the solution from entities to working Java, the deep dives an interviewer pushes on, then core concepts, interview Q&amp;A, what each level is expected to cover, and a cheatsheet. Rate Limiter covers per-endpoint algorithms behind one interface, typed configuration with a factory, thread safety without a global lock, idle eviction and composite rules. File System covers a Composite tree with parent pointers, path parsing and resolution, safe moves, specific exceptions, locking and folder sizes. A practice set adds six more classics with working Java solutions and their follow-ups.</p>
-        <div class="chips"><span class="chip">Rate limiter</span><span class="chip">File system</span><span class="chip">Parking lot</span><span class="chip">Elevator</span><span class="chip">LRU cache</span><span class="chip">Splitwise</span><span class="chip">Vending machine</span><span class="chip">Pub-sub</span></div>
-        <div class="meta"><span><b data-count="chapters" data-src="notes/problem-breakdowns">8</b> problems</span><span><b data-count="concepts" data-src="notes/problem-breakdowns">69</b> concepts</span><span><b data-count="labs" data-src="notes/problem-breakdowns">5</b> labs</span><span><b data-count="qa" data-src="notes/problem-breakdowns">46</b> Q&amp;A</span></div>
+        <p>One page per interview problem, with tabs for the problem and its requirements, the solution from entities to working Java, the deep dives an interviewer pushes on, then core concepts, interview Q&amp;A, what each level is expected to cover, and a cheatsheet. Problems are ordered by difficulty, from Connect Four to Inventory Management, with a green, yellow or red badge on each, and every solution is working Java.</p>
+        <div class="chips"><span class="chip" style="color:#22c55e">Easy</span><span class="chip" style="color:#eab308">Medium</span><span class="chip" style="color:#ef4444">Hard</span><span class="chip">Strategy</span><span class="chip">State</span><span class="chip">Observer</span><span class="chip">Thread safety</span></div>
+        <div class="meta"><span><b data-count="chapters" data-src="notes/problem-breakdowns">12</b> problems</span><span><b data-count="concepts" data-src="notes/problem-breakdowns">95</b> concepts</span><span><b data-count="labs" data-src="notes/problem-breakdowns">5</b> labs</span><span><b data-count="qa" data-src="notes/problem-breakdowns">67</b> Q&amp;A</span></div>
         <div class="prog"><div class="bar"><div class="fill"></div></div><span class="pct">Not started</span></div>
         <span class="open">Open notes &rarr;</span>
       </div>
       <div class="side">
-        <strong style="color:var(--text)">Problems so far</strong>
-        <ol>
-          <li>Rate Limiter: config-driven, per endpoint, in memory</li>
-          <li>File System: an in-memory, Unix-style tree</li>
-          <li>Parking Lot</li>
-          <li>Elevator</li>
-          <li>LRU Cache</li>
-          <li>Splitwise</li>
-          <li>Vending Machine</li>
-          <li>Pub-Sub</li>
-        </ol>
+        <strong style="color:var(--text)">Problems, easiest first</strong>
+        <div style="margin-top:4px"><b style="color:#22c55e">Easy</b>: Connect Four, Vending Machine, Parking Lot</div>
+        <div><b style="color:#eab308">Medium</b>: LRU Cache, File System, Elevator, Splitwise, Logging Service, Movie Ticket Booking, Pub-Sub</div>
+        <div><b style="color:#ef4444">Hard</b>: Rate Limiter, Inventory Management</div>
       </div>
     </a>
 

@@ -5,7 +5,7 @@
   const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const span = (cls, text) => `<span class="tok-${cls}">${esc(text)}</span>`;
   const words = s => new Set(s.split(/\s+/).filter(Boolean));
-  const NUMBER = /(\b0[xX][\da-fA-F_]+[lLiu]*\b|\b\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?[lLfFdDi]?\b)/.source;
+  const NUMBER = /(\b0[xXoObB][\da-fA-F_]+[lLiu]*\b|\b\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?[lLfFdDi]?\b)/.source;
 
   /**
    * A tokenizer for C-family languages. Comments and strings are matched first, so words inside them stay uncoloured.

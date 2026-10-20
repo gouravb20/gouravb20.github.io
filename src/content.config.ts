@@ -18,7 +18,7 @@ const sheetBase = { title: text, note: text.optional() };
 const cheatsheet = z.discriminatedUnion("type", [
   z.strictObject({ ...sheetBase, type: z.literal("table"), headers: z.array(z.string()), rows: z.array(z.array(z.union([z.string(), z.number()]))) }),
   z.strictObject({ ...sheetBase, type: z.literal("list"), items: z.array(text) }),
-  z.strictObject({ ...sheetBase, type: z.literal("code"), body: text, lang: z.string().optional() }),
+  z.strictObject({ ...sheetBase, type: z.literal("code"), body: text, lang: z.string().optional(), alt: z.record(z.string(), text).optional() }),
 ]);
 
 const titled = { title: text.optional() };
@@ -31,7 +31,7 @@ const block = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("tradeoffs"), pros: z.array(text).min(1), cons: z.array(text).min(1), prosLabel: text.optional(), consLabel: text.optional(), ...titled }),
   z.strictObject({ type: z.literal("compare"), items: z.array(z.strictObject({ title: text, html: text, tone: z.enum(["ok", "bad", "warn", "info"]).optional() })).min(2), ...titled }),
   z.strictObject({ type: z.literal("table"), headers: z.array(z.string()), rows: z.array(z.array(z.union([z.string(), z.number()]))), note: text.optional(), ...titled }),
-  z.strictObject({ type: z.literal("code"), code: text, lang: z.string().optional(), caption: text.optional(), ...titled }),
+  z.strictObject({ type: z.literal("code"), code: text, lang: z.string().optional(), alt: z.record(z.string(), text).optional(), caption: text.optional(), ...titled }),
   z.strictObject({ type: z.enum(["steps", "keypoints", "list"]), items: z.array(text).min(1), ...titled }),
   z.strictObject({ type: z.literal("quiz"), q: text, options: z.array(text).min(2), answer: z.number().int().min(0), explain: text }),
   z.strictObject({ type: z.literal("lab"), id: z.string(), caption: text.optional() }),
@@ -45,6 +45,7 @@ const chapter = z.strictObject({
   title: text,
   overview: text,
   source: z.strictObject({ title: text, url: z.url() }).optional(),
+  difficulty: z.enum(["easy", "medium", "hard"]).optional(),
   concepts: z.array(concept),
   labs: z.array(z.string()),
   cheatsheet: z.array(cheatsheet),

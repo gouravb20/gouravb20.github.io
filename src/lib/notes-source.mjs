@@ -92,10 +92,47 @@ export function loadApp(app) {
     run(file);
     for (const id of Object.keys(ctx.DEEP)) if (!before.has(id)) deepFiles[id] = file;
   }
+  ctx.ALT = {};
+  for (const file of altScripts(app.dir)) run(file);
+  if (ctx.DATA) mergeAlternatives(ctx.DATA, ctx.DEEP, ctx.ALT, errors);
   return { DATA: ctx.DATA, DEMOS: ctx.DEMOS || {}, DEEP: ctx.DEEP, deepFiles, errors };
 }
 
-/** @type {{ render: (deep: any, opts: any) => string, article: (sections: any[], opts: any) => string, sectionText: (section: any) => string, highlight: (code: string, lang?: string) => string } | undefined} */
+/**
+ * The app's code in other languages, alt/<chapter id>.js: `ALT[chapterId] = { go: { "<code block title>": "..." } }`.
+ * @param {string} dir
+ */
+function altScripts(dir) {
+  const altDir = path.join(dir, "alt");
+  return fs.existsSync(altDir) ? fs.readdirSync(altDir).filter(n => n.endsWith(".js")).sort().map(n => path.join(altDir, n)) : [];
+}
+
+/**
+ * Attaches each alternative to the code block (or cheatsheet code) with the same title in that chapter, as `alt[lang]`.
+ * An alternative whose title matches no block is an error, so a renamed block can't silently lose its translation.
+ * @param {any} DATA @param {Record<string, any>} DEEP @param {Record<string, Record<string, Record<string, string>>>} ALT
+ * @param {string[]} errors
+ */
+function mergeAlternatives(DATA, DEEP, ALT, errors) {
+  for (const [chapterId, byLang] of Object.entries(ALT)) {
+    const ch = (DATA.chapters || []).find((/** @type {any} */ c) => c.id === chapterId);
+    if (!ch) { errors.push(`alt/${chapterId}.js: no chapter has id "${chapterId}"`); continue; }
+    /** @type {Map<string, any>} */
+    const byTitle = new Map();
+    const sections = [...(ch.problem || []), ...(ch.solution || []), ...(ch.levels || []), ...((DEEP[chapterId] || {}).sections || [])];
+    for (const s of sections) for (const b of s.blocks) if (b.type === "code" && b.title) byTitle.set(b.title, b);
+    for (const cs of ch.cheatsheet || []) if (cs.type === "code") byTitle.set(cs.title, cs);
+    for (const [lang, snippets] of Object.entries(byLang)) {
+      for (const [title, code] of Object.entries(snippets)) {
+        const target = byTitle.get(title);
+        if (!target) { errors.push(`alt/${chapterId}.js: no code block titled "${title}" for ${lang}`); continue; }
+        target.alt = { ...(target.alt || {}), [lang]: code };
+      }
+    }
+  }
+}
+
+/** @type {{ render: (deep: any, opts: any) => string, article: (sections: any[], opts: any) => string, sectionText: (section: any) => string, highlight: (code: string, lang?: string) => string, codeHtml: (code: string, lang?: string, alt?: Record<string, string>) => string } | undefined} */
 let renderer;
 /**
  * The browser's deep dive renderer (public/shared/deep.js, with shared/highlight.js for code), run once in a sandbox.

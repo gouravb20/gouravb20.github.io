@@ -3,7 +3,7 @@ import { getCollection } from "astro:content";
 import path from "node:path";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
 import { deepRenderer } from "../../../../../lib/notes-source.mjs";
-import { SITE_NAME, TRACKS, appPath, chapterPath, plain, summary, unitNoun, url, type Chapter, type Notes } from "../../../../../lib/site";
+import { CODE_LANG_NAMES, LEVEL_LABEL, SITE_NAME, TRACKS, appPath, chapterPath, codeLanguages, plain, summary, unitNoun, url, type Chapter, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -44,6 +44,7 @@ const levelsHtml = article(ch.levels, "levels", "By level");
 const hasLab = (sections: { blocks: { type: string }[] }[] = []) => sections.some(s => s.blocks.some(b => b.type === "lab"));
 const embeddedLabs = hasLab(deep?.sections) || hasLab(ch.problem) || hasLab(ch.solution) || hasLab(ch.levels);
 const firstTab = isProblem ? "problem" : "concepts";
+const codeLangs = codeLanguages([ch], notes.deep);
 // A problem breakdown reads Problem, Solution, Deep Dives, then the reference tabs; chapters lead with Core Concepts.
 const deepAfterSolution = isProblem;
 
@@ -82,10 +83,17 @@ const structuredData = [
 ---
 <NotesLayout notes={notes} chapter={ch.id} title={title} description={description} path={pagePath} structuredData={structuredData} labs={ch.labs.length > 0 || embeddedLabs}>
   <div class="chapter-header">
-    <div class="chapter-label" set:html={`${unitNoun(ch)} ${ch.number} &middot; ${parts[ch.part]}`} />
+    <div class="chapter-label"><Fragment set:html={`${unitNoun(ch)} ${ch.number} &middot; ${parts[ch.part]}`} />{ch.difficulty && <span class={`level-pill level-${ch.difficulty}`}>{LEVEL_LABEL[ch.difficulty]}</span>}</div>
     <h1 set:html={ch.title} />
     <div class="overview-text" set:html={ch.overview} />
     {ch.source && <div class="chapter-source">Reference: <a href={ch.source.url} target="_blank" rel="noopener" set:html={ch.source.title} /> &#8599;</div>}
+    {codeLangs.length > 1 && (
+      <label class="code-lang-picker">Code in
+        <select data-code-lang-select aria-label="Programming language for code examples">
+          {codeLangs.map(l => <option value={l}>{CODE_LANG_NAMES[l] ?? l}</option>)}
+        </select>
+      </label>
+    )}
   </div>
 
   {isProblem ? (
@@ -221,7 +229,7 @@ const structuredData = [
           </table>
         )}
         {cs.type === "list" && <ul>{cs.items.map(it => <li set:html={it} />)}</ul>}
-        {cs.type === "code" && <pre data-lang={cs.lang}><code set:html={renderer.highlight(cs.body, cs.lang)} /></pre>}
+        {cs.type === "code" && <Fragment set:html={renderer.codeHtml(cs.body, cs.lang, cs.alt)} />}
         {cs.note && <div class="cs-note" set:html={cs.note} />}
       </div>
     ))}

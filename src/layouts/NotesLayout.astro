@@ -1,5 +1,5 @@
 ---
-import { SITE_NAME, appPath, chapterPath, jsonLd, plain, sortedParts, url, type Notes } from "../lib/site";
+import { LEVEL_LABEL, SITE_NAME, appPath, chapterPath, jsonLd, plain, sortedParts, url, type Notes } from "../lib/site";
 
 interface Props {
   notes: Notes;
@@ -71,6 +71,10 @@ const ring = 2 * Math.PI * 8;
 >
   <script is:inline>
     try {
+      var codeLang = localStorage.getItem("learn_code_lang");
+      if (codeLang) document.documentElement.setAttribute("data-code-lang", codeLang);
+    } catch (e) {}
+    try {
       if (window.SDLooks) window.SDLooks.boot();
       else if (JSON.parse(localStorage.getItem(document.body.dataset.storageKey || "") || "{}").theme === "light") document.body.classList.add("light");
     } catch (e) {}
@@ -137,6 +141,7 @@ const ring = 2 * Math.PI * 8;
               >
                 <div class="chapter-num">{ch.number}</div>
                 <div class="chapter-title" set:html={ch.title} />
+                {ch.difficulty && <span class={`level-pill level-${ch.difficulty}`} title={`Difficulty: ${ch.difficulty}`}>{LEVEL_LABEL[ch.difficulty]}</span>}
                 <div class="chapter-ring">
                   <svg viewBox="0 0 20 20"><circle class="bg" cx="10" cy="10" r="8" /><circle class="fg" cx="10" cy="10" r="8" stroke-dasharray={ring} stroke-dashoffset={ring} /></svg>
                 </div>

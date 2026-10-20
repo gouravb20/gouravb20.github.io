@@ -40,6 +40,8 @@ interface Chapter {
   overview: string;
   /** The page this chapter is based on, shown under the overview as "Reference: <title>". */
   source?: { title: string; url: string };
+  /** Shown as a green, yellow or red badge in the sidebar, chapter header and dashboard. */
+  difficulty?: "easy" | "medium" | "hard";
   concepts: Concept[];
   /** Keys into DEMOS. */
   labs: string[];
@@ -70,7 +72,10 @@ interface SheetBase { title: string; note?: string }
 interface TableSheet extends SheetBase { type: "table"; headers: string[]; rows: (string | number)[][] }
 interface ListSheet extends SheetBase { type: "list"; items: string[] }
 /** `body` is plain text, escaped; with `lang` ("java", "go", "json") it is also syntax-highlighted by shared/highlight.js. */
-interface CodeSheet extends SheetBase { type: "code"; body: string; lang?: string }
+interface CodeSheet extends SheetBase { type: "code"; body: string; lang?: string; alt?: CodeAlternatives }
+
+/** The same code in other languages, by language ("go"). Filled from alt/<chapter id>.js by title; readers pick with the language menu. */
+type CodeAlternatives = Record<string, string>;
 
 interface QA {
   q: string;
@@ -127,7 +132,7 @@ type DeepBlock =
   | { type: "compare"; items: { title: string; html: string; tone?: "ok" | "bad" | "warn" | "info" }[]; title?: string }
   | { type: "table"; headers: string[]; rows: (string | number)[][]; title?: string; note?: string }
   /** `code` is plain text, escaped; `lang` "java", "go" or "json" adds syntax highlighting. */
-  | { type: "code"; code: string; lang?: string; title?: string; caption?: string }
+  | { type: "code"; code: string; lang?: string; alt?: CodeAlternatives; title?: string; caption?: string }
   | { type: "steps" | "keypoints" | "list"; items: string[]; title?: string }
   /** `answer` is the index of the correct option. */
   | { type: "quiz"; q: string; options: string[]; answer: number; explain: string }
@@ -137,3 +142,5 @@ type DeepBlock =
 declare var DATA: NotesData;
 declare var DEMOS: Record<string, Lab>;
 declare var DEEP: Record<string, DeepDive>;
+/** alt/<chapter id>.js: ALT[chapterId][lang][code block title] = code. */
+declare var ALT: Record<string, Record<string, Record<string, string>>>;

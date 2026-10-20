@@ -5,6 +5,19 @@
   const titled = (title, cls = "deep-block-title") => (title ? `<div class="${cls}">${title}</div>` : "");
   /** Code as HTML: coloured by shared/highlight.js when it is loaded, otherwise just escaped. */
   const highlight = (code, lang) => (window.CodeHighlight ? window.CodeHighlight.highlight(code, lang) : esc(code));
+  const LANG_NAMES = { java: "Java", go: "Go", json: "JSON" };
+
+  /**
+   * A <pre> for the code, or, when it has alternatives in other languages, one <pre> per language marked with
+   * data-code-lang; CSS shows the one matching <html data-code-lang>, falling back to the main language.
+   */
+  function codeHtml(code, lang, alt) {
+    const pre = (src, l) => `<pre${l ? ` data-lang="${esc(l)}"` : ""}><code>${highlight(src, l)}</code></pre>`;
+    if (!alt || !Object.keys(alt).length) return pre(code, lang);
+    const variants = [[lang || "", code], ...Object.entries(alt)];
+    return `<div class="code-variants" data-main-lang="${esc(lang || "")}">` + variants.map(([l, src]) =>
+      `<div class="code-variant" data-code-lang="${esc(l)}"><span class="code-variant-label">${LANG_NAMES[l] || esc(l)}</span>${pre(src, l)}</div>`).join("") + `</div>`;
+  }
   const LABELS = {
     problem: "The problem", idea: "The key idea", analogy: "Analogy",
     insight: "Insight", warning: "Watch out", interview: "Interview angle", history: "History",
@@ -41,7 +54,7 @@
         return `<div class="deep-table">${titled(b.title)}<div class="deep-table-wrap"><table><thead><tr>${b.headers.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${
           b.rows.map(r => `<tr>${r.map((c, i) => `<td data-label="${esc(String(b.headers[i] || "").replace(/<[^>]+>/g, ""))}">${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${b.note ? `<div class="cs-note">${b.note}</div>` : ""}</div>`;
       case "code":
-        return `<figure class="deep-code">${titled(b.title)}<pre${b.lang ? ` data-lang="${esc(b.lang)}"` : ""}><code>${highlight(b.code, b.lang)}</code></pre>${b.caption ? `<figcaption>${b.caption}</figcaption>` : ""}</figure>`;
+        return `<figure class="deep-code">${titled(b.title)}${codeHtml(b.code, b.lang, b.alt)}${b.caption ? `<figcaption>${b.caption}</figcaption>` : ""}</figure>`;
       case "steps":
         return `<div class="deep-steps">${titled(b.title)}<ol>${b.items.map(it => `<li>${it}</li>`).join("")}</ol></div>`;
       case "keypoints":
@@ -128,5 +141,5 @@
     return parts.join(" ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   }
 
-  window.DeepRender = { render, article, sectionText, highlight };
+  window.DeepRender = { render, article, sectionText, highlight, codeHtml };
 })();

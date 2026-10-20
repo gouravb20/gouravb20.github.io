@@ -2,15 +2,6 @@
 // follow-ups interviewers usually ask: Parking Lot, Elevator, LRU Cache, Splitwise, Vending Machine and Pub-Sub.
 // Imports are omitted in the code: java.util.*, java.util.concurrent.*, java.time.*.
 (function () {
-Object.assign(window.DATA.parts, {
-  3: `Part III &middot; Parking Lot`,
-  4: `Part IV &middot; Elevator`,
-  5: `Part V &middot; LRU Cache`,
-  6: `Part VI &middot; Splitwise`,
-  7: `Part VII &middot; Vending Machine`,
-  8: `Part VIII &middot; Pub-Sub`
-});
-
 const PRACTICE_TIP = `<p><strong>How to practise this problem:</strong> read only the requirements, then build the solution yourself in 45 minutes: clarify (5), entities (5), public API (5), core code (20), follow-ups (10). Then compare with the Solution tab and note what you missed, and redo it from a blank file a few days later. Imports are omitted in the code: <code>java.util.*</code>, <code>java.util.concurrent.*</code>, <code>java.time.*</code>.</p>`;
 
 /** @type {Cheatsheet} */
@@ -33,7 +24,7 @@ const levels = (mid, senior, staff) => [
 window.DATA.chapters.push(
   // ====================================================================== Parking Lot
   {
-    id: `parking-lot`, part: 3, number: 3,
+    id: `parking-lot`, part: 1, number: 3, difficulty: `easy`,
     title: `Parking Lot: swappable pricing and allocation, safe under concurrency`,
     overview: `Spots by vehicle type, a ticket on entry and a fee on exit. The interesting parts are what varies (how fees are computed, how a spot is chosen) and what must never happen (two cars claiming the same spot). The design puts pricing and allocation behind <strong>Strategy</strong> interfaces and claims spots with an <strong>atomic</strong> <code>tryOccupy()</code>, so concurrent entries can't race.`,
     problem: [
@@ -199,8 +190,9 @@ class ParkingLot {
 
   // ====================================================================== Elevator
   {
-    id: `elevator`, part: 4, number: 4,
+    id: `elevator`, part: 2, number: 4, difficulty: `medium`,
     title: `Elevator System: dispatching calls and the SCAN schedule`,
+    source: { title: `Hello Interview: Elevator (LLD) problem breakdown`, url: `https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/elevator` },
     overview: `N elevators serve F floors. Passengers press hall buttons (floor and direction) and cabin buttons (destination). The controller must send each hall call to the best elevator, and each elevator must serve its stops in a sensible order. Each elevator keeps a sorted set of stops and a direction and follows the <strong>SCAN</strong> idea: keep going while stops remain ahead, then reverse. Dispatch is a cost function, which makes it a natural <strong>Strategy</strong>; the cabin itself is a candidate for the <strong>State</strong> pattern.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [
@@ -217,8 +209,12 @@ class ParkingLot {
           [`How is time modelled?`, `A scheduler calls tick() every second`, `A discrete simulation, easy to test`],
           [`What does "best elevator" mean?`, `Lowest cost: closest, preferring ones already heading that way`, `The dispatch cost function`],
           [`Door timing, weight, emergencies?`, `Out of scope to start`, `Fewer states`],
-          [`Do hall calls know their destination?`, `No, up/down buttons only`, `Destination dispatch is a follow-up`]
-        ] }
+          [`Do hall calls know their destination?`, `No, up/down buttons only`, `Destination dispatch is a follow-up`],
+          [`Should a car going up stop for someone who pressed DOWN?`, `No: stops are direction-aware`, `Store requests as (floor, type), not just floors (Deep Dives)`],
+          [`Invalid floors? A call for the floor the car is on?`, `Reject out-of-range floors; the current floor is already served`, `Validation in addStop`],
+          [`Simulation or real control software?`, `Simulation: time advances with tick()`, `Deterministic, testable movement`]
+        ] },
+        { type: `callout`, tone: `insight`, html: `<p>Asking "simulation or real control software?" is worth it. Real elevators react to hardware events (a floor sensor fires, a motor stops); interviews almost always want a simulation where you control time with <code>tick()</code>, which keeps the logic deterministic and testable.</p>` }
       ] }
     ],
     solution: [
@@ -343,7 +339,7 @@ class ElevatorController {
 
   // ====================================================================== LRU Cache
   {
-    id: `lru-cache`, part: 5, number: 5,
+    id: `lru-cache`, part: 2, number: 5, difficulty: `medium`,
     title: `LRU Cache: O(1) get and put, generic and thread-safe`,
     overview: `A fixed-capacity cache that evicts the least recently used entry when full, with <code>get</code> and <code>put</code> in O(1). It is a pure data-structure problem: a <strong>hash map</strong> finds an entry in O(1), and a <strong>doubly linked list</strong> ordered by recency moves or removes it in O(1). Sentinel nodes remove edge cases, generics make it reusable, and because <code>get</code> reorders the list, every operation needs the same lock.`,
     problem: [
@@ -498,7 +494,7 @@ class ElevatorController {
 
   // ====================================================================== Splitwise
   {
-    id: `splitwise`, part: 6, number: 6,
+    id: `splitwise`, part: 2, number: 6, difficulty: `medium`,
     title: `Splitwise: splitting expenses and keeping balances`,
     overview: `Users add expenses paid by one person and split equally, by exact amounts or by percentages; the app shows who owes whom. Two things are tested: <strong>money handling</strong> (store the smallest unit as <code>long</code>, distribute rounding remainders deliberately) and <strong>balance bookkeeping</strong> (net each pair so only one direction is stored). Splitting rules sit behind a <strong>Strategy</strong> interface.`,
     problem: [
@@ -672,7 +668,7 @@ while (!creditors.isEmpty() && !debtors.isEmpty()) {
 
   // ====================================================================== Vending Machine
   {
-    id: `vending-machine`, part: 7, number: 7,
+    id: `vending-machine`, part: 1, number: 7, difficulty: `easy`,
     title: `Vending Machine: the State pattern`,
     overview: `Insert money, select a product, get it with change, or cancel for a refund, and fail clearly on invalid actions such as selecting before paying, selecting something out of stock, or not having enough money. Behaviour depends on what the machine is doing right now, which is exactly what the <strong>State</strong> pattern models: one class per state, and the machine delegates every action to its current state.`,
     problem: [
@@ -827,7 +823,7 @@ class VendingMachine {
 
   // ====================================================================== Pub-Sub
   {
-    id: `pub-sub`, part: 8, number: 8,
+    id: `pub-sub`, part: 2, number: 8, difficulty: `medium`,
     title: `Pub-Sub / Notification Broker: the Observer pattern, asynchronously`,
     overview: `Topics, subscribe and unsubscribe, and publish that delivers to every current subscriber. The catch is in the last requirement: a slow or failing subscriber must not block or break the others. The design is the <strong>Observer</strong> pattern with asynchronous delivery: each subscriber gets its own single-thread executor, so its messages arrive in order and a slow subscriber only delays itself, and exceptions are caught per delivery.`,
     problem: [

@@ -1,7 +1,7 @@
 ---
 import { getCollection } from "astro:content";
 import NotesLayout from "../../../../layouts/NotesLayout.astro";
-import { SITE_NAME, TRACKS, appPath, chapterPath, plain, summary, unitNoun, url, type Notes } from "../../../../lib/site";
+import { LEVEL_LABEL, SITE_NAME, TRACKS, appPath, chapterPath, plain, summary, unitNoun, url, type Notes } from "../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -95,7 +95,7 @@ const structuredData = [
   <div class="dash-chapters">
     {chapters.map(ch => (
       <a class="dash-chapter-card" href={url(chapterPath(notes, ch))} data-chapter-card={ch.id} data-total={ch.concepts.length + ch.interview.length} data-noun={unitNoun(ch)} data-number={ch.number} data-title={plain(ch.title)} data-concepts={ch.concepts.length} data-qa={ch.interview.length}>
-        <div class="dcc-head"><div class="dcc-num">{ch.number}</div><div class="dcc-title" set:html={ch.title} /></div>
+        <div class="dcc-head"><div class="dcc-num">{ch.number}</div><div class="dcc-title" set:html={ch.title} />{ch.difficulty && <span class={`level-pill level-${ch.difficulty}`}>{LEVEL_LABEL[ch.difficulty]}</span>}</div>
         <div class="dcc-meta"><span>{ch.concepts.length} concepts &middot; {ch.labs.length} labs &middot; {ch.interview.length} Q&amp;A</span><span class="dcc-pct">0%</span></div>
         <div class="dcc-prog-bar"><div class="dcc-prog-fill" style="width:0%"></div></div>
       </a>
