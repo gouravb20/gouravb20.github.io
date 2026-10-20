@@ -41,7 +41,8 @@
     ] },
     { id: "lld", path: "low-level-design/", icon: "lld", title: "Low-Level Design", kids: [
       { path: `${LLD}in-a-hurry/`, icon: "concepts", title: "LLD in a Hurry" },
-      { path: `${LLD}concurrency/`, icon: "advanced", title: "Concurrency" }
+      { path: `${LLD}concurrency/`, icon: "advanced", title: "Concurrency" },
+      { path: `${LLD}problem-breakdowns/`, icon: "problems", title: "Problem Breakdowns" }
     ] },
     { icon: "code", title: "Code", soon: true },
     { group: "" },
