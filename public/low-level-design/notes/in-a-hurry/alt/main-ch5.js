@@ -2,20 +2,23 @@
 window.ALT = window.ALT || {};
 ALT.ch5 = ALT.ch5 || {};
 ALT.ch5.go = Object.assign(ALT.ch5.go || {}, {
-"Thread-safe Singleton: enum and holder idiom": `// Go has no enums or class initialisers. sync.Once gives the same guarantee:
-// the function runs exactly once, and every caller sees the finished value.
-type Metrics struct {
+"Lazy Singleton with a lock": `type Metrics struct {
 	mu       sync.Mutex // guards counters
 	counters map[string]int64
 }
 
 var (
-	metricsOnce sync.Once
-	metrics     *Metrics
+	metrics   *Metrics   // guarded by metricsMu
+	metricsMu sync.Mutex
 )
 
+// Check and create under one lock: only one goroutine can ever see nil and build.
 func GetMetrics() *Metrics {
-	metricsOnce.Do(func() { metrics = &Metrics{counters: map[string]int64{}} })
+	metricsMu.Lock()
+	defer metricsMu.Unlock()
+	if metrics == nil {
+		metrics = &Metrics{counters: map[string]int64{}}
+	}
 	return metrics
 }
 
@@ -23,13 +26,10 @@ func (m *Metrics) Increment(name string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.counters[name]++
-}
-
-// Go 1.21+: sync.OnceValue is the lazy "holder" in one line. AppConfig is immutable once built.
-var GetAppConfig = sync.OnceValue(func() *AppConfig { return LoadAppConfig() })`,
+}`,
 
 "Double-checked locking needs volatile": `// Go's equivalent of a volatile reference is an atomic pointer.
-// In practice, prefer sync.Once, which does exactly this for you.
+// (sync.Once in the standard library is this same check-lock-check pattern.)
 type Registry struct{}
 
 var (

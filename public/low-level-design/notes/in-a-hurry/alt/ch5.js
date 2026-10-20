@@ -48,38 +48,54 @@ func NewFlightSearch(from, to string, opts ...Option) (FlightSearch, error) {
 
 q, err := NewFlightSearch("BLR", "SFO", On(time.Date(2026, 12, 20, 0, 0, 0, 0, time.UTC)), WithCabin(Business))`,
 
-"Singleton, if you must: let the JVM make it thread-safe": `var (
-	controller     *LotController
-	controllerOnce sync.Once
-)
-
-// Instance creates the controller once, safely, even when many goroutines call it at the same time.
-func Instance() *LotController {
-	controllerOnce.Do(func() { controller = &LotController{gates: map[string]*Gate{}} })
-	return controller
+"Lazy Singleton: check and create under a lock": `type LotController struct {
+	mu    sync.Mutex // its state must be thread-safe too
+	gates map[string]*Gate
 }
-// Usually better: create one controller in main() and pass it to whoever needs it.
-// The map is shared by every goroutine, so LotController guards it with a sync.Mutex (or uses sync.Map).`,
-
-"Lazy and thread-safe: holder idiom and double-checked locking": `// Go has no class initialisation to lean on; sync.Once is the idiomatic answer to both Java forms.
-// Do runs the function exactly once; other callers block until it finishes, then never lock again.
-type PricingEngine struct{ /* rules... */ }
 
 var (
-	engine     *PricingEngine
-	engineOnce sync.Once
+	controller   *LotController // guarded by controllerMu
+	controllerMu sync.Mutex
 )
 
-func Engine() *PricingEngine {
-	engineOnce.Do(func() { engine = loadPricingEngine() })
-	return engine
+// One goroutine at a time: check, create, return.
+func Instance() *LotController {
+	controllerMu.Lock()
+	defer controllerMu.Unlock()
+	if controller == nil {
+		controller = &LotController{gates: map[string]*Gate{}}
+	}
+	return controller
 }
 
-// Go 1.21+: sync.OnceValue wraps the same thing in one line.
-var auditLog = sync.OnceValue(func() *AuditLog { return &AuditLog{} })
+func (c *LotController) Register(g *Gate) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.gates[g.ID] = g
+}
+// Usually better: create one controller in main() and pass it to whoever needs it.`,
 
-// Broken, like Java's unsynchronised check: two goroutines can both see nil.
-//   if engine == nil { engine = loadPricingEngine() }`,
+"Double-checked locking: lock only until the instance exists": `type AuditLog struct{ /* ... */ }
+
+var (
+	auditLog   atomic.Pointer[AuditLog] // atomic: a reader never sees a half-built value
+	auditLogMu sync.Mutex
+)
+
+func GetAuditLog() *AuditLog {
+	if l := auditLog.Load(); l != nil { // 1. fast path: no lock once created
+		return l
+	}
+	auditLogMu.Lock() // 2. only the first callers get here
+	defer auditLogMu.Unlock()
+	if l := auditLog.Load(); l != nil { // 3. check again: another goroutine may have won
+		return l
+	}
+	l := &AuditLog{}
+	auditLog.Store(l)
+	return l
+}
+// The standard library's sync.Once is this same check-lock-check pattern, packaged.`,
 
 "Adapter: make a vendor fit your interface": `type PaymentGateway interface {
 	Charge(amount Money, token string) (PaymentResult, error)

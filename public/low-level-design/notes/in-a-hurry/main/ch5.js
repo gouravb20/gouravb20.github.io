@@ -24,47 +24,43 @@ MAIN.ch5 = [
     title: "Singleton, done safely, and usually avoided",
     kicker: "Creational",
     blocks: [
-      { type: "text", html: `<p>Singleton guarantees one instance of a class with a global access point. The naive lazy version, "if instance is null, create it", is a check-then-act race: two threads can both see null and build two instances. If you genuinely need a process-wide singleton, let the language make it thread-safe for you.</p>` },
-      { type: "code", lang: "java", title: "Thread-safe Singleton: enum and holder idiom", code: `// Option 1: an enum. The JVM creates INSTANCE exactly once, thread-safely.
-enum Metrics {
-    INSTANCE;
-    private final ConcurrentHashMap<String, LongAdder> counters = new ConcurrentHashMap<>();
+      { type: "text", html: `<p>Singleton guarantees one instance of a class with a global access point. The naive lazy version, "if instance is null, create it", is a check-then-act race: two threads can both see null and build two instances. The fix works the same way in every language: <strong>make the check and the creation one step by doing both while holding a lock</strong>.</p>` },
+      { type: "code", lang: "java", title: "Lazy Singleton with a lock", code: `final class Metrics {
+    private static Metrics instance;                      // guarded by the class lock
+    private final Map<String, LongAdder> counters = new ConcurrentHashMap<>();
+
+    private Metrics() { }
+
+    // Check and create under one lock: only one thread can ever see null and build.
+    static synchronized Metrics get() {
+        if (instance == null) instance = new Metrics();
+        return instance;
+    }
 
     void increment(String name) { counters.computeIfAbsent(name, k -> new LongAdder()).increment(); }
     long count(String name) { LongAdder a = counters.get(name); return a == null ? 0 : a.sum(); }
-}
-
-// Option 2: initialization-on-demand holder. Lazy, with no locking in your code.
-final class AppConfig {
-    private final Map<String, String> values;            // immutable after construction
-
-    private AppConfig() { values = Map.copyOf(ConfigLoader.load()); }
-
-    private static final class Holder {
-        static final AppConfig INSTANCE = new AppConfig();   // runs on first use of Holder
-    }
-
-    static AppConfig get() { return Holder.INSTANCE; }
-    String value(String key) { return values.get(key); }
 }` },
-      { type: "text", html: `<p>Both rely on the JVM's class initialisation, which runs once under a lock and publishes the finished object to every thread. The instance's own state must be safe as well: <code>Metrics</code> uses <code>ConcurrentHashMap</code> and <code>LongAdder</code>, and <code>AppConfig</code> is immutable. A thread-safe way to create a singleton does not make its fields thread-safe.</p><p>You may be asked about double-checked locking. It works in modern Java only if the field is <code>volatile</code>. Without it, another thread can see a non-null reference to an object whose constructor hasn't finished writing its fields.</p>` },
+      { type: "text", html: `<p>This is the version to write first. It is lazy, obviously correct, and the same in any language: a mutex around "check, create if missing, return". The lock also publishes the finished object, so no thread can see a half-built instance. An uncontended lock costs tens of nanoseconds, so locking on every call only matters if <code>get()</code> sits on a very hot path.</p><p>Creation is only half the job. The one instance is shared by every thread, so its own state must be safe too: here <code>ConcurrentHashMap</code> and <code>LongAdder</code>. A thread-safe way to create a singleton does not make its fields thread-safe.</p><p>If the interviewer asks you to avoid the lock on every call, use double-checked locking: check without the lock, and only lock (and check again) when the instance is missing. It is correct only if the shared field is read and written with visibility guarantees: <code>volatile</code> in Java and C#, an atomic in Go, C++ or Rust. Without that, another thread can see a non-null reference to an object whose constructor hasn't finished writing its fields.</p>` },
       { type: "code", lang: "java", title: "Double-checked locking needs volatile", code: `final class Registry {
     private static volatile Registry instance;          // volatile is what makes this correct
 
     private Registry() { }
 
     static Registry get() {
-        Registry r = instance;                          // one volatile read on the fast path
+        Registry r = instance;                          // 1. fast path: no lock once created
         if (r == null) {
-            synchronized (Registry.class) {
+            synchronized (Registry.class) {             // 2. only the first callers get here
                 r = instance;
-                if (r == null) instance = r = new Registry();
+                if (r == null) {                        // 3. check again: another thread may have won
+                    r = new Registry();
+                    instance = r;
+                }
             }
         }
         return r;
     }
 }` },
-      { type: "callout", tone: "warning", html: `<p>Interviewers push back on Singleton because it hides dependencies inside method bodies and makes tests share state. When the prompt says "there is one parking lot", the stronger answer is <em>one instance, created at startup and passed to whoever needs it</em>. Mention the enum or holder idiom only if a true global really is required.</p>` }
+      { type: "callout", tone: "warning", html: `<p>Interviewers push back on Singleton because it hides dependencies inside method bodies and makes tests share state. When the prompt says "there is one parking lot", the stronger answer is <em>one instance, created at startup and passed to whoever needs it</em>. Write the lock-based lazy singleton only if a true global really is required.</p>` }
     ]
   },
   {

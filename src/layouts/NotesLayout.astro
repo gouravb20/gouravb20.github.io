@@ -97,12 +97,21 @@ const ring = 2 * Math.PI * 8;
       <div class="progress-pill-bar"><div class="progress-pill-fill" id="overallProgressFill" style="width:0%"></div></div>
     </div>
 
-    <label class="code-lang-picker" title="Language for code examples across the site">
-      <span class="code-lang-label">Language</span>
-      <select data-code-lang-select aria-label="Programming language for code examples">
-        {CODE_LANGUAGES.map(([value, name]) => <option value={value}>{name}</option>)}
-      </select>
-    </label>
+    <div class="lang-wrap" data-code-lang-picker>
+      <button type="button" class="iconbtn lang-toggle" aria-haspopup="menu" aria-expanded="false" title="Language for code examples across the site">
+        <span class="lang-toggle-label">Language</span>
+        <b data-code-lang-current>{CODE_LANGUAGES[0][1]}</b>
+        <span class="lang-caret" aria-hidden="true">&#9662;</span>
+      </button>
+      <div class="lang-menu" role="menu" aria-label="Programming language for code examples">
+        <div class="lang-title">Code examples in</div>
+        {CODE_LANGUAGES.map(([value, name]) => (
+          <button type="button" class="lang-opt" role="menuitemradio" aria-checked="false" data-code-lang-option={value}>
+            <span>{name}</span><span class="lang-check" aria-hidden="true">&#10003;</span>
+          </button>
+        ))}
+      </div>
+    </div>
 
     <div class="search-wrap">
       <input type="search" class="search-box" id="searchBox" placeholder="Search concepts, labs, questions... (press /)" aria-label="Search these notes">

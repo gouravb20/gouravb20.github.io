@@ -285,18 +285,33 @@ const CODE_LANG_KEY = "learn_code_lang";
 
 /** One choice for the whole site: the layout applies it to <html data-code-lang> before paint, CSS shows matching code. */
 function initCodeLanguage() {
-  const selects = [...document.querySelectorAll<HTMLSelectElement>("[data-code-lang-select]")];
-  if (!selects.length) return;
-  const set = (lang: string) => {
-    document.documentElement.setAttribute("data-code-lang", lang);
-    for (const s of selects) if ([...s.options].some(o => o.value === lang)) s.value = lang;
+  const picker = $("[data-code-lang-picker]");
+  const toggle = picker?.querySelector<HTMLButtonElement>(".lang-toggle");
+  const current = picker?.querySelector<HTMLElement>("[data-code-lang-current]");
+  if (!picker || !toggle || !current) return;
+  const options = [...picker.querySelectorAll<HTMLButtonElement>("[data-code-lang-option]")];
+  const open = (on: boolean) => {
+    picker.classList.toggle("open", on);
+    toggle.setAttribute("aria-expanded", String(on));
   };
-  const saved = document.documentElement.getAttribute("data-code-lang");
-  if (saved) set(saved);
-  for (const s of selects) s.addEventListener("change", () => {
-    set(s.value);
-    try { localStorage.setItem(CODE_LANG_KEY, s.value); } catch { /* private mode: the choice lasts for this page */ }
+  const set = (lang: string) => {
+    const chosen = options.find(o => o.dataset.codeLangOption === lang);
+    if (!chosen) return;
+    document.documentElement.setAttribute("data-code-lang", lang);
+    current.textContent = chosen.textContent?.replace("\u2713", "").trim() ?? lang;
+    for (const o of options) o.setAttribute("aria-checked", String(o === chosen));
+  };
+  set(document.documentElement.getAttribute("data-code-lang") ?? "java");
+  toggle.addEventListener("click", e => { e.stopPropagation(); open(!picker.classList.contains("open")); });
+  for (const o of options) o.addEventListener("click", () => {
+    const lang = o.dataset.codeLangOption!;
+    set(lang);
+    open(false);
+    toggle.focus();
+    try { localStorage.setItem(CODE_LANG_KEY, lang); } catch { /* private mode: the choice lasts for this page */ }
   });
+  document.addEventListener("click", e => { if (!(e.target as Element).closest?.("[data-code-lang-picker]")) open(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && picker.classList.contains("open")) { open(false); toggle.focus(); } });
 }
 
 // ------------------------------------------------------------------ chapter: concepts and Q&A

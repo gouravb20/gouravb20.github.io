@@ -20,7 +20,7 @@ DEEP.ch5 = {
           ["Behavioural", "Strategy, Observer, State, Command, Chain of Responsibility, Template Method, Iterator", "Pricing, notifications, vending machines, undo, approvals"]
         ] },
         { type: "table", title: "Keeping each pattern thread-safe", headers: ["Pattern", "What can race", "How the examples stay safe"], rows: [
-          ["Singleton", "Two threads both see no instance and both create one", "Enum or holder class (the JVM initialises a class once); double-checked locking only with <code>volatile</code>; Go: <code>sync.Once</code>"],
+          ["Singleton", "Two threads both see no instance and both create one", "Check and create while holding a lock; for a lock-free fast path, double-checked locking with a <code>volatile</code> or atomic reference"],
           ["Factory, Strategy, Adapter, Decorator, Template Method", "Nothing, as long as they hold no mutable state", "<code>final</code> fields, immutable maps and records, stateless helpers"],
           ["Builder", "A builder shared between threads", "Each thread uses its own builder; the built object is immutable"],
           ["Composite, Iterator", "The structure changing while someone walks it", "Defensive copies, or iterate a snapshot taken under a lock"],
@@ -77,42 +77,47 @@ final class NotifierFactory {
 
 FlightSearch q = FlightSearch.from("BLR", "SFO").on(LocalDate.of(2026, 12, 20)).cabin(Cabin.BUSINESS).build();
 // A builder is used by one thread; the FlightSearch it returns has only final fields, so it is safe to share.` },
-        { type: "code", lang: "java", title: "Singleton, if you must: let the JVM make it thread-safe", code: `enum LotController {
-    INSTANCE;
+        { type: "text", html: `<p>A singleton has two separate thread-safety jobs. <strong>Creation</strong>: exactly one instance must be made even if many threads ask for it at the same moment. <strong>Use</strong>: the one instance is shared by every thread, so its own fields need thread-safe types or locks. Creation is a check-then-act ("is it there? if not, build it"), and the language-agnostic way to make a check-then-act safe is to do it while holding a lock.</p>` },
+        { type: "code", lang: "java", title: "Lazy Singleton: check and create under a lock", code: `final class LotController {
+    private static LotController instance;                          // guarded by the class lock
     private final Map<String, Gate> gates = new ConcurrentHashMap<>();   // its state must be thread-safe too
+
+    private LotController() {}
+
+    static synchronized LotController getInstance() {   // one thread at a time: check, create, return
+        if (instance == null) instance = new LotController();
+        return instance;
+    }
+
     void register(Gate g) { gates.put(g.id(), g); }
 }
 // Usually better: create one controller at startup and pass it to whoever needs it.` },
-        { type: "text", html: `<p>A singleton has two separate thread-safety jobs. <strong>Creation</strong>: exactly one instance must be made even if many threads ask for it at the same moment. <strong>Use</strong>: the one instance is shared by every thread, so its own fields need thread-safe types or locks. The enum handles creation and the <code>ConcurrentHashMap</code> handles use. When creation is expensive and should be lazy, use one of these:</p>` },
-        { type: "code", lang: "java", title: "Lazy and thread-safe: holder idiom and double-checked locking", code: `// 1. Holder idiom (preferred): Holder is initialised on the first getInstance() call,
-//    and the JVM guarantees class initialisation runs exactly once, with no locking afterwards.
-final class PricingEngine {
-    private PricingEngine() { /* load rules... */ }
-    private static final class Holder { static final PricingEngine INSTANCE = new PricingEngine(); }
-    static PricingEngine getInstance() { return Holder.INSTANCE; }
-}
-
-// 2. Double-checked locking: only correct because the field is volatile.
-final class AuditLog {
-    private static volatile AuditLog instance;
+        { type: "text", html: `<p>This is the default: lazy, simple, and obviously correct. The lock also guarantees that every thread sees a fully constructed object. Its only cost is taking an uncontended lock on every call, which is tens of nanoseconds. If <code>getInstance()</code> is called on a very hot path, keep the lock for the first call only with double-checked locking:</p>` },
+        { type: "code", lang: "java", title: "Double-checked locking: lock only until the instance exists", code: `final class AuditLog {
+    private static volatile AuditLog instance;   // volatile: a reader never sees a half-built object
     private AuditLog() {}
+
     static AuditLog getInstance() {
-        AuditLog local = instance;                 // one volatile read on the fast path
+        AuditLog local = instance;               // 1. fast path: no lock once created
         if (local == null) {
-            synchronized (AuditLog.class) {
+            synchronized (AuditLog.class) {      // 2. only the first callers get here
                 local = instance;
-                if (local == null) instance = local = new AuditLog();
+                if (local == null) {             // 3. check again: another thread may have won
+                    local = new AuditLog();
+                    instance = local;
+                }
             }
         }
         return local;
     }
 }` },
         { type: "compare", title: "Lazy singletons, safe and unsafe", items: [
-          { title: "if (instance == null) instance = new X();", tone: "bad", html: `<p>Two threads can both see <code>null</code> and both construct, so callers end up holding different instances.</p>` },
-          { title: "synchronized getInstance()", tone: "warn", html: `<p>Correct, but every call takes the lock, even long after the instance exists.</p>` },
-          { title: "Double-checked locking without volatile", tone: "bad", html: `<p>Another thread can see the reference before the constructor's writes are visible and use a half-built object.</p>` },
-          { title: "Enum, holder idiom, or volatile with double-checked locking", tone: "ok", html: `<p>Exactly one instance and no lock on the fast path. In Go, <code>sync.Once</code> gives the same guarantee.</p>` }
+          { title: "Check, then create, with no lock", tone: "bad", html: `<p>Two threads can both see no instance and both construct, so callers end up holding different instances.</p>` },
+          { title: "Lock around check and create", tone: "ok", html: `<p>Correct in every language and the simplest to get right. The default answer.</p>` },
+          { title: "Double-checked locking with a plain field", tone: "bad", html: `<p>Another thread can see the reference before the constructor's writes are visible and use a half-built object.</p>` },
+          { title: "Double-checked locking with a volatile or atomic field", tone: "ok", html: `<p>Correct, and no lock after the first call. Use it when <code>getInstance()</code> is hot.</p>` }
         ] },
+        { type: "callout", tone: "interview", title: "synchronized or an explicit lock?", html: `<p>For a singleton they are equivalent: both give mutual exclusion and make the new object visible to other threads. Prefer <code>synchronized</code> (or the language's plain mutex) because it can't be left locked by an exception. An explicit <code>ReentrantLock</code> only adds <code>tryLock</code>, timeouts and fairness, and creating one object needs none of them. In Go the same code uses a <code>sync.Mutex</code> plus an <code>atomic.Pointer</code>.</p>` },
         { type: "callout", tone: "warning", html: `<p>Singleton is the pattern interviewers most often push back on. It is global state: dependencies are hidden inside method bodies, tests can't swap in a fake, and tests leak state into each other. If the prompt says "there is one X", say "one instance, created at startup and injected" rather than reaching for a static <code>getInstance()</code>. If you do use one, say how it stays thread-safe for both creation and use.</p>` }
       ]
     },
@@ -342,7 +347,7 @@ for (Cell c : board) { ... }      // callers never touch the 2D array` },
   takeaways: [
     "Start from a force in the design; name the pattern that resolves it in one sentence; keep it minimal.",
     "Factory centralises which class to create; Builder handles many optional parts; prefer injecting one instance to a Singleton.",
-    "If you do use a Singleton, make creation thread-safe (enum, holder idiom, double-checked locking with volatile, or Go's sync.Once) and make its state thread-safe too.",
+    "If you do use a Singleton, check and create it under a lock (double-checked locking with a volatile or atomic field if the call is hot), and make its state thread-safe too.",
     "Every pattern must survive concurrent callers: immutable fields and copies for shared structure, one lock around each state transition, atomics or thread-safe collections for shared counters and lists.",
     "Adapter changes an interface, Decorator adds behaviour behind the same one, Facade simplifies many, Composite treats groups like items.",
     "Strategy: the client picks the algorithm. State: the current state picks the behaviour.",

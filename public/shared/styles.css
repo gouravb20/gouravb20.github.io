@@ -135,14 +135,33 @@ html[data-code-lang="java"] .code-variants:has(> .code-variant[data-code-lang="j
   letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-muted); background: var(--bg-2);
   border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; pointer-events: none;
 }
-.code-lang-picker {
-  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 12.5px; color: var(--text-muted);
+/* Language menu in the top bar; same surface, radius and accent as the appearance (look) menu. */
+.lang-wrap { position: relative; flex-shrink: 0; }
+.lang-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.lang-toggle-label { color: var(--text-muted); }
+.lang-toggle:hover .lang-toggle-label { color: inherit; }
+.lang-caret { font-size: 10px; opacity: 0.7; transition: transform 0.15s; }
+.lang-wrap.open .lang-caret { transform: rotate(180deg); }
+.lang-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; min-width: 190px; z-index: 210; display: none;
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; padding: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); color: var(--text);
 }
-.code-lang-picker select {
-  font: inherit; font-weight: 600; color: var(--text); background: var(--bg-3); border: 1px solid var(--border);
-  border-radius: 8px; padding: 4px 6px; cursor: pointer;
+.lang-wrap.open .lang-menu { display: block; }
+.lang-title {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--text-muted);
+  padding: 6px 10px 4px;
 }
-@media (max-width: 720px) { .code-lang-label { display: none; } }
+.lang-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 40px;
+  padding: 7px 10px; text-align: left; background: transparent; color: inherit; border: 1px solid transparent;
+  border-radius: 8px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.lang-opt:hover, .lang-opt:focus-visible { background: var(--bg-3); outline: none; }
+.lang-opt[aria-checked="true"] { border-color: var(--accent); }
+.lang-check { color: var(--accent); font-weight: 800; visibility: hidden; }
+.lang-opt[aria-checked="true"] .lang-check { visibility: visible; }
+@media (max-width: 720px) { .lang-toggle-label { display: none; } }
 
 p, li, td, th, .concept-def, .concept-why, .concept-example,
 .overview-text, .qa-body-inner, .cs-note, .qa-q, .concept-term,
