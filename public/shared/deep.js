@@ -5,7 +5,7 @@
   const titled = (title, cls = "deep-block-title") => (title ? `<div class="${cls}">${title}</div>` : "");
   /** Code as HTML: coloured by shared/highlight.js when it is loaded, otherwise just escaped. */
   const highlight = (code, lang) => (window.CodeHighlight ? window.CodeHighlight.highlight(code, lang) : esc(code));
-  const LANG_NAMES = { java: "Java", go: "Go", json: "JSON" };
+  const LANG_NAMES = { java: "Java", go: "Go", json: "JSON", python: "Python", js: "JavaScript", javascript: "JavaScript" };
 
   /**
    * A <pre> for the code, or, when it has alternatives in other languages, one <pre> per language marked with

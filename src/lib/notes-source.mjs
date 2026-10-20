@@ -108,7 +108,8 @@ function altScripts(dir) {
 }
 
 /**
- * Attaches each alternative to the code block (or cheatsheet code) with the same title in that chapter, as `alt[lang]`.
+ * Attaches each alternative to every code block (or cheatsheet code) with the same title in that chapter, as `alt[lang]`;
+ * a deep dive snippet and its cheatsheet copy often share a title.
  * An alternative whose title matches no block is an error, so a renamed block can't silently lose its translation.
  * @param {any} DATA @param {Record<string, any>} DEEP @param {Record<string, Record<string, Record<string, string>>>} ALT
  * @param {string[]} errors
@@ -117,16 +118,17 @@ function mergeAlternatives(DATA, DEEP, ALT, errors) {
   for (const [chapterId, byLang] of Object.entries(ALT)) {
     const ch = (DATA.chapters || []).find((/** @type {any} */ c) => c.id === chapterId);
     if (!ch) { errors.push(`alt/${chapterId}.js: no chapter has id "${chapterId}"`); continue; }
-    /** @type {Map<string, any>} */
+    /** @type {Map<string, any[]>} */
     const byTitle = new Map();
+    const add = (/** @type {string} */ title, /** @type {any} */ block) => byTitle.set(title, [...(byTitle.get(title) || []), block]);
     const sections = [...(ch.problem || []), ...(ch.solution || []), ...(ch.levels || []), ...((DEEP[chapterId] || {}).sections || [])];
-    for (const s of sections) for (const b of s.blocks) if (b.type === "code" && b.title) byTitle.set(b.title, b);
-    for (const cs of ch.cheatsheet || []) if (cs.type === "code") byTitle.set(cs.title, cs);
+    for (const s of sections) for (const b of s.blocks) if (b.type === "code" && b.title) add(b.title, b);
+    for (const cs of ch.cheatsheet || []) if (cs.type === "code") add(cs.title, cs);
     for (const [lang, snippets] of Object.entries(byLang)) {
       for (const [title, code] of Object.entries(snippets)) {
-        const target = byTitle.get(title);
-        if (!target) { errors.push(`alt/${chapterId}.js: no code block titled "${title}" for ${lang}`); continue; }
-        target.alt = { ...(target.alt || {}), [lang]: code };
+        const targets = byTitle.get(title);
+        if (!targets) { errors.push(`alt/${chapterId}.js: no code block titled "${title}" for ${lang}`); continue; }
+        for (const t of targets) t.alt = { ...(t.alt || {}), [lang]: code };
       }
     }
   }

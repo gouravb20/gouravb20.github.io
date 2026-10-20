@@ -1,0 +1,352 @@
+// Go versions of chapter 5's code blocks, matched to the Java blocks by title. Imports are omitted.
+window.ALT = window.ALT || {};
+ALT["ch5"] = { go: {
+"Factory: one place decides which class to create": `type Notifier interface{ Send(u User, message string) error }
+
+type EmailNotifier struct{ /* ... */ }
+type SMSNotifier struct{ /* ... */ }
+type PushNotifier struct{ /* ... */ }
+
+type NotifierFactory struct{ byChannel map[Channel]Notifier }
+
+func NewNotifierFactory(e *EmailNotifier, s *SMSNotifier, p *PushNotifier) *NotifierFactory {
+	return &NotifierFactory{byChannel: map[Channel]Notifier{Email: e, SMS: s, Push: p}}
+}
+
+func (f *NotifierFactory) ForUser(u User) (Notifier, error) {
+	n, ok := f.byChannel[u.PreferredChannel]
+	if !ok {
+		return nil, fmt.Errorf("no notifier for channel %v", u.PreferredChannel)
+	}
+	return n, nil
+}`,
+
+"Builder: readable construction with validation at the end": `// Go's usual answer to a builder is functional options.
+type FlightSearch struct {
+	from, to string
+	date     time.Time
+	cabin    Cabin
+	maxStops int
+}
+
+type Option func(*FlightSearch)
+
+func On(d time.Time) Option   { return func(s *FlightSearch) { s.date = d } }
+func WithCabin(c Cabin) Option { return func(s *FlightSearch) { s.cabin = c } }
+func MaxStops(n int) Option    { return func(s *FlightSearch) { s.maxStops = n } }
+
+func NewFlightSearch(from, to string, opts ...Option) (FlightSearch, error) {
+	s := FlightSearch{from: from, to: to, date: time.Now(), cabin: Economy, maxStops: 2} // defaults
+	for _, opt := range opts {
+		opt(&s)
+	}
+	if from == to { // validate once everything is set
+		return FlightSearch{}, errors.New("origin equals destination")
+	}
+	return s, nil
+}
+
+q, err := NewFlightSearch("BLR", "SFO", On(time.Date(2026, 12, 20, 0, 0, 0, 0, time.UTC)), WithCabin(Business))`,
+
+"Singleton, if you must: let the JVM make it thread-safe": `var (
+	controller     *LotController
+	controllerOnce sync.Once
+)
+
+// Instance creates the controller once, safely, even when many goroutines call it at the same time.
+func Instance() *LotController {
+	controllerOnce.Do(func() { controller = &LotController{gates: map[string]*Gate{}} })
+	return controller
+}
+// Usually better: create one controller in main() and pass it to whoever needs it.`,
+
+"Adapter: make a vendor fit your interface": `type PaymentGateway interface {
+	Charge(amount Money, token string) (PaymentResult, error)
+}
+
+type AcmePayAdapter struct{ client *acme.Client } // vendor SDK, different shape
+
+func (a AcmePayAdapter) Charge(amount Money, token string) (PaymentResult, error) {
+	r, err := a.client.CreateTransaction(token, amount.Cents(), amount.Currency())
+	if err != nil {
+		return PaymentResult{}, err
+	}
+	if r.Status != acme.StatusOK {
+		return Declined(r.Message), nil
+	}
+	return Approved(r.TxnID), nil
+}`,
+
+"Decorator: stackable features, same interface": `// Go's standard library is built on this: io.Writer wrapped by gzip.NewWriter, bufio.NewWriter...
+type DataSource interface{ Write(data []byte) error }
+
+type FileDataSource struct{ path string }
+
+type Compressed struct{ inner DataSource }
+
+func (c Compressed) Write(data []byte) error { return c.inner.Write(gzipBytes(data)) }
+
+type Encrypted struct {
+	inner DataSource
+	key   []byte
+}
+
+func (e Encrypted) Write(data []byte) error { return e.inner.Write(encrypt(data, e.key)) }
+
+var out DataSource = Encrypted{Compressed{FileDataSource{path}}, key} // any combination`,
+
+"Composite: files and folders through one interface": `type Node interface {
+	Name() string
+	Size() int64
+}
+
+type File struct {
+	name string
+	size int64
+}
+
+func (f File) Name() string { return f.name }
+func (f File) Size() int64  { return f.size }
+
+type Folder struct {
+	name     string
+	children []Node
+}
+
+func (f Folder) Name() string { return f.name }
+
+func (f Folder) Size() int64 { // recursion for free
+	var total int64
+	for _, c := range f.children {
+		total += c.Size()
+	}
+	return total
+}`,
+
+"Strategy: the client picks the algorithm": `type DispatchStrategy interface {
+	Choose(cars []*Elevator, r Request) *Elevator
+}
+
+type NearestCar struct{}
+
+func (NearestCar) Choose(cars []*Elevator, r Request) *Elevator {
+	return slices.MinFunc(cars, func(a, b *Elevator) int { return abs(a.Floor-r.Floor) - abs(b.Floor-r.Floor) })
+}
+
+type LeastBusy struct{}
+
+func (LeastBusy) Choose(cars []*Elevator, r Request) *Elevator {
+	return slices.MinFunc(cars, func(a, b *Elevator) int { return a.PendingStops() - b.PendingStops() })
+}
+
+type Dispatcher struct{ strategy DispatchStrategy } // chosen by configuration
+
+func (d Dispatcher) Handle(r Request, cars []*Elevator) { d.strategy.Choose(cars, r).AddStop(r.Floor) }
+
+// A strategy can also be a plain function type: type DispatchFunc func([]*Elevator, Request) *Elevator`,
+
+"State: the object's state picks the behaviour": `type VendingState interface {
+	InsertCoin(m *Machine, coin Money) VendingState
+	Select(m *Machine, slot string) VendingState
+	Cancel(m *Machine) VendingState
+}
+
+type Idle struct{}
+
+func (Idle) InsertCoin(m *Machine, c Money) VendingState { m.addCredit(c); return HasCredit{} }
+func (s Idle) Select(m *Machine, _ string) VendingState  { m.display("Insert coins first"); return s }
+func (s Idle) Cancel(*Machine) VendingState              { return s }
+
+type HasCredit struct{}
+
+func (s HasCredit) InsertCoin(m *Machine, c Money) VendingState { m.addCredit(c); return s }
+
+func (s HasCredit) Select(m *Machine, slot string) VendingState {
+	if !m.canAfford(slot) {
+		m.display("Not enough credit")
+		return s
+	}
+	m.dispense(slot)
+	m.returnChange()
+	return Idle{}
+}
+
+func (HasCredit) Cancel(m *Machine) VendingState { m.refund(); return Idle{} }
+
+type Machine struct{ state VendingState } // Idle{} to start
+
+func (m *Machine) InsertCoin(c Money) { m.state = m.state.InsertCoin(m, c) }
+func (m *Machine) Select(slot string) { m.state = m.state.Select(m, slot) }
+func (m *Machine) Cancel()            { m.state = m.state.Cancel(m) }
+// addCredit, canAfford, dispense, refund, display...`,
+
+"Observer: publish events, let listeners react": `type SpotListener func(floorID string, freeSpots int)
+
+type Floor struct {
+	id        string
+	mu        sync.Mutex
+	listeners []SpotListener
+	free      int
+}
+
+func (f *Floor) Subscribe(l SpotListener) {
+	f.mu.Lock()
+	f.listeners = append(f.listeners, l)
+	f.mu.Unlock()
+}
+
+func (f *Floor) Occupy() { f.change(-1) }
+func (f *Floor) Vacate() { f.change(+1) }
+
+func (f *Floor) change(delta int) {
+	f.mu.Lock()
+	f.free += delta
+	free, ls := f.free, slices.Clone(f.listeners)
+	f.mu.Unlock()
+	for _, l := range ls { // notify outside the lock
+		l(f.id, free)
+	}
+}
+
+floor.Subscribe(func(id string, n int) { entranceBoard.Show(id, n) })
+floor.Subscribe(func(id string, n int) { metrics.Gauge("free_spots", n, "floor", id) })`,
+
+"Command: requests as objects, so they can be undone": `type EditCommand interface {
+	Execute()
+	Undo()
+}
+
+type InsertText struct {
+	doc  *Document
+	at   int
+	text string
+}
+
+func (c InsertText) Execute() { c.doc.Insert(c.at, c.text) }
+func (c InsertText) Undo()    { c.doc.Delete(c.at, len(c.text)) }
+
+type Editor struct{ done, undone []EditCommand } // slices used as stacks
+
+func (e *Editor) Run(c EditCommand) {
+	c.Execute()
+	e.done = append(e.done, c)
+	e.undone = nil
+}
+
+func (e *Editor) Undo() {
+	if n := len(e.done); n > 0 {
+		c := e.done[n-1]
+		e.done = e.done[:n-1]
+		c.Undo()
+		e.undone = append(e.undone, c)
+	}
+}
+
+func (e *Editor) Redo() {
+	if n := len(e.undone); n > 0 {
+		c := e.undone[n-1]
+		e.undone = e.undone[:n-1]
+		c.Execute()
+		e.done = append(e.done, c)
+	}
+}`,
+
+"Chain of Responsibility: an ATM paying out notes": `type NoteDispenser struct {
+	note int
+	next *NoteDispenser
+}
+
+func (d *NoteDispenser) Then(n *NoteDispenser) *NoteDispenser { d.next = n; return n }
+
+func (d *NoteDispenser) Dispense(amount int, out map[int]int) error {
+	if count := amount / d.note; count > 0 {
+		out[d.note] = count
+	}
+	rest := amount % d.note
+	if rest == 0 {
+		return nil
+	}
+	if d.next == nil {
+		return fmt.Errorf("can't make %d", rest)
+	}
+	return d.next.Dispense(rest, out)
+}
+
+chain := &NoteDispenser{note: 500}
+chain.Then(&NoteDispenser{note: 200}).Then(&NoteDispenser{note: 100})
+err := chain.Dispense(1700, result) // 3 x 500, 1 x 200`,
+
+"Template Method: fixed skeleton, variable steps": `// No abstract classes in Go: the skeleton is a function, the variable steps an interface.
+type ReportFormat interface {
+	WriteHeader(r Report, w io.Writer) error
+	WriteRow(row Row, w io.Writer) error
+	WriteFooter(w io.Writer) error
+}
+
+func Export(r Report, f ReportFormat, w io.Writer) error { // the fixed skeleton
+	if err := f.WriteHeader(r, w); err != nil {
+		return err
+	}
+	for _, row := range r.Rows() {
+		if err := f.WriteRow(row, w); err != nil {
+			return err
+		}
+	}
+	return f.WriteFooter(w)
+}
+
+type CSVFormat struct{ /* ... */ }
+type PDFFormat struct{ /* ... */ }
+// Which is the Strategy pattern again: in Go, Template Method usually becomes Strategy.`,
+
+"Iterator: walk a structure without exposing it": `type Board struct{ cells [][]Cell }
+
+// All returns a Go 1.23 range-over-func iterator.
+func (b *Board) All() iter.Seq[Cell] {
+	return func(yield func(Cell) bool) {
+		for _, row := range b.cells {
+			for _, c := range row {
+				if !yield(c) {
+					return
+				}
+			}
+		}
+	}
+}
+
+for c := range board.All() { /* ... */ } // callers never touch the 2D slice`,
+
+"Strategy in a few lines": `type SpotSelector interface {
+	Select(free []*Spot, v *Vehicle) (*Spot, bool)
+}
+
+type NearestToEntrance struct{ /* ... */ }
+type SpreadAcrossFloors struct{ /* ... */ }
+
+type ParkingLot struct{ selector SpotSelector }
+
+func (l *ParkingLot) Park(v *Vehicle) (*Ticket, error) {
+	spot, ok := l.selector.Select(l.freeSpotsFor(v), v)
+	if !ok {
+		return nil, ErrLotFull
+	}
+	return l.issueTicket(spot, v), nil
+}`,
+
+"Decorator vs inheritance": `type Beverage interface {
+	Cost() Money
+	Describe() string
+}
+
+type Espresso struct{}
+
+func (Espresso) Cost() Money      { return MoneyOf(250) }
+func (Espresso) Describe() string { return "espresso" }
+
+type WithMilk struct{ inner Beverage }
+
+func (w WithMilk) Cost() Money      { return w.inner.Cost().Plus(MoneyOf(50)) }
+func (w WithMilk) Describe() string { return w.inner.Describe() + ", milk" }
+
+var order Beverage = WithMilk{WithMilk{Espresso{}}} // double milk, no new type`
+} };

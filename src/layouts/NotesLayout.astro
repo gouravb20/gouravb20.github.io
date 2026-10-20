@@ -1,5 +1,5 @@
 ---
-import { CODE_LANG_NAMES, LEVEL_LABEL, SITE_NAME, appPath, chapterPath, jsonLd, plain, shortName, sortedParts, url, usesShortNames, type Notes } from "../lib/site";
+import { CODE_LANGUAGES, LEVEL_LABEL, SITE_NAME, appPath, chapterPath, jsonLd, plain, shortName, sortedParts, url, usesShortNames, type Notes } from "../lib/site";
 
 interface Props {
   notes: Notes;
@@ -14,11 +14,9 @@ interface Props {
   structuredData: object[];
   /** Load the lab scripts (labkit.js and the app's demos*.js). */
   labs?: boolean;
-  /** Languages the page's code can be shown in; with two or more, the top bar gets a "Code in" menu. */
-  codeLangs?: string[];
 }
 
-const { notes, chapter, view, title, description, path, structuredData, labs = false, codeLangs = [] } = Astro.props;
+const { notes, chapter, view, title, description, path, structuredData, labs = false } = Astro.props;
 const { book } = notes;
 const canonical = new URL(url(path), Astro.site).href;
 const brand = book.shortTitle ?? plain(book.title);
@@ -41,6 +39,7 @@ const ring = 2 * Math.PI * 8;
   <meta name="twitter:card" content="summary">
   <link rel="icon" href={url("favicon.svg")} type="image/svg+xml">
   <link rel="sitemap" href={url("sitemap-index.xml")}>
+  <link rel="alternate" type="application/rss+xml" title={`${SITE_NAME} RSS`} href={url("rss.xml")}>
   <link rel="stylesheet" href={url("shared/styles.css")}>
   <script is:inline data-skin-base={url("shared/skins/")}>
     (function () {
@@ -73,8 +72,7 @@ const ring = 2 * Math.PI * 8;
 >
   <script is:inline>
     try {
-      var codeLang = localStorage.getItem("learn_code_lang");
-      if (codeLang) document.documentElement.setAttribute("data-code-lang", codeLang);
+      document.documentElement.setAttribute("data-code-lang", localStorage.getItem("learn_code_lang") || "java");
     } catch (e) {}
     try {
       if (window.SDLooks) window.SDLooks.boot();
@@ -99,14 +97,12 @@ const ring = 2 * Math.PI * 8;
       <div class="progress-pill-bar"><div class="progress-pill-fill" id="overallProgressFill" style="width:0%"></div></div>
     </div>
 
-    {codeLangs.length > 1 && (
-      <label class="code-lang-picker" title="Language for code examples on this site">
-        <span class="code-lang-label">Code</span>
-        <select data-code-lang-select aria-label="Programming language for code examples">
-          {codeLangs.map(l => <option value={l}>{CODE_LANG_NAMES[l] ?? l}</option>)}
-        </select>
-      </label>
-    )}
+    <label class="code-lang-picker" title="Language for code examples across the site">
+      <span class="code-lang-label">Language</span>
+      <select data-code-lang-select aria-label="Programming language for code examples">
+        {CODE_LANGUAGES.map(([value, name]) => <option value={value}>{name}</option>)}
+      </select>
+    </label>
 
     <div class="search-wrap">
       <input type="search" class="search-box" id="searchBox" placeholder="Search concepts, labs, questions... (press /)" aria-label="Search these notes">

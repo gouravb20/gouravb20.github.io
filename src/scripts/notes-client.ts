@@ -19,7 +19,7 @@ interface SDLooksApi {
 }
 declare global { interface Window { DEMOS?: Record<string, Lab>; SDLooks?: SDLooksApi } }
 
-const TABS = ["problem", "solution", "concepts", "learn", "labs", "interview", "levels", "cheatsheet"] as const;
+const TABS = ["problem", "solution", "main", "concepts", "learn", "labs", "interview", "levels", "cheatsheet"] as const;
 type Tab = (typeof TABS)[number];
 const isTab = (s: string): s is Tab => (TABS as readonly string[]).includes(s);
 

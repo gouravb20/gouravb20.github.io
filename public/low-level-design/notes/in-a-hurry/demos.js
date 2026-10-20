@@ -60,6 +60,13 @@
     }
   };
 
+  // A Java snippet, plus its Go version when there is one; the site's Language menu picks which shows.
+  const highlight = (code, lang) => (window.CodeHighlight ? window.CodeHighlight.highlight(code, lang) : esc(code));
+  const pre = (code, lang) => `<pre style="white-space:pre;overflow-x:auto;font-size:12.5px;line-height:1.45;margin:0"><code>${highlight(code, lang)}</code></pre>`;
+  const snippet = (java, go) => !go ? pre(java, `java`) :
+    `<div class="code-variants"><div class="code-variant" data-code-lang="java"><span class="code-variant-label">Java</span>${pre(java, `java`)}</div>` +
+    `<div class="code-variant" data-code-lang="go"><span class="code-variant-label">Go</span>${pre(go, `go`)}</div></div>`;
+
   // =====================================================================
   // Shared quiz drill
   // =====================================================================
@@ -77,7 +84,7 @@
         <div class="lab-panel">
           <h4>${opts.prompt}</h4>
           ${it.text ? `<p style="margin:0 0 10px">${it.text}</p>` : ``}
-          ${it.code ? `<pre style="white-space:pre;overflow-x:auto;font-size:12.5px;line-height:1.45;background:var(--bg-3);border:1px solid var(--border);border-radius:8px;padding:10px;margin:0 0 12px"><code>${window.CodeHighlight ? window.CodeHighlight.highlight(it.code, `java`) : esc(it.code)}</code></pre>` : ``}
+          ${it.code ? `<div style="margin:0 0 12px">${snippet(it.code, it.go)}</div>` : ``}
           <div class="ctl-row" style="gap:8px">${opts.choices.map((c, ci) => `<button class="lab-btn ghost" data-choice="${ci}" ${st.answered ? `disabled` : ``} style="${st.answered && ci === it.a ? `border-color:var(--good);color:var(--good)` : st.answered && ci === st.picked && ci !== it.a ? `border-color:var(--bad);color:var(--bad)` : ``}">${c}</button>`).join(``)}</div>
           <div data-k="fb"></div>
         </div>`;
@@ -177,9 +184,94 @@ Spot spot = strategy.select(ctx);`, why: `Three layers of indirection for a sing
     }
 }`, why: `Movement rules, console rendering and input parsing are tangled in one method, so you can't test the logic without a console or swap in a GUI. Keep <code>Elevator</code> for the rules and put display and input in their own classes.` }
   ];
+  const SPOT_GO = {
+    OCP: `func Fee(v Vehicle, hours int64) (float64, error) {
+	switch v.Type {
+	case Car:
+		return float64(hours) * 2.0, nil
+	case Motorcycle:
+		return float64(hours) * 1.0, nil
+	case Truck:
+		return float64(hours) * 4.0, nil
+	// every new vehicle type means editing this function
+	}
+	return 0, errors.New("unknown vehicle type")
+}`,
+    LSP: `type Account interface{ Withdraw(m Money) error }
+
+type FixedDepositAccount struct{ balance Money }
+
+func (a *FixedDepositAccount) Withdraw(Money) error {
+	return errors.New("locked until maturity") // satisfies the interface, breaks its promise
+}`,
+    "Law of Demeter": `func PlateFor(ride *Ride) string {
+	return ride.Driver().Vehicle().Registration().Plate()
+}`,
+    SRP: `type Invoice struct{ /* ... */ }
+
+func (i *Invoice) Total() Money                  { /* pricing rules */ }
+func (i *Invoice) ToHTML() string                { /* presentation */ }
+func (i *Invoice) SaveTo(db *sql.DB) error       { /* persistence */ }
+func (i *Invoice) EmailTo(address string) error  { /* delivery */ }`,
+    DIP: `type CheckoutService struct{}
+
+func (s *CheckoutService) Checkout(cart Cart) (Receipt, error) {
+	stripe := stripeclient.New("sk_live_...") // concrete vendor client, created inside
+	chargeID, err := stripe.CreateCharge(cart.Total().Cents())
+	if err != nil {
+		return Receipt{}, err
+	}
+	return Receipt{ChargeID: chargeID}, nil
+}`,
+    ISP: `type OfficeDevice interface {
+	Print(d Doc)
+	Scan(d Doc)
+	Fax(d Doc)
+}
+
+type BasicPrinter struct{}
+
+func (BasicPrinter) Print(d Doc) { /* ... */ }
+func (BasicPrinter) Scan(Doc)    { panic("not supported") }
+func (BasicPrinter) Fax(Doc)     { panic("not supported") }`,
+    DRY: `func (SignupService) Valid(email string) bool {
+	return email != "" && strings.Contains(email, "@") && len(email) < 255
+}
+func (InviteService) Valid(email string) bool {
+	return email != "" && strings.Contains(email, "@") && len(email) < 255
+}
+func (ProfileService) Valid(email string) bool {
+	return email != "" && strings.Contains(email, "@") // already drifted
+}`,
+    YAGNI: `// Requirements: cars and motorcycles, hourly pricing.
+type ParkingSpot struct {
+	dronePad     *DroneLandingPad // "in case we add drones"
+	valetQueue   *ValetQueue      // "might need valet later"
+	pluginConfig map[string]any   // "for future extensions"
+}`,
+    KISS: `// Requirement: return the first free spot that fits the vehicle.
+factory := NewSpotSelectionStrategyFactoryProvider().Get()
+strategy := factory.Create(FirstFitMode)
+ctx := NewSpotSelectionContextBuilder().Vehicle(v).Spots(spots).Build()
+spot := strategy.Select(ctx)`,
+    "Separation of concerns": `func (e *Elevator) Step() {
+	if len(e.requests) > 0 {
+		e.moveToward(e.requests[0])
+	}
+	fmt.Println("Floor", e.floor, strings.Repeat("#", e.floor)) // rendering
+	in := bufio.NewScanner(os.Stdin)                            // console input
+	in.Scan()
+	if line := in.Text(); strings.HasPrefix(line, "call ") {
+		if f, err := strconv.Atoi(strings.TrimSpace(line[5:])); err == nil {
+			e.requests = append(e.requests, f)
+		}
+	}
+}`
+  };
+  for (const it of SPOT) it.go = SPOT_GO[PRINCIPLES[it.a]];
   D.principleSpotter = {
     title: `Which principle does this code break?`,
-    blurb: `Ten short Java snippets, each with one main design problem. Pick the principle it breaks and read why. Several principles overlap, so the answer is the one that best names the problem.`,
+    blurb: `Ten short code snippets, each with one main design problem. Pick the principle it breaks and read why. Several principles overlap, so the answer is the one that best names the problem. Snippets follow the site's Language menu.`,
     mount(el) { drill(el, SPOT, { prompt: `Which principle is broken here?`, choices: PRINCIPLES }); }
   };
 

@@ -62,7 +62,7 @@ Every book gets the same app:
 - Full-text search (press `/`; every word must match, title hits rank first, <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd> pick a result), <kbd>j</kbd> / <kbd>k</kbd> for the next / previous chapter, light and dark themes, and a mobile layout.
 - Progress is saved in `localStorage`, separately for each book. The hub pages show progress for every set of notes.
 - Bookmarkable chapters, tabs and labs with real URLs (`problem-breakdowns/top-k/#lab-servingStrategy`, `core-concepts/glossary/`). Old single-page hash links (`#/ch3/labs/btree`) redirect to the new pages, and saved progress carries over.
-- Astro-rendered apps also get per-page titles, descriptions, canonical URLs, Open Graph tags, structured data (Course, LearningResource, BreadcrumbList) and a sitemap. Their content is in the HTML, so it reads fine without JavaScript; only labs and progress tracking need it.
+- Astro-rendered apps also get per-page titles, descriptions, canonical URLs, Open Graph tags, structured data (Course, LearningResource, BreadcrumbList), a sitemap, and an [RSS feed](https://gouravb20.github.io/learn/rss.xml) of every chapter. Their content is in the HTML, so it reads fine without JavaScript; only labs and progress tracking need it.
 
 ## Running locally
 
@@ -179,7 +179,7 @@ Check deep dives without building: `node scripts/check-deep.mjs [book folder]`. 
 
 Pages is published by `.github/workflows/deploy.yml` on every push to `main` (or run it by hand from the Actions tab). It relies on **Settings → Pages → Build and deployment → Source** being **GitHub Actions**; publishing the branch directly would serve the repository root, while the site lives in `public/` and `src/`.
 
-Search engines read `robots.txt` only at the domain root, so it lives in the [gouravb20.github.io](https://github.com/gouravb20/gouravb20.github.io) repository. It keeps crawlers off the book PDFs (`Disallow: /learn/*.pdf$`) and advertises this site's sitemap (`Sitemap: …/learn/sitemap-index.xml`) so pages can be discovered without waiting for inbound links. Hub pages also ship canonical URLs, Open Graph tags, JSON-LD (`WebSite` / `Dataset` / `CollectionPage`), and a machine-readable [`dataset.jsonld`](public/dataset.jsonld). After deploy, submit the sitemap once in [Google Search Console](https://search.google.com/search-console) and [Bing Webmaster Tools](https://www.bing.com/webmasters) if you want indexing sooner.
+Search engines read `robots.txt` only at the domain root, so it lives in the [gouravb20.github.io](https://github.com/gouravb20/gouravb20.github.io) repository. It keeps crawlers off the book PDFs (`Disallow: /learn/*.pdf$`) and advertises this site's sitemap (`Sitemap: …/learn/sitemap-index.xml`) so pages can be discovered without waiting for inbound links. Hub pages also ship canonical URLs, Open Graph tags, JSON-LD (`WebSite` / `Dataset` / `CollectionPage`), a machine-readable [`dataset.jsonld`](public/dataset.jsonld), and an [RSS feed](https://gouravb20.github.io/learn/rss.xml) of every chapter. After deploy, submit the sitemap once in [Google Search Console](https://search.google.com/search-console) and [Bing Webmaster Tools](https://www.bing.com/webmasters) if you want indexing sooner.
 
 ## Credits
 

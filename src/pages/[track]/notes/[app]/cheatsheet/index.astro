@@ -3,7 +3,7 @@ import { getCollection } from "astro:content";
 import nodePath from "node:path";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
 import { deepRenderer } from "../../../../../lib/notes-source.mjs";
-import { SITE_NAME, TRACKS, appPath, chapterPath, codeLanguages, plain, unitNoun, url, type Notes } from "../../../../../lib/site";
+import { SITE_NAME, TRACKS, appPath, chapterPath, plain, unitNoun, url, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -14,7 +14,6 @@ const { notes } = Astro.props as { notes: Notes };
 const { book } = notes;
 const chapters = notes.chapters.filter(ch => ch.cheatsheet.length);
 const { codeHtml } = deepRenderer(nodePath.join(process.cwd(), "public"));
-const codeLangs = codeLanguages(notes.chapters, notes.deep);
 
 const path = `${appPath(notes)}cheatsheet/`;
 const bookTitle = plain(book.title);
@@ -35,7 +34,7 @@ const structuredData = [
   },
 ];
 ---
-<NotesLayout notes={notes} view="cheatsheet" title={title} description={description} path={path} structuredData={structuredData} codeLangs={codeLangs}>
+<NotesLayout notes={notes} view="cheatsheet" title={title} description={description} path={path} structuredData={structuredData}>
   <div class="chapter-header">
     <div class="chapter-label">Reference</div>
     <h1>Every cheatsheet</h1>

@@ -3,7 +3,7 @@ import { getCollection } from "astro:content";
 import path from "node:path";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
 import { deepRenderer } from "../../../../../lib/notes-source.mjs";
-import { LEVEL_LABEL, SITE_NAME, TRACKS, appPath, chapterPath, codeLanguages, plain, summary, unitNoun, url, type Chapter, type Notes } from "../../../../../lib/site";
+import { LEVEL_LABEL, SITE_NAME, TRACKS, appPath, chapterPath, plain, summary, unitNoun, url, type Chapter, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
   const all = await getCollection("notes");
@@ -43,10 +43,8 @@ const solutionHtml = article(ch.solution, "solution", "The solution");
 const levelsHtml = article(ch.levels, "levels", "By level");
 const hasLab = (sections: { blocks: { type: string }[] }[] = []) => sections.some(s => s.blocks.some(b => b.type === "lab"));
 const embeddedLabs = hasLab(deep?.sections) || hasLab(ch.problem) || hasLab(ch.solution) || hasLab(ch.levels);
-const firstTab = isProblem ? "problem" : "concepts";
-const codeLangs = codeLanguages([ch], notes.deep);
-// A problem breakdown reads Problem, Solution, Deep Dives, then the reference tabs; chapters lead with Core Concepts.
-const deepAfterSolution = isProblem;
+// A problem opens on its Problem tab; a chapter opens on Main, a one-screen summary that links into the other tabs.
+const firstTab = isProblem ? "problem" : "main";
 
 const pagePath = chapterPath(notes, ch);
 const bookTitle = plain(book.title);
@@ -81,7 +79,7 @@ const structuredData = [
   },
 ];
 ---
-<NotesLayout notes={notes} chapter={ch.id} title={title} description={description} path={pagePath} structuredData={structuredData} labs={ch.labs.length > 0 || embeddedLabs} codeLangs={codeLangs}>
+<NotesLayout notes={notes} chapter={ch.id} title={title} description={description} path={pagePath} structuredData={structuredData} labs={ch.labs.length > 0 || embeddedLabs}>
   <div class="chapter-header">
     <div class="chapter-label">{ch.difficulty
       ? <>{unitNoun(ch)} {ch.number}<span class={`level-pill level-${ch.difficulty}`}>{LEVEL_LABEL[ch.difficulty]}</span></>
@@ -95,17 +93,17 @@ const structuredData = [
     <nav class="tabs" aria-label="Problem sections" data-first-tab={firstTab}>
       <a class="tab active" href="#problem" data-tab="problem">Problem</a>
       <a class="tab" href="#solution" data-tab="solution">Solution</a>
-      {deep && deepAfterSolution && <a class="tab learn-tab" href="#learn" data-tab="learn">Deep Dives <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
+      {deep && <a class="tab learn-tab" href="#learn" data-tab="learn">Deep Dives <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
       <a class="tab" href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
-      {deep && !deepAfterSolution && <a class="tab learn-tab" href="#learn" data-tab="learn">Deep Dives <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
       <a class="tab" href="#interview" data-tab="interview">Interview Q&amp;A <span class="tab-count" data-tab-count="interview">0/{ch.interview.length}</span></a>
       <a class="tab" href="#levels" data-tab="levels">By Level</a>
       <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>
     </nav>
   ) : (
     <nav class="tabs" aria-label="Chapter sections" data-first-tab={firstTab}>
-      <a class="tab active" href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
+      <a class="tab active" href="#main" data-tab="main">Main</a>
       {deep && <a class="tab learn-tab" href="#learn" data-tab="learn">Deep Dive <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
+      <a class="tab" href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
       <a class="tab labs-tab" href="#labs" data-tab="labs">&#9654; Interactive Labs <span class="tab-count">{ch.labs.length}</span></a>
       <a class="tab" href="#interview" data-tab="interview">Interview Q&amp;A <span class="tab-count" data-tab-count="interview">0/{ch.interview.length}</span></a>
       <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>
@@ -119,7 +117,48 @@ const structuredData = [
     </>
   )}
 
-  {deep && deepAfterSolution && (
+  {deep && isProblem && (
+    <section id="learn" data-panel="learn">
+      <Fragment set:html={deepHtml} />
+    </section>
+  )}
+
+  {!isProblem && (
+    <section id="main" data-panel="main" class="main-panel">
+      <h2 class="sr-only">Main points</h2>
+      {deep && deep.takeaways.length > 0 && (
+        <div class="main-block">
+          <h3>Key points</h3>
+          <ol class="main-points">{deep.takeaways.map(t => <li set:html={t} />)}</ol>
+        </div>
+      )}
+      {deep && (
+        <div class="main-block">
+          <h3>What the deep dive covers</h3>
+          <ol class="main-toc">
+            {deep.sections.map(s => (
+              <li><a href={`#learn-${s.id}`}>{s.kicker && <span class="main-kicker" set:html={s.kicker} />}<span set:html={s.title} /></a></li>
+            ))}
+          </ol>
+          <a class="iconbtn main-cta" href="#learn">Read the deep dive &rarr;</a>
+        </div>
+      )}
+      <div class="main-block">
+        <h3>Core concepts at a glance</h3>
+        <div class="main-terms">{ch.concepts.map(c => <a class="main-term" href="#concepts" set:html={c.term} />)}</div>
+      </div>
+      <div class="main-block main-practice">
+        <h3>Practise</h3>
+        <div class="main-links">
+          {ch.labs.length > 0 && <a class="iconbtn" href="#labs">&#9654; {ch.labs.length} interactive lab{ch.labs.length === 1 ? "" : "s"}</a>}
+          {ch.interview.length > 0 && <a class="iconbtn" href="#interview">{ch.interview.length} interview question{ch.interview.length === 1 ? "" : "s"}</a>}
+          {ch.cheatsheet.length > 0 && <a class="iconbtn" href="#cheatsheet">&#8801; Cheatsheet</a>}
+        </div>
+      </div>
+    </section>
+  )}
+
+  {deep && !isProblem && (
     <section id="learn" data-panel="learn">
       <Fragment set:html={deepHtml} />
     </section>
@@ -155,12 +194,6 @@ const structuredData = [
     </div>
     <div class="empty-tab filter-empty" id="conceptEmpty" hidden></div>
   </section>
-
-  {deep && !deepAfterSolution && (
-    <section id="learn" data-panel="learn">
-      <Fragment set:html={deepHtml} />
-    </section>
-  )}
 
   {!isProblem && (
     <section id="labs" data-panel="labs">

@@ -151,7 +151,7 @@ near  = [r for r in rows if haversine(lat, lng, r.lat, r.lng) <= radius_m]` }
         [`Counting Bloom`, `No`, `Yes`, `Yes`, `~4x a Bloom filter`],
         [`Cuckoo filter`, `No`, `Yes`, `Yes`, `Similar to Bloom at low error rates`]
       ] },
-      { title: `A Bloom filter in a few lines`, type: `code`, body: `import math, mmh3
+      { title: `A Bloom filter in a few lines`, type: `code`, lang: `python`, body: `import math, mmh3
 
 class Bloom:
     def __init__(self, n, p):
@@ -270,7 +270,7 @@ TOPK.LIST trending` }
         [`50`, `10%`, `~7,700`],
         [`128`, `6.3%`, `~800`]
       ], note: `Pick the largest a whose range still covers the biggest count you expect, or add bits: 10 bits with a = 30 reach past a billion.` },
-      { title: `A Morris counter in a few lines`, type: `code`, body: `import random
+      { title: `A Morris counter in a few lines`, type: `code`, lang: `python`, body: `import random
 
 class MorrisCounter:
     def __init__(self, a=1.0):
@@ -341,7 +341,7 @@ print(sum(c.estimate() for c in counters) / len(counters))   # ~100,000` },
         [`1,536`, `6 KB`, `61 GB`, `6.1 TB`],
         [`3,072`, `12 KB`, `123 GB`, `12.3 TB`]
       ] },
-      { title: `Exact search with NumPy`, type: `code`, body: `import numpy as np
+      { title: `Exact search with NumPy`, type: `code`, lang: `python`, body: `import numpy as np
 
 docs  = np.load("embeddings.npy")                    # (N, d) float32
 docs /= np.linalg.norm(docs, axis=1, keepdims=True)  # normalize once

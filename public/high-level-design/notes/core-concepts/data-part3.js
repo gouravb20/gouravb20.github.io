@@ -33,7 +33,7 @@ window.DATA.chapters.push(
         [`Write-behind`, `Cache; DB later in batches`, `Cache`, `Fast writes; data loss on cache crash`],
         [`Read-through`, `-`, `Cache loads from DB itself`, `Central logic; needs special cache (e.g. CDN)`]
       ] },
-      { title: `Cache-aside in code`, type: `code`, body: `def get_user(user_id):
+      { title: `Cache-aside in code`, type: `code`, lang: `python`, body: `def get_user(user_id):
     key = f"user:{user_id}:profile"
     cached = redis.get(key)
     if cached is not None:
@@ -90,7 +90,7 @@ def update_user(user_id, fields):
         [`Cache down`, `DB flooded`, `Cache replicas, circuit breaker, rate limit, local cache`],
         [`Cold start`, `Low hit ratio after deploy or restart`, `Warm popular keys, roll out gradually`]
       ] },
-      { title: `Single-flight rebuild`, type: `code`, body: `def get(key):
+      { title: `Single-flight rebuild`, type: `code`, lang: `python`, body: `def get(key):
     v = redis.get(key)
     if v is not None:
         return v
@@ -253,7 +253,7 @@ p = 0.1%: N = 100 -> 9.5%` },
         [`Hazelcast`, `271 partitions (default)`, `hash(serialized key) mod partition count`],
         [`Elasticsearch`, `Primary shards, set when the index is created`, `hash(_routing) mod number of primary shards`]
       ], note: `From each system's own documentation. Couchbase also offers 128 vBuckets with the Magma engine, and uses 64 on macOS.` },
-      { title: `Ring lookup`, type: `code`, body: `ring = sorted([(hash(f"{node}-vn{i}"), node) for node in nodes for i in range(V)])
+      { title: `Ring lookup`, type: `code`, lang: `python`, body: `ring = sorted([(hash(f"{node}-vn{i}"), node) for node in nodes for i in range(V)])
 
 def owner(key):
     h = hash(key)

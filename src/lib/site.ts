@@ -18,25 +18,8 @@ export function url(path = ""): string {
 
 export const appPath = (n: Notes) => `${n.track}/notes/${n.slug}/`;
 export const chapterPath = (n: Notes, ch: Chapter) => `${appPath(n)}${ch.id}/`;
-/** Display names for code languages in the language menu. */
-export const CODE_LANG_NAMES: Record<string, string> = { java: "Java", go: "Go" };
-
-/**
- * Languages a reader can switch between on these chapters: each translated block's main language plus its alternatives,
- * main languages first. Empty when nothing is translated, so no menu is shown.
- */
-export function codeLanguages(chapters: Chapter[], deep: Record<string, { sections: { blocks: any[] }[] }>): string[] {
-  const langs = new Set<string>();
-  for (const ch of chapters) {
-    const sections = [...(ch.problem ?? []), ...(ch.solution ?? []), ...(ch.levels ?? []), ...(deep[ch.id]?.sections ?? [])];
-    const codes: { lang?: string; alt?: Record<string, string> }[] = [
-      ...sections.flatMap(s => s.blocks.filter((b: any) => b.type === "code")),
-      ...ch.cheatsheet.filter(cs => cs.type === "code"),
-    ];
-    for (const c of codes) if (c.alt && Object.keys(c.alt).length) { if (c.lang) langs.add(c.lang); Object.keys(c.alt).forEach(l => langs.add(l)); }
-  }
-  return [...langs];
-}
+/** The site-wide language menu: code with a version in the chosen language shows it; other code shows as written. */
+export const CODE_LANGUAGES = [["java", "Java"], ["go", "Go"]] as const;
 
 /** Short sidebar name: the title before the colon ("Logging Service: levels, ..." -> "Logging Service"). */
 export const shortName = (title: string) => plain(title).split(":")[0].trim();

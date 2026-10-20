@@ -66,6 +66,12 @@
     },
     {
       "@type": "dcat:Distribution",
+      "dcat:accessURL": "https://gouravb20.github.io/learn/rss.xml",
+      "dcat:mediaType": "application/rss+xml",
+      "dct:title": "Chapter RSS feed"
+    },
+    {
+      "@type": "dcat:Distribution",
       "dcat:accessURL": "https://gouravb20.github.io/learn/dataset.jsonld",
       "dcat:mediaType": "application/ld+json",
       "dct:title": "Site dataset description (JSON-LD)"
