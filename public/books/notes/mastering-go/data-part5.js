@@ -42,7 +42,7 @@ window.DATA.chapters.push(
         [`Phases of one HTTP request`, `net/http/httptrace.ClientTrace`],
         [`Check all router paths`, `gorilla/mux Router.Walk()`]
       ] },
-      { title: `Table-driven test with subtests`, type: `code`, body: `func TestDiv(t *testing.T) {
+      { title: `Table-driven test with subtests`, type: `code`, lang: `go`, body: `func TestDiv(t *testing.T) {
     tests := []struct {
         name     string
         a, b     int
@@ -123,7 +123,7 @@ func ExampleLengthRange() {
       { term: `Docker, Prometheus and Grafana`, def: `A multi-stage Dockerfile builds the binary in <code>golang:alpine</code> and copies it into <code>alpine:latest</code>. docker-compose runs goapp (:1234), Prometheus (:9090, scraping <code>goapp:1234</code>) and Grafana (:3000) on one network; Grafana adds Prometheus as a data source at <code>http://prometheus:9090</code>.`, why: `Containers on a shared network reach each other by <code>container_name</code>. Prometheus stores the time series; Grafana visualizes them, since the Prometheus UI is meant for debugging, not dashboards.` }
     ],
     cheatsheet: [
-      { title: `Fuzz test skeleton`, type: `code`, body: `func FuzzReverse(f *testing.F) {
+      { title: `Fuzz test skeleton`, type: `code`, lang: `go`, body: `func FuzzReverse(f *testing.F) {
     for _, seed := range []string{"Hello, world", " ", "!12345"} {
         f.Add(seed) // seed corpus
     }
@@ -225,7 +225,7 @@ func Reverse(s string) (string, error) {
         [`-cpuprofile=c.out -memprofile=m.out`, `Profile while benchmarking`],
         [`benchstat old.txt new.txt`, `Statistical comparison; ~ means no significant change`]
       ] },
-      { title: `Benchmark patterns`, type: `code`, body: `var sink []int // package-level: keeps results alive
+      { title: `Benchmark patterns`, type: `code`, lang: `go`, body: `var sink []int // package-level: keeps results alive
 
 func BenchmarkInitNew(b *testing.B) {
     b.ReportAllocs()
@@ -304,7 +304,7 @@ func BenchmarkRead(b *testing.B) {
         [`1.22`, `math/rand/v2 (rand.N, IntN, ChaCha8, PCG)`, `Prefer it for new code`],
         [`1.22`, `ServeMux: "GET /path/{id}", r.PathValue`, `Fewer third-party routers needed`]
       ] },
-      { title: `Recent-features snippets`, type: `code`, body: `// Reproducible random numbers (Go 1.20+)
+      { title: `Recent-features snippets`, type: `code`, lang: `go`, body: `// Reproducible random numbers (Go 1.20+)
 r := rand.New(rand.NewSource(1))
 fmt.Println(r.Uint64()) // same value for the same seed
 
@@ -375,7 +375,7 @@ d := randv2.N(5 * time.Second)     // time.Duration` },
         [`Pacing`, `GOGC (default 100) heap growth target; GOMEMLIMIT soft limit`],
         [`STW pauses`, `Short: mark setup and mark termination, typically well under 1 ms`]
       ] },
-      { title: `Inspecting the GC`, type: `code`, body: `func printStats() {
+      { title: `Inspecting the GC`, type: `code`, lang: `go`, body: `func printStats() {
     var m runtime.MemStats
     runtime.ReadMemStats(&m) // note: stops the world briefly
     fmt.Println("Alloc:", m.Alloc)           // live heap bytes

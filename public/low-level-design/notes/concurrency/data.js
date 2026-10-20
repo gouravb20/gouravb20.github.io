@@ -146,7 +146,7 @@ window.DATA = {
           [`No preemption`, `Locks can't be taken away`, `Timeouts (tryLock) so a thread gives up`],
           [`Circular wait`, `A cycle of threads each waiting on the next`, `Global lock ordering (the usual answer)`]
         ] },
-        { title: `Safe transfer between two accounts`, type: `code`, body: `void transfer(Account from, Account to, long amount) {
+        { title: `Safe transfer between two accounts`, type: `code`, lang: `java`, body: `void transfer(Account from, Account to, long amount) {
     Account first  = from.id() < to.id() ? from : to;   // global order
     Account second = first == from ? to : from;
     synchronized (first) {
@@ -157,7 +157,7 @@ window.DATA = {
         }
     }
 }` },
-        { title: `Atomic "book if free" with ConcurrentHashMap`, type: `code`, body: `private final ConcurrentHashMap<String, String> seatOwner = new ConcurrentHashMap<>();
+        { title: `Atomic "book if free" with ConcurrentHashMap`, type: `code`, lang: `java`, body: `private final ConcurrentHashMap<String, String> seatOwner = new ConcurrentHashMap<>();
 
 boolean book(String seatId, String userId) {
     // putIfAbsent is atomic: exactly one caller sees null
@@ -216,7 +216,7 @@ boolean book(String seatId, String userId) {
           [`Remove`, `remove()`, `poll() -> null`, `take()`, `poll(t, unit)`],
           [`Examine`, `element()`, `peek() -> null`, `-`, `-`]
         ] },
-        { title: `Bounded buffer by hand (ReentrantLock + two conditions)`, type: `code`, body: `class BoundedBuffer<T> {
+        { title: `Bounded buffer by hand (ReentrantLock + two conditions)`, type: `code`, lang: `java`, body: `class BoundedBuffer<T> {
     private final Deque<T> items = new ArrayDeque<>();
     private final int capacity;
     private final ReentrantLock lock = new ReentrantLock();
@@ -244,7 +244,7 @@ boolean book(String seatId, String userId) {
         } finally { lock.unlock(); }
     }
 }` },
-        { title: `Fan out, combine, time out`, type: `code`, body: `ExecutorService io = Executors.newVirtualThreadPerTaskExecutor();
+        { title: `Fan out, combine, time out`, type: `code`, lang: `java`, body: `ExecutorService io = Executors.newVirtualThreadPerTaskExecutor();
 
 CompletableFuture<Price> price = CompletableFuture.supplyAsync(() -> pricing.quote(item), io);
 CompletableFuture<Stock> stock = CompletableFuture.supplyAsync(() -> inventory.check(item), io);
@@ -303,7 +303,7 @@ Offer offer = price.thenCombine(stock, Offer::new)
           [`50 threads`, `100 ms`, `500 / s`],
           [`8 GPU slots`, `2 s`, `4 / s`]
         ], note: `Throughput = permits / hold time. If arrivals exceed it, queues grow without bound unless you reject.` },
-        { title: `Semaphore with timeout`, type: `code`, body: `private final Semaphore slots = new Semaphore(10, true);
+        { title: `Semaphore with timeout`, type: `code`, lang: `java`, body: `private final Semaphore slots = new Semaphore(10, true);
 
 Result callModel(Request r) throws InterruptedException {
     if (!slots.tryAcquire(200, TimeUnit.MILLISECONDS)) {
@@ -315,7 +315,7 @@ Result callModel(Request r) throws InterruptedException {
         slots.release();
     }
 }` },
-        { title: `Thread-safe token bucket`, type: `code`, body: `final class TokenBucket {
+        { title: `Thread-safe token bucket`, type: `code`, lang: `java`, body: `final class TokenBucket {
     private final long capacity;
     private final double refillPerNano;
     private double tokens;

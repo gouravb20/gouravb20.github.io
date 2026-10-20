@@ -15,7 +15,7 @@ const partNumber = name => Number((name.match(/-part(\d+)\.js$/) || [])[1] || 0)
  * @property {string} slug       e.g. "problem-breakdowns"
  * @property {boolean} legacy    true when the folder still has its own index.html
  * @property {string[]} scripts  every script the app loads, in order (absolute paths)
- * @property {string[]} labScripts  the lab scripts (shared labkit.js, then demos*.js), relative to public/
+ * @property {string[]} labScripts  the lab scripts (shared highlight.js and labkit.js, then demos*.js), relative to public/
  * @property {string[]} deepScripts the chapters' deep dives, deep/<chapter id>.js (absolute paths)
  */
 
@@ -62,7 +62,7 @@ function appFiles(publicDir, dir, track, slug) {
     .filter(n => new RegExp(`^${prefix}(-part\\d+)?\\.js$`).test(n))
     .sort((a, b) => partNumber(a) - partNumber(b))
     .map(n => path.join(dir, n));
-  const labs = [path.join(publicDir, "shared", "labkit.js"), ...pick("demos")];
+  const labs = [path.join(publicDir, "shared", "highlight.js"), path.join(publicDir, "shared", "labkit.js"), ...pick("demos")];
   return { dir, track, slug, legacy: false, scripts: [...pick("data"), ...labs], labScripts: labs.map(toPublic), deepScripts };
 }
 
@@ -95,10 +95,10 @@ export function loadApp(app) {
   return { DATA: ctx.DATA, DEMOS: ctx.DEMOS || {}, DEEP: ctx.DEEP, deepFiles, errors };
 }
 
-/** @type {{ render: (deep: any, opts: any) => string, article: (sections: any[], opts: any) => string, sectionText: (section: any) => string } | undefined} */
+/** @type {{ render: (deep: any, opts: any) => string, article: (sections: any[], opts: any) => string, sectionText: (section: any) => string, highlight: (code: string, lang?: string) => string } | undefined} */
 let renderer;
 /**
- * The browser's deep dive renderer (public/shared/deep.js), run once in a sandbox.
+ * The browser's deep dive renderer (public/shared/deep.js, with shared/highlight.js for code), run once in a sandbox.
  * @param {string} publicDir
  */
 export function deepRenderer(publicDir) {
@@ -106,8 +106,10 @@ export function deepRenderer(publicDir) {
     /** @type {any} */
     const ctx = vm.createContext({});
     ctx.window = ctx;
-    const file = path.join(publicDir, "shared", "deep.js");
-    vm.runInContext(fs.readFileSync(file, "utf8"), ctx, { filename: file });
+    for (const name of ["highlight.js", "deep.js"]) {
+      const file = path.join(publicDir, "shared", name);
+      vm.runInContext(fs.readFileSync(file, "utf8"), ctx, { filename: file });
+    }
     renderer = ctx.DeepRender;
   }
   return /** @type {NonNullable<typeof renderer>} */ (renderer);

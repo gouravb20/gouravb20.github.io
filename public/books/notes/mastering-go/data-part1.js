@@ -50,7 +50,7 @@ window.DATA.chapters.push(
         [`<code>%s</code>, <code>%q</code>`, `String, quoted string`],
         [`<code>%c</code>, <code>%U</code>`, `A rune as a character, as U+20AC`]
       ], note: `fmt.Println adds spaces between operands and a newline at the end; fmt.Printf adds neither.` },
-      { title: `which(1), the idiomatic way`, type: `code`, body: `// which.go - print the first executable called os.Args[1] found in PATH
+      { title: `which(1), the idiomatic way`, type: `code`, lang: `go`, body: `// which.go - print the first executable called os.Args[1] found in PATH
 package main
 
 import (
@@ -151,7 +151,7 @@ func main() {
         [`<code>MST</code> / <code>-0700</code>`, `Zone abbreviation / numeric offset`, `EET / +0200`],
         [`<code>time.RFC3339</code>`, `"2006-01-02T15:04:05Z07:00"`, `Prefer it for machine-readable timestamps`]
       ] },
-      { title: `Slice operations`, type: `code`, body: `s := make([]int, 0, 10)          // len 0, cap 10: no reallocation until 11 elements
+      { title: `Slice operations`, type: `code`, lang: `go`, body: `s := make([]int, 0, 10)          // len 0, cap 10: no reallocation until 11 elements
 s = append(s, 1, 2, 3)            // always assign the result back
 s = append(s, other...)           // expand another slice into arguments
 
@@ -184,7 +184,7 @@ empty := []int{}                  // not nil, but also len 0` },
         [`<code>strings.Fields</code> / <code>Split(s, "")</code>`, `Split on whitespace runs / into single characters`],
         [`<code>strings.EqualFold(a, b)</code>`, `Case-insensitive equality`]
       ] },
-      { title: `Constants and iota patterns`, type: `code`, body: `type Weekday int
+      { title: `Constants and iota patterns`, type: `code`, lang: `go`, body: `type Weekday int
 
 const (
 	Sunday Weekday = iota // 0
@@ -270,7 +270,7 @@ const untyped = 100      // adapts: works with int, float64, int16...` }
         [`<code>(?i)</code>, <code>(...)</code>, <code>(?P&lt;name&gt;...)</code>`, `Case-insensitive flag, capture group, named group`],
         [`<code>(?=</code> <code>(?!</code> <code>(?&lt;=</code> <code>\\1</code>`, `<strong>Not supported</strong> in Go (RE2): lookaround and backreferences`]
       ] },
-      { title: `Structs, maps and CSV in one program`, type: `code`, body: `type Record struct {
+      { title: `Structs, maps and CSV in one program`, type: `code`, lang: `go`, body: `type Record struct {
 	Name       string
 	Surname    string
 	Number     string

@@ -483,7 +483,7 @@ final class FixedWindowLimiter implements Limiter {
           [`Sliding window counter`, `prevCount, curCount, windowStart`, `Smoothed`, `Close to exact`, `Estimated from the weighted count`],
           [`Leaky bucket`, `level, lastLeak`, `None (smooths output)`, `Exact output rate`, `level / leak rate`]
         ] },
-        { title: `Class sketch`, type: `code`, body: `record RateLimitResult(boolean allowed, int remaining, Long retryAfterMs) {}
+        { title: `Class sketch`, type: `code`, lang: `java`, body: `record RateLimitResult(boolean allowed, int remaining, Long retryAfterMs) {}
 
 sealed interface LimitParams permits TokenBucketParams, SlidingWindowLogParams, FixedWindowParams {}
 record EndpointRule(String endpoint, LimitParams params) {}
@@ -913,7 +913,7 @@ public class InvalidOperationException  extends FileSystemException { ... }   //
           [`rename`, `Check conflict, re-key in the parent's map`, `O(depth) to resolve, O(1) to rename`],
           [`delete (recursive)`, `Remove from parent's map`, `O(depth); subtree reclaimed by GC`]
         ] },
-        { title: `Class sketch`, type: `code`, body: `abstract sealed class Node permits File, Directory { String name; Directory parent; String path(); }
+        { title: `Class sketch`, type: `code`, lang: `java`, body: `abstract sealed class Node permits File, Directory { String name; Directory parent; String path(); }
 final class File extends Node { String content; String read(); void write(String c); }
 final class Directory extends Node { Map<String, Node> children; Optional<Node> child(String n); List<Node> list(); }
 

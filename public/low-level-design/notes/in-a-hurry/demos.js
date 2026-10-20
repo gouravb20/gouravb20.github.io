@@ -77,7 +77,7 @@
         <div class="lab-panel">
           <h4>${opts.prompt}</h4>
           ${it.text ? `<p style="margin:0 0 10px">${it.text}</p>` : ``}
-          ${it.code ? `<pre style="white-space:pre;overflow-x:auto;font-size:12.5px;line-height:1.45;background:var(--bg-3);border:1px solid var(--border);border-radius:8px;padding:10px;margin:0 0 12px"><code>${esc(it.code)}</code></pre>` : ``}
+          ${it.code ? `<pre style="white-space:pre;overflow-x:auto;font-size:12.5px;line-height:1.45;background:var(--bg-3);border:1px solid var(--border);border-radius:8px;padding:10px;margin:0 0 12px"><code>${window.CodeHighlight ? window.CodeHighlight.highlight(it.code, `java`) : esc(it.code)}</code></pre>` : ``}
           <div class="ctl-row" style="gap:8px">${opts.choices.map((c, ci) => `<button class="lab-btn ghost" data-choice="${ci}" ${st.answered ? `disabled` : ``} style="${st.answered && ci === it.a ? `border-color:var(--good);color:var(--good)` : st.answered && ci === st.picked && ci !== it.a ? `border-color:var(--bad);color:var(--bad)` : ``}">${c}</button>`).join(``)}</div>
           <div data-k="fb"></div>
         </div>`;

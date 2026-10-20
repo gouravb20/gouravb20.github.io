@@ -1,6 +1,8 @@
 ---
 import { getCollection } from "astro:content";
+import nodePath from "node:path";
 import NotesLayout from "../../../../../layouts/NotesLayout.astro";
+import { deepRenderer } from "../../../../../lib/notes-source.mjs";
 import { SITE_NAME, TRACKS, appPath, chapterPath, plain, unitNoun, url, type Notes } from "../../../../../lib/site";
 
 export async function getStaticPaths() {
@@ -11,6 +13,7 @@ export async function getStaticPaths() {
 const { notes } = Astro.props as { notes: Notes };
 const { book } = notes;
 const chapters = notes.chapters.filter(ch => ch.cheatsheet.length);
+const { highlight } = deepRenderer(nodePath.join(process.cwd(), "public"));
 
 const path = `${appPath(notes)}cheatsheet/`;
 const bookTitle = plain(book.title);
@@ -56,7 +59,7 @@ const structuredData = [
             </table>
           )}
           {cs.type === "list" && <ul>{cs.items.map(it => <li set:html={it} />)}</ul>}
-          {cs.type === "code" && <pre><code>{cs.body}</code></pre>}
+          {cs.type === "code" && <pre data-lang={cs.lang}><code set:html={highlight(cs.body, cs.lang)} /></pre>}
           {cs.note && <div class="cs-note" set:html={cs.note} />}
         </div>
       ))}

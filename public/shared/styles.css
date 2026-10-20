@@ -103,6 +103,24 @@ pre {
 }
 pre code { background: none; padding: 0; font-size: inherit; }
 
+/* Syntax highlighting (shared/highlight.js). Dark palette here, light palette under body.light. */
+:root {
+  --tok-kw: #ff7b72; --tok-type: #ffa657; --tok-fn: #d2a8ff; --tok-str: #a5d6ff;
+  --tok-num: #79c0ff; --tok-com: #8b949e; --tok-ann: #e3b341;
+}
+body.light {
+  --tok-kw: #cf222e; --tok-type: #953800; --tok-fn: #8250df; --tok-str: #0a3069;
+  --tok-num: #0550ae; --tok-com: #6e7781; --tok-ann: #9a6700;
+}
+.tok-kw { color: var(--tok-kw); }
+.tok-type { color: var(--tok-type); }
+.tok-fn { color: var(--tok-fn); }
+.tok-str { color: var(--tok-str); }
+.tok-num { color: var(--tok-num); }
+.tok-com { color: var(--tok-com); font-style: italic; }
+.tok-ann { color: var(--tok-ann); }
+@media print { .tok-kw, .tok-type, .tok-fn, .tok-str, .tok-num, .tok-com, .tok-ann { color: inherit; } }
+
 p, li, td, th, .concept-def, .concept-why, .concept-example,
 .overview-text, .qa-body-inner, .cs-note, .qa-q, .concept-term,
 .dcc-title, .sr-title, .sr-snippet, .nav-btn, .lab-blurb {

@@ -3,6 +3,8 @@
 (function () {
   const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const titled = (title, cls = "deep-block-title") => (title ? `<div class="${cls}">${title}</div>` : "");
+  /** Code as HTML: coloured by shared/highlight.js when it is loaded, otherwise just escaped. */
+  const highlight = (code, lang) => (window.CodeHighlight ? window.CodeHighlight.highlight(code, lang) : esc(code));
   const LABELS = {
     problem: "The problem", idea: "The key idea", analogy: "Analogy",
     insight: "Insight", warning: "Watch out", interview: "Interview angle", history: "History",
@@ -39,7 +41,7 @@
         return `<div class="deep-table">${titled(b.title)}<div class="deep-table-wrap"><table><thead><tr>${b.headers.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${
           b.rows.map(r => `<tr>${r.map((c, i) => `<td data-label="${esc(String(b.headers[i] || "").replace(/<[^>]+>/g, ""))}">${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${b.note ? `<div class="cs-note">${b.note}</div>` : ""}</div>`;
       case "code":
-        return `<figure class="deep-code">${titled(b.title)}<pre${b.lang ? ` data-lang="${esc(b.lang)}"` : ""}><code>${esc(b.code)}</code></pre>${b.caption ? `<figcaption>${b.caption}</figcaption>` : ""}</figure>`;
+        return `<figure class="deep-code">${titled(b.title)}<pre${b.lang ? ` data-lang="${esc(b.lang)}"` : ""}><code>${highlight(b.code, b.lang)}</code></pre>${b.caption ? `<figcaption>${b.caption}</figcaption>` : ""}</figure>`;
       case "steps":
         return `<div class="deep-steps">${titled(b.title)}<ol>${b.items.map(it => `<li>${it}</li>`).join("")}</ol></div>`;
       case "keypoints":
@@ -126,5 +128,5 @@
     return parts.join(" ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   }
 
-  window.DeepRender = { render, article, sectionText };
+  window.DeepRender = { render, article, sectionText, highlight };
 })();

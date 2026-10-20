@@ -50,7 +50,7 @@ window.DATA.chapters.push(
         [`<code>secret string</code>`, `Unexported: invisible to encoding/json in both directions`],
         [`<code>ID int \`json:"id,string"\`</code>`, `Encodes the number as a JSON string, <code>"42"</code>`]
       ], note: `viper.Unmarshal ignores json tags. It uses mapstructure tags such as \`mapstructure:"macos"\`.` },
-      { title: `Idiomatic file and JSON code`, type: `code`, body: `// Read a file line by line (newline stripped, last line handled)
+      { title: `Idiomatic file and JSON code`, type: `code`, lang: `go`, body: `// Read a file line by line (newline stripped, last line handled)
 f, err := os.Open(path)
 if err != nil {
     return err
@@ -161,7 +161,7 @@ var defaultConfig []byte` },
         [`<code>context</code>`, `Cancellation, deadlines across API boundaries`, `Always defer cancel(); don't store in structs`],
         [`<code>semaphore.Weighted</code>`, `Limiting concurrency by weight`, `Release exactly what you acquired`]
       ] },
-      { title: `Worker pool with context and WaitGroup`, type: `code`, body: `func run(ctx context.Context, jobs []int, workers int) []int {
+      { title: `Worker pool with context and WaitGroup`, type: `code`, lang: `go`, body: `func run(ctx context.Context, jobs []int, workers int) []int {
     in := make(chan int)
     out := make(chan int, workers)
     var wg sync.WaitGroup
@@ -199,7 +199,7 @@ var defaultConfig []byte` },
     }
     return res
 }` },
-      { title: `select, timeout and signal patterns`, type: `code`, body: `// Timeout (buffered so the worker never leaks)
+      { title: `select, timeout and signal patterns`, type: `code`, lang: `go`, body: `// Timeout (buffered so the worker never leaks)
 c := make(chan string, 1)
 go func() { c <- slowCall() }()
 select {

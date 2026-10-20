@@ -137,7 +137,7 @@ window.DATA = {
           `Can several users act at the same time on the same thing?`,
           `What should I leave out: payments, persistence, UI, notifications?`
         ] },
-        { title: `A class sketch at the end of step 3`, type: `code`, body: `enum SpotSize { SMALL, MEDIUM, LARGE }
+        { title: `A class sketch at the end of step 3`, type: `code`, lang: `java`, body: `enum SpotSize { SMALL, MEDIUM, LARGE }
 
 class ParkingLot  { List<Floor> floors;  Ticket park(Vehicle v);  Money unpark(Ticket t); }
 class Floor       { int number; List<Spot> spots;  Optional<Spot> findSpotFor(Vehicle v); }
@@ -191,7 +191,7 @@ interface PricingPolicy { Money priceFor(Ticket t, Instant exit); }` }
           [`ISP`, `Small, focused interfaces`, `Empty or throwing implementations`],
           [`DIP`, `Depend on abstractions you own`, `new ConcreteService() inside business logic`]
         ] },
-        { title: `OCP and DIP together: pluggable pricing`, type: `code`, body: `interface PricingPolicy { Money price(Ticket ticket, Instant exit); }
+        { title: `OCP and DIP together: pluggable pricing`, type: `code`, lang: `java`, body: `interface PricingPolicy { Money price(Ticket ticket, Instant exit); }
 
 final class HourlyPricing implements PricingPolicy { ... }
 final class WeekendFlatPricing implements PricingPolicy { ... }
@@ -257,7 +257,7 @@ final class ExitGate {
           [`Aggregation`, `has-a (shared)`, `Parts outlive the whole`, `Team has Players`],
           [`Composition`, `owns-a`, `Parts die with the whole`, `ParkingLot owns Floors`]
         ] },
-        { title: `Enum with behaviour and a value object`, type: `code`, body: `enum VehicleSize {
+        { title: `Enum with behaviour and a value object`, type: `code`, lang: `java`, body: `enum VehicleSize {
     SMALL(1), MEDIUM(2), LARGE(3);
     private final int rank;
     VehicleSize(int rank) { this.rank = rank; }
@@ -322,7 +322,7 @@ record Money(long cents, Currency currency) {
           [`A request handled by one of several handlers`, `Chain of Responsibility`, `Approvals, ATM denominations, validation`],
           [`Same process, varying steps`, `Template Method`, `Report export, game turns`]
         ] },
-        { title: `Strategy in a few lines`, type: `code`, body: `interface SpotSelector { Optional<Spot> select(List<Spot> free, Vehicle v); }
+        { title: `Strategy in a few lines`, type: `code`, lang: `java`, body: `interface SpotSelector { Optional<Spot> select(List<Spot> free, Vehicle v); }
 
 final class NearestToEntrance implements SpotSelector { ... }
 final class SpreadAcrossFloors implements SpotSelector { ... }
@@ -335,7 +335,7 @@ final class ParkingLot {
         return issueTicket(spot, v);
     }
 }` },
-        { title: `Decorator vs inheritance`, type: `code`, body: `interface Beverage { Money cost(); String describe(); }
+        { title: `Decorator vs inheritance`, type: `code`, lang: `java`, body: `interface Beverage { Money cost(); String describe(); }
 
 record Espresso() implements Beverage {
     public Money cost() { return Money.of(250); }

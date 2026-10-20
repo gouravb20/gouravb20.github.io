@@ -43,7 +43,7 @@ window.DATA.chapters.push(
         [`<code>Server.IdleTimeout</code>`, `server`, `Keep-alive wait for the next request`, `Idle connection closed`],
         [`<code>Server.ReadHeaderTimeout</code>`, `server`, `Reading only the headers`, `Slow-loris protection`]
       ], note: `Defaults are zero (no timeout) for both <code>http.DefaultClient</code> and <code>http.ListenAndServe</code>.` },
-      { title: `Server with its own mux and timeouts`, type: `code`, body: `func main() {
+      { title: `Server with its own mux and timeouts`, type: `code`, lang: `go`, body: `func main() {
     mux := http.NewServeMux()
     mux.HandleFunc("/time", timeHandler)
     mux.HandleFunc("GET /search/{name}", searchHandler) // Go 1.22+ pattern
@@ -80,7 +80,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "text/plain")
     fmt.Fprintf(w, "%s %d %f %f\\n", t.Name, t.Len, t.Mean, t.StdDev)
 }` },
-      { title: `Client with a timeout and errgroup fan-out`, type: `code`, body: `var client = &http.Client{Timeout: 15 * time.Second} // reuse it
+      { title: `Client with a timeout and errgroup fan-out`, type: `code`, lang: `go`, body: `var client = &http.Client{Timeout: 15 * time.Second} // reuse it
 
 func fetchAll(ctx context.Context, urls []string) error {
     g, ctx := errgroup.WithContext(ctx)
@@ -167,7 +167,7 @@ func fetchAll(ctx context.Context, urls []string) error {
         [`Server model in Go`, `Accept loop + goroutine per conn`, `One socket, sender address per datagram`, `HTTP handler + Upgrade + read loop`],
         [`Test tool`, `<code>nc host port</code>`, `<code>nc -u host port</code>`, `<code>websocat ws://...</code>`]
       ] },
-      { title: `Concurrent TCP server template`, type: `code`, body: `func main() {
+      { title: `Concurrent TCP server template`, type: `code`, lang: `go`, body: `func main() {
     l, err := net.Listen("tcp", ":1234")
     if err != nil {
         log.Fatal(err)
@@ -198,7 +198,7 @@ func handleConnection(c net.Conn) {
         fmt.Fprintf(c, "%s\\n", time.Now().Format(time.RFC3339))
     }
 }` },
-      { title: `WebSocket echo server (gorilla/websocket)`, type: `code`, body: `var upgrader = websocket.Upgrader{
+      { title: `WebSocket echo server (gorilla/websocket)`, type: `code`, lang: `go`, body: `var upgrader = websocket.Upgrader{
     ReadBufferSize:  1024,
     WriteBufferSize: 1024,
     CheckOrigin: func(r *http.Request) bool {
@@ -287,7 +287,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
         [`DELETE`, `<code>/username/{id:[0-9]+}</code>`, `DeleteHandler`, `yes`],
         [`(root)`, `<code>/time</code>`, `TimeHandler (all methods)`, `no`]
       ], note: `<code>NotFoundHandler</code> answers "/x is not supported. Thanks for visiting!" and <code>MethodNotAllowedHandler</code> answers "Method not allowed!".` },
-      { title: `gorilla/mux router with subrouters`, type: `code`, body: `rMux := mux.NewRouter()
+      { title: `gorilla/mux router with subrouters`, type: `code`, lang: `go`, body: `rMux := mux.NewRouter()
 rMux.NotFoundHandler = http.HandlerFunc(DefaultHandler)
 rMux.MethodNotAllowedHandler = notAllowedHandler{}
 rMux.HandleFunc("/time", TimeHandler) // every method
@@ -318,7 +318,7 @@ func GetUserDataHandler(rw http.ResponseWriter, r *http.Request) {
     rw.Header().Set("Content-Type", "application/json")
     json.NewEncoder(rw).Encode(u)
 }` },
-      { title: `JSON client request`, type: `code`, body: `type User struct {
+      { title: `JSON client request`, type: `code`, lang: `go`, body: `type User struct {
     ID       int    \`json:"id"\`
     Username string \`json:"username"\`
     Password string \`json:"password"\`

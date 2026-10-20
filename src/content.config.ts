@@ -18,7 +18,7 @@ const sheetBase = { title: text, note: text.optional() };
 const cheatsheet = z.discriminatedUnion("type", [
   z.strictObject({ ...sheetBase, type: z.literal("table"), headers: z.array(z.string()), rows: z.array(z.array(z.union([z.string(), z.number()]))) }),
   z.strictObject({ ...sheetBase, type: z.literal("list"), items: z.array(text) }),
-  z.strictObject({ ...sheetBase, type: z.literal("code"), body: text }),
+  z.strictObject({ ...sheetBase, type: z.literal("code"), body: text, lang: z.string().optional() }),
 ]);
 
 const titled = { title: text.optional() };

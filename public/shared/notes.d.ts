@@ -69,8 +69,8 @@ type Cheatsheet = TableSheet | ListSheet | CodeSheet;
 interface SheetBase { title: string; note?: string }
 interface TableSheet extends SheetBase { type: "table"; headers: string[]; rows: (string | number)[][] }
 interface ListSheet extends SheetBase { type: "list"; items: string[] }
-/** `body` is shown as escaped plain text. */
-interface CodeSheet extends SheetBase { type: "code"; body: string }
+/** `body` is plain text, escaped; with `lang` ("java", "go", "json") it is also syntax-highlighted by shared/highlight.js. */
+interface CodeSheet extends SheetBase { type: "code"; body: string; lang?: string }
 
 interface QA {
   q: string;
@@ -126,7 +126,7 @@ type DeepBlock =
   | { type: "tradeoffs"; pros: string[]; cons: string[]; prosLabel?: string; consLabel?: string; title?: string }
   | { type: "compare"; items: { title: string; html: string; tone?: "ok" | "bad" | "warn" | "info" }[]; title?: string }
   | { type: "table"; headers: string[]; rows: (string | number)[][]; title?: string; note?: string }
-  /** `code` is shown as escaped plain text. */
+  /** `code` is plain text, escaped; `lang` "java", "go" or "json" adds syntax highlighting. */
   | { type: "code"; code: string; lang?: string; title?: string; caption?: string }
   | { type: "steps" | "keypoints" | "list"; items: string[]; title?: string }
   /** `answer` is the index of the correct option. */

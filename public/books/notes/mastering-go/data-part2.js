@@ -42,7 +42,7 @@ window.DATA.chapters.push(
         [`<code>maps.Equal</code>, <code>maps.EqualFunc</code>`, `Same keys and values; custom value comparison`],
         [`<code>maps.DeleteFunc(m, pred)</code>`, `Delete pairs where <code>pred(k, v)</code> is true`]
       ] },
-      { title: `Generic function and generic type`, type: `code`, body: `type Number interface {
+      { title: `Generic function and generic type`, type: `code`, lang: `go`, body: `type Number interface {
     ~int | ~int64 | ~float64
 }
 
@@ -149,7 +149,7 @@ func Map[T, U any](l *List[T], f func(T) U) *List[U] {
         [`<code>v.CanSet()</code>, <code>SetInt</code>, <code>SetString</code>`, `Modify; panics if not settable or the Kind is wrong`],
         [`<code>v.Len()</code>, <code>v.Index(i)</code>`, `Slices, arrays and strings`]
       ] },
-      { title: `Assertions, switches, sort.Interface and errors`, type: `code`, body: `// Comma-ok assertion never panics
+      { title: `Assertions, switches, sort.Interface and errors`, type: `code`, lang: `go`, body: `// Comma-ok assertion never panics
 if n, ok := x.(int); ok {
     fmt.Println("int:", n+1)
 }
@@ -248,7 +248,7 @@ if errors.As(err, &ef) && ef.Read == 0 {
         [`<code>func f() (n int) { defer func() { n *= 2 }(); return 4 }</code>`, `8`, `return sets n, then defers run`],
         [`<code>func g() int { n := 4; defer func() { n *= 2 }(); return n }</code>`, `4`, `Result already copied; defer edits a local`]
       ] },
-      { title: `Functions, closures, variadics and defer`, type: `code`, body: `// Named results + defer: annotate any returned error
+      { title: `Functions, closures, variadics and defer`, type: `code`, lang: `go`, body: `// Named results + defer: annotate any returned error
 func readConfig(path string) (cfg Config, err error) {
     f, err := os.Open(path)
     if err != nil {

@@ -221,7 +221,7 @@ const structuredData = [
           </table>
         )}
         {cs.type === "list" && <ul>{cs.items.map(it => <li set:html={it} />)}</ul>}
-        {cs.type === "code" && <pre><code>{cs.body}</code></pre>}
+        {cs.type === "code" && <pre data-lang={cs.lang}><code set:html={renderer.highlight(cs.body, cs.lang)} /></pre>}
         {cs.note && <div class="cs-note" set:html={cs.note} />}
       </div>
     ))}
