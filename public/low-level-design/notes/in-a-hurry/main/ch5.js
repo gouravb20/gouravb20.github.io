@@ -25,39 +25,29 @@ MAIN.ch5 = [
     kicker: "Creational",
     blocks: [
       { type: "text", html: `<p>Singleton guarantees one instance of a class with a global access point. The naive lazy version, "if instance is null, create it", is a check-then-act race: two threads can both see null and build two instances. The fix works the same way in every language: <strong>make the check and the creation one step by doing both while holding a lock</strong>.</p>` },
-      { type: "code", lang: "java", title: "Lazy Singleton with a lock", code: `final class Metrics {
-    private static Metrics instance;                      // guarded by the class lock
-    private final Map<String, LongAdder> counters = new ConcurrentHashMap<>();
+      { type: "code", lang: "java", title: "Lazy Singleton with a lock", code: `final class Singleton {
+    private static Singleton instance;
 
-    private Metrics() { }
+    private Singleton() {}
 
-    // Check and create under one lock: only one thread can ever see null and build.
-    static synchronized Metrics get() {
-        if (instance == null) instance = new Metrics();
+    static synchronized Singleton getInstance() {   // check and create under one lock
+        if (instance == null) instance = new Singleton();
         return instance;
     }
-
-    void increment(String name) { counters.computeIfAbsent(name, k -> new LongAdder()).increment(); }
-    long count(String name) { LongAdder a = counters.get(name); return a == null ? 0 : a.sum(); }
 }` },
-      { type: "text", html: `<p>This is the version to write first. It is lazy, obviously correct, and the same in any language: a mutex around "check, create if missing, return". The lock also publishes the finished object, so no thread can see a half-built instance. An uncontended lock costs tens of nanoseconds, so locking on every call only matters if <code>get()</code> sits on a very hot path.</p><p>Creation is only half the job. The one instance is shared by every thread, so its own state must be safe too: here <code>ConcurrentHashMap</code> and <code>LongAdder</code>. A thread-safe way to create a singleton does not make its fields thread-safe.</p><p>If the interviewer asks you to avoid the lock on every call, use double-checked locking: check without the lock, and only lock (and check again) when the instance is missing. It is correct only if the shared field is read and written with visibility guarantees: <code>volatile</code> in Java and C#, an atomic in Go, C++ or Rust. Without that, another thread can see a non-null reference to an object whose constructor hasn't finished writing its fields.</p>` },
-      { type: "code", lang: "java", title: "Double-checked locking needs volatile", code: `final class Registry {
-    private static volatile Registry instance;          // volatile is what makes this correct
+      { type: "text", html: `<p>This is the version to write first. It is lazy, obviously correct, and the same in any language: a mutex around "check, create if missing, return". The lock also publishes the finished object, so no thread can see a half-built instance. An uncontended lock costs tens of nanoseconds, so locking on every call only matters if <code>getInstance()</code> sits on a very hot path.</p><p>Creation is only half the job. The one instance is shared by every thread, so any state you add to it needs thread-safe types or locks of its own. A thread-safe way to create a singleton does not make its fields thread-safe.</p><p>If the interviewer asks you to avoid the lock on every call, use double-checked locking: check without the lock, and only lock (and check again) when the instance is missing. It is correct only if the shared field is read and written with visibility guarantees: <code>volatile</code> in Java and C#, an atomic in Go, C++ or Rust. Without that, another thread can see a non-null reference to an object whose constructor hasn't finished writing its fields.</p>` },
+      { type: "code", lang: "java", title: "Double-checked locking needs volatile", code: `final class Singleton {
+    private static volatile Singleton instance;     // volatile: no thread sees a half-built object
 
-    private Registry() { }
+    private Singleton() {}
 
-    static Registry get() {
-        Registry r = instance;                          // 1. fast path: no lock once created
-        if (r == null) {
-            synchronized (Registry.class) {             // 2. only the first callers get here
-                r = instance;
-                if (r == null) {                        // 3. check again: another thread may have won
-                    r = new Registry();
-                    instance = r;
-                }
+    static Singleton getInstance() {
+        if (instance == null) {                     // fast path: no lock once created
+            synchronized (Singleton.class) {
+                if (instance == null) instance = new Singleton();   // check again under the lock
             }
         }
-        return r;
+        return instance;
     }
 }` },
       { type: "callout", tone: "warning", html: `<p>Interviewers push back on Singleton because it hides dependencies inside method bodies and makes tests share state. When the prompt says "there is one parking lot", the stronger answer is <em>one instance, created at startup and passed to whoever needs it</em>. Write the lock-based lazy singleton only if a true global really is required.</p>` }

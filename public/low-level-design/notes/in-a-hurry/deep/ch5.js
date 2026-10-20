@@ -78,37 +78,29 @@ final class NotifierFactory {
 FlightSearch q = FlightSearch.from("BLR", "SFO").on(LocalDate.of(2026, 12, 20)).cabin(Cabin.BUSINESS).build();
 // A builder is used by one thread; the FlightSearch it returns has only final fields, so it is safe to share.` },
         { type: "text", html: `<p>A singleton has two separate thread-safety jobs. <strong>Creation</strong>: exactly one instance must be made even if many threads ask for it at the same moment. <strong>Use</strong>: the one instance is shared by every thread, so its own fields need thread-safe types or locks. Creation is a check-then-act ("is it there? if not, build it"), and the language-agnostic way to make a check-then-act safe is to do it while holding a lock.</p>` },
-        { type: "code", lang: "java", title: "Lazy Singleton: check and create under a lock", code: `final class LotController {
-    private static LotController instance;                          // guarded by the class lock
-    private final Map<String, Gate> gates = new ConcurrentHashMap<>();   // its state must be thread-safe too
+        { type: "code", lang: "java", title: "Lazy Singleton with a lock", code: `final class Singleton {
+    private static Singleton instance;
 
-    private LotController() {}
+    private Singleton() {}
 
-    static synchronized LotController getInstance() {   // one thread at a time: check, create, return
-        if (instance == null) instance = new LotController();
+    static synchronized Singleton getInstance() {   // check and create under one lock
+        if (instance == null) instance = new Singleton();
         return instance;
     }
-
-    void register(Gate g) { gates.put(g.id(), g); }
-}
-// Usually better: create one controller at startup and pass it to whoever needs it.` },
+}` },
         { type: "text", html: `<p>This is the default: lazy, simple, and obviously correct. The lock also guarantees that every thread sees a fully constructed object. Its only cost is taking an uncontended lock on every call, which is tens of nanoseconds. If <code>getInstance()</code> is called on a very hot path, keep the lock for the first call only with double-checked locking:</p>` },
-        { type: "code", lang: "java", title: "Double-checked locking: lock only until the instance exists", code: `final class AuditLog {
-    private static volatile AuditLog instance;   // volatile: a reader never sees a half-built object
-    private AuditLog() {}
+        { type: "code", lang: "java", title: "Double-checked locking needs volatile", code: `final class Singleton {
+    private static volatile Singleton instance;     // volatile: no thread sees a half-built object
 
-    static AuditLog getInstance() {
-        AuditLog local = instance;               // 1. fast path: no lock once created
-        if (local == null) {
-            synchronized (AuditLog.class) {      // 2. only the first callers get here
-                local = instance;
-                if (local == null) {             // 3. check again: another thread may have won
-                    local = new AuditLog();
-                    instance = local;
-                }
+    private Singleton() {}
+
+    static Singleton getInstance() {
+        if (instance == null) {                     // fast path: no lock once created
+            synchronized (Singleton.class) {
+                if (instance == null) instance = new Singleton();   // check again under the lock
             }
         }
-        return local;
+        return instance;
     }
 }` },
         { type: "compare", title: "Lazy singletons, safe and unsafe", items: [

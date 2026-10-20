@@ -2,53 +2,41 @@
 window.ALT = window.ALT || {};
 ALT.ch5 = ALT.ch5 || {};
 ALT.ch5.go = Object.assign(ALT.ch5.go || {}, {
-"Lazy Singleton with a lock": `type Metrics struct {
-	mu       sync.Mutex // guards counters
-	counters map[string]int64
-}
+"Lazy Singleton with a lock": `type Singleton struct{}
 
 var (
-	metrics   *Metrics   // guarded by metricsMu
-	metricsMu sync.Mutex
+	instance *Singleton
+	mu       sync.Mutex
 )
 
-// Check and create under one lock: only one goroutine can ever see nil and build.
-func GetMetrics() *Metrics {
-	metricsMu.Lock()
-	defer metricsMu.Unlock()
-	if metrics == nil {
-		metrics = &Metrics{counters: map[string]int64{}}
+func GetInstance() *Singleton { // check and create under one lock
+	mu.Lock()
+	defer mu.Unlock()
+	if instance == nil {
+		instance = &Singleton{}
 	}
-	return metrics
-}
-
-func (m *Metrics) Increment(name string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.counters[name]++
+	return instance
 }`,
 
-"Double-checked locking needs volatile": `// Go's equivalent of a volatile reference is an atomic pointer.
-// (sync.Once in the standard library is this same check-lock-check pattern.)
-type Registry struct{}
+"Double-checked locking needs volatile": `type Singleton struct{}
 
 var (
-	registry   atomic.Pointer[Registry]
-	registryMu sync.Mutex
+	instance atomic.Pointer[Singleton] // atomic: no goroutine sees a half-built object
+	mu       sync.Mutex
 )
 
-func GetRegistry() *Registry {
-	if r := registry.Load(); r != nil { // fast path: one atomic read
-		return r
+func GetInstance() *Singleton {
+	if s := instance.Load(); s != nil { // fast path: no lock once created
+		return s
 	}
-	registryMu.Lock()
-	defer registryMu.Unlock()
-	if r := registry.Load(); r != nil {
-		return r
+	mu.Lock()
+	defer mu.Unlock()
+	if s := instance.Load(); s != nil { // check again under the lock
+		return s
 	}
-	r := &Registry{}
-	registry.Store(r)
-	return r
+	s := &Singleton{}
+	instance.Store(s)
+	return s
 }`,
 
 "An auction with a bid-rule strategy and observers": `type BidRule interface {
