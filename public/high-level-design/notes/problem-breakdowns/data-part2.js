@@ -1,4 +1,4 @@
-// Problem breakdowns, part 2: Flash Sale, as one problem page (Problem, Solution, Core Concepts, Deep Dives, Q&A, By Level, Cheatsheet).
+// Problem breakdowns, part 2: Flash Sale, as one problem page (Problem, Solution, Deep Dives, Core Concepts, Q&A, By Level, Cheatsheet).
 // Original study notes. The problem follows Hello Interview's Flash Sale breakdown:
 // https://www.hellointerview.com/learn/system-design/problem-breakdowns/flash-sale
 window.DATA.parts[2] = `Part II &middot; Flash Sale`;

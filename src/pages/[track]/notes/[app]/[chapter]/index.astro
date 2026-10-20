@@ -44,6 +44,8 @@ const levelsHtml = article(ch.levels, "levels", "By level");
 const hasLab = (sections: { blocks: { type: string }[] }[] = []) => sections.some(s => s.blocks.some(b => b.type === "lab"));
 const embeddedLabs = hasLab(deep?.sections) || hasLab(ch.problem) || hasLab(ch.solution) || hasLab(ch.levels);
 const firstTab = isProblem ? "problem" : "concepts";
+// A problem breakdown reads Problem, Solution, Deep Dives, then the reference tabs; chapters lead with Core Concepts.
+const deepAfterSolution = isProblem;
 
 const pagePath = chapterPath(notes, ch);
 const bookTitle = plain(book.title);
@@ -90,8 +92,9 @@ const structuredData = [
     <nav class="tabs" aria-label="Problem sections" data-first-tab={firstTab}>
       <a class="tab active" href="#problem" data-tab="problem">Problem</a>
       <a class="tab" href="#solution" data-tab="solution">Solution</a>
+      {deep && deepAfterSolution && <a class="tab learn-tab" href="#learn" data-tab="learn">Deep Dives <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
       <a class="tab" href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
-      {deep && <a class="tab learn-tab" href="#learn" data-tab="learn">Deep Dives <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
+      {deep && !deepAfterSolution && <a class="tab learn-tab" href="#learn" data-tab="learn">Deep Dives <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
       <a class="tab" href="#interview" data-tab="interview">Interview Q&amp;A <span class="tab-count" data-tab-count="interview">0/{ch.interview.length}</span></a>
       <a class="tab" href="#levels" data-tab="levels">By Level</a>
       <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>
@@ -111,6 +114,12 @@ const structuredData = [
       <section id="problem" data-panel="problem"><Fragment set:html={problemHtml} /></section>
       <section id="solution" data-panel="solution"><Fragment set:html={solutionHtml} /></section>
     </>
+  )}
+
+  {deep && deepAfterSolution && (
+    <section id="learn" data-panel="learn">
+      <Fragment set:html={deepHtml} />
+    </section>
   )}
 
   <section id="concepts" data-panel="concepts">
@@ -144,7 +153,7 @@ const structuredData = [
     <div class="empty-tab filter-empty" id="conceptEmpty" hidden></div>
   </section>
 
-  {deep && (
+  {deep && !deepAfterSolution && (
     <section id="learn" data-panel="learn">
       <Fragment set:html={deepHtml} />
     </section>

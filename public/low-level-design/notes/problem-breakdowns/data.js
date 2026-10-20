@@ -524,7 +524,8 @@ final class RateLimiter {
           blocks: [
             { type: `problem`, html: `<p>Design the core of an in-memory file system: folders, files with text content, and the operations a shell or file browser would call. Nothing touches a disk; the interest is entirely in the data structure and the operations on it.</p>` },
             { type: `text`, html: `<p>Everyone has used a file system, which makes this problem deceptively easy to start badly. Candidates skip the questions and build their own mental model (Windows drives, permissions, symlinks), then discover the interviewer wanted something narrower. Clarify first.</p>` },
-            { type: `code`, lang: `text`, title: `The kind of usage to support`, code: `fs.createDirectory("/home");
+            { type: `code`, lang: `java`, title: `The kind of usage to support`, code: `FileSystem fs = new FileSystem();
+fs.createDirectory("/home");
 fs.createDirectory("/home/ana");
 fs.createFile("/home/ana/notes.txt", "buy milk");
 fs.list("/home/ana");                 // [notes.txt]

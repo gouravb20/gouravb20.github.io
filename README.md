@@ -140,7 +140,7 @@ All of it runs in CI on pull requests and pushes to `main` (`.github/workflows/c
    - `fourQuestions`: the four "big idea" cards on the dashboard (`cls`, `q`, `text`, `answer`).
    - `takeaways`: a list of HTML strings.
    - `chapters`: each has `id`, `part`, `number`, `title`, `overview`, `concepts[{term, def, why, ex?, demo?}]`, `cheatsheet[{title, type: table|list|code, ...}]`, `interview[{q, a, diff: easy|med|hard}]` and `labs[]`.
-   - A problem breakdown is one chapter per problem that also has `problem`, `solution` and `levels`, each a list of deep dive sections (see below). Its page has the tabs Problem, Solution, Core Concepts, Deep Dives, Interview Q&A, By Level and Cheatsheet, and no Labs tab: every lab in `labs` must be embedded with a `lab` block in one of the sections.
+   - A problem breakdown is one chapter per problem that also has `problem`, `solution` and `levels`, each a list of deep dive sections (see below). Its page has the tabs Problem, Solution, Deep Dives, Core Concepts, Interview Q&A, By Level and Cheatsheet, and no Labs tab: every lab in `labs` must be embedded with a `lab` block in one of the sections.
 
    Text is raw HTML, so escape `<` as `&lt;`. Only `code` cheatsheet bodies are escaped automatically.
 3. Write labs in `demos.js` as `window.DEMOS[id] = { title, blurb, mount(el, ctx) }` and list their ids in each chapter's `labs`.
