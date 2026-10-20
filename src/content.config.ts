@@ -50,6 +50,7 @@ const chapter = z.strictObject({
   labs: z.array(z.string()),
   cheatsheet: z.array(cheatsheet),
   interview: z.array(z.strictObject({ q: text, a: text, diff: z.enum(["easy", "med", "medium", "hard"]).optional() })),
+  main: z.array(section).min(1).optional(),
   problem: z.array(section).min(1).optional(),
   solution: z.array(section).min(1).optional(),
   levels: z.array(section).min(1).optional(),
@@ -98,7 +99,8 @@ const schema = z
       for (const c of ch.concepts) if (c.demo && !d.labInfo[c.demo]) issue(`concept "${c.term}" links to missing lab ${c.demo}`);
       const tabs = [ch.problem, ch.solution, ch.levels];
       if (tabs.some(Boolean) && !tabs.every(Boolean)) issue("a problem breakdown needs problem, solution and levels");
-      checkSections(tabs.flatMap(t => t ?? []), issue);
+      if (ch.main && ch.problem) issue("a problem breakdown has Problem and Solution instead of main");
+      checkSections([...(ch.main ?? []), ...tabs.flatMap(t => t ?? [])], issue);
       // A problem has no Labs tab, so a lab it lists that no section embeds would never be shown.
       if (ch.problem) {
         const embedded = new Set([...tabs.flatMap(t => t ?? []), ...(d.deep[ch.id]?.sections ?? [])]

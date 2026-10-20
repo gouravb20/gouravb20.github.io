@@ -70,8 +70,13 @@ export function checkDeep(app) {
     checkSections(deep.sections, r);
   }
 
-  // A problem breakdown's Problem, Solution and By Level tabs use the same section format.
+  // A chapter's Main tab, and a problem breakdown's Problem, Solution and By Level tabs, use the same section format.
   for (const ch of chapters.values()) {
+    if (ch.main != null) {
+      const r = reporter(`${app.name} main/${ch.id}.js`);
+      if (!Array.isArray(ch.main) || !ch.main.length) r.p("needs at least one section");
+      else checkSections(ch.main, r);
+    }
     const tabs = ["problem", "solution", "levels"];
     if (!tabs.some(t => ch[t] != null)) continue;
     for (const t of tabs) {

@@ -25,6 +25,7 @@ export const GET: APIRoute = ({ props }) => {
         add(kind, title, text.slice(title.length + 1, title.length + 121), at(`${prefix}-${s.id}`), text);
       }
     };
+    sections("Main", "main", ch.main);
     sections("Problem", "problem", ch.problem);
     sections("Solution", "solution", ch.solution);
     sections("Deep dive", "learn", notes.deep[ch.id]?.sections);

@@ -7,7 +7,7 @@ type EmailNotifier struct{ /* ... */ }
 type SMSNotifier struct{ /* ... */ }
 type PushNotifier struct{ /* ... */ }
 
-type NotifierFactory struct{ byChannel map[Channel]Notifier }
+type NotifierFactory struct{ byChannel map[Channel]Notifier } // never written after construction, so safe to read concurrently
 
 func NewNotifierFactory(e *EmailNotifier, s *SMSNotifier, p *PushNotifier) *NotifierFactory {
 	return &NotifierFactory{byChannel: map[Channel]Notifier{Email: e, SMS: s, Push: p}}
@@ -58,7 +58,28 @@ func Instance() *LotController {
 	controllerOnce.Do(func() { controller = &LotController{gates: map[string]*Gate{}} })
 	return controller
 }
-// Usually better: create one controller in main() and pass it to whoever needs it.`,
+// Usually better: create one controller in main() and pass it to whoever needs it.
+// The map is shared by every goroutine, so LotController guards it with a sync.Mutex (or uses sync.Map).`,
+
+"Lazy and thread-safe: holder idiom and double-checked locking": `// Go has no class initialisation to lean on; sync.Once is the idiomatic answer to both Java forms.
+// Do runs the function exactly once; other callers block until it finishes, then never lock again.
+type PricingEngine struct{ /* rules... */ }
+
+var (
+	engine     *PricingEngine
+	engineOnce sync.Once
+)
+
+func Engine() *PricingEngine {
+	engineOnce.Do(func() { engine = loadPricingEngine() })
+	return engine
+}
+
+// Go 1.21+: sync.OnceValue wraps the same thing in one line.
+var auditLog = sync.OnceValue(func() *AuditLog { return &AuditLog{} })
+
+// Broken, like Java's unsynchronised check: two goroutines can both see nil.
+//   if engine == nil { engine = loadPricingEngine() }`,
 
 "Adapter: make a vendor fit your interface": `type PaymentGateway interface {
 	Charge(amount Money, token string) (PaymentResult, error)
@@ -113,6 +134,11 @@ type Folder struct {
 	children []Node
 }
 
+// NewFolder copies the children, so no goroutine can change them while another walks the tree.
+func NewFolder(name string, children ...Node) Folder {
+	return Folder{name: name, children: slices.Clone(children)}
+}
+
 func (f Folder) Name() string { return f.name }
 
 func (f Folder) Size() int64 { // recursion for free
@@ -139,9 +165,9 @@ func (LeastBusy) Choose(cars []*Elevator, r Request) *Elevator {
 	return slices.MinFunc(cars, func(a, b *Elevator) int { return a.PendingStops() - b.PendingStops() })
 }
 
-type Dispatcher struct{ strategy DispatchStrategy } // chosen by configuration
+type Dispatcher struct{ strategy DispatchStrategy } // chosen by configuration; strategies are stateless
 
-func (d Dispatcher) Handle(r Request, cars []*Elevator) { d.strategy.Choose(cars, r).AddStop(r.Floor) }
+func (d Dispatcher) Handle(r Request, cars []*Elevator) { d.strategy.Choose(cars, r).AddStop(r.Floor) } // AddStop locks the car
 
 // A strategy can also be a plain function type: type DispatchFunc func([]*Elevator, Request) *Elevator`,
 
@@ -173,12 +199,16 @@ func (s HasCredit) Select(m *Machine, slot string) VendingState {
 
 func (HasCredit) Cancel(m *Machine) VendingState { m.refund(); return Idle{} }
 
-type Machine struct{ state VendingState } // Idle{} to start
+type Machine struct {
+	mu    sync.Mutex
+	state VendingState // Idle{} to start; guarded by mu
+}
 
-func (m *Machine) InsertCoin(c Money) { m.state = m.state.InsertCoin(m, c) }
-func (m *Machine) Select(slot string) { m.state = m.state.Select(m, slot) }
-func (m *Machine) Cancel()            { m.state = m.state.Cancel(m) }
-// addCredit, canAfford, dispense, refund, display...`,
+// One lock per transition: two buttons pressed at once can't both act on the same state.
+func (m *Machine) InsertCoin(c Money) { m.mu.Lock(); defer m.mu.Unlock(); m.state = m.state.InsertCoin(m, c) }
+func (m *Machine) Select(slot string) { m.mu.Lock(); defer m.mu.Unlock(); m.state = m.state.Select(m, slot) }
+func (m *Machine) Cancel()            { m.mu.Lock(); defer m.mu.Unlock(); m.state = m.state.Cancel(m) }
+// addCredit, canAfford, dispense, refund, display: only called from inside a transition`,
 
 "Observer: publish events, let listeners react": `type SpotListener func(floorID string, freeSpots int)
 
@@ -225,15 +255,23 @@ type InsertText struct {
 func (c InsertText) Execute() { c.doc.Insert(c.at, c.text) }
 func (c InsertText) Undo()    { c.doc.Delete(c.at, len(c.text)) }
 
-type Editor struct{ done, undone []EditCommand } // slices used as stacks
+// Each method changes the document and both stacks together, so each holds the editor's mutex.
+type Editor struct {
+	mu           sync.Mutex
+	done, undone []EditCommand // slices used as stacks
+}
 
 func (e *Editor) Run(c EditCommand) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	c.Execute()
 	e.done = append(e.done, c)
 	e.undone = nil
 }
 
 func (e *Editor) Undo() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	if n := len(e.done); n > 0 {
 		c := e.done[n-1]
 		e.done = e.done[:n-1]
@@ -243,6 +281,8 @@ func (e *Editor) Undo() {
 }
 
 func (e *Editor) Redo() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	if n := len(e.undone); n > 0 {
 		c := e.undone[n-1]
 		e.undone = e.undone[:n-1]
@@ -251,13 +291,17 @@ func (e *Editor) Redo() {
 	}
 }`,
 
-"Chain of Responsibility: an ATM paying out notes": `type NoteDispenser struct {
+"Chain of Responsibility: an ATM paying out notes": `// The links are set once at construction and never changed, so the chain is safe to share.
+type NoteDispenser struct {
 	note int
 	next *NoteDispenser
 }
 
-func (d *NoteDispenser) Then(n *NoteDispenser) *NoteDispenser { d.next = n; return n }
+func NewNoteDispenser(note int, next *NoteDispenser) *NoteDispenser {
+	return &NoteDispenser{note: note, next: next}
+}
 
+// Per-request data travels in parameters, never in fields, so concurrent withdrawals don't mix.
 func (d *NoteDispenser) Dispense(amount int, out map[int]int) error {
 	if count := amount / d.note; count > 0 {
 		out[d.note] = count
@@ -272,8 +316,7 @@ func (d *NoteDispenser) Dispense(amount int, out map[int]int) error {
 	return d.next.Dispense(rest, out)
 }
 
-chain := &NoteDispenser{note: 500}
-chain.Then(&NoteDispenser{note: 200}).Then(&NoteDispenser{note: 100})
+chain := NewNoteDispenser(500, NewNoteDispenser(200, NewNoteDispenser(100, nil)))
 err := chain.Dispense(1700, result) // 3 x 500, 1 x 200`,
 
 "Template Method: fixed skeleton, variable steps": `// No abstract classes in Go: the skeleton is a function, the variable steps an interface.
@@ -297,21 +340,30 @@ func Export(r Report, f ReportFormat, w io.Writer) error { // the fixed skeleton
 
 type CSVFormat struct{ /* ... */ }
 type PDFFormat struct{ /* ... */ }
-// Which is the Strategy pattern again: in Go, Template Method usually becomes Strategy.`,
+// Which is the Strategy pattern again: in Go, Template Method usually becomes Strategy.
+// Keep per-export state in locals, not struct fields, and one format value can serve many goroutines.`,
 
-"Iterator: walk a structure without exposing it": `type Board struct{ cells [][]Cell }
+"Iterator: walk a structure without exposing it": `type Board struct {
+	mu    sync.Mutex
+	cells [][]Cell // guarded by mu
+}
 
-// All returns a Go 1.23 range-over-func iterator.
+func (b *Board) Place(row, col int, c Cell) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.cells[row][col] = c
+}
+
+// All returns a Go 1.23 range-over-func iterator over a snapshot taken under the lock,
+// so a concurrent Place can't change cells mid-loop (and the caller's loop body never runs while holding the lock).
 func (b *Board) All() iter.Seq[Cell] {
-	return func(yield func(Cell) bool) {
-		for _, row := range b.cells {
-			for _, c := range row {
-				if !yield(c) {
-					return
-				}
-			}
-		}
+	b.mu.Lock()
+	var snapshot []Cell
+	for _, row := range b.cells {
+		snapshot = append(snapshot, row...)
 	}
+	b.mu.Unlock()
+	return slices.Values(snapshot)
 }
 
 for c := range board.All() { /* ... */ } // callers never touch the 2D slice`,
@@ -323,9 +375,15 @@ for c := range board.All() { /* ... */ } // callers never touch the 2D slice`,
 type NearestToEntrance struct{ /* ... */ }
 type SpreadAcrossFloors struct{ /* ... */ }
 
-type ParkingLot struct{ selector SpotSelector }
+type ParkingLot struct {
+	mu       sync.Mutex
+	selector SpotSelector
+}
 
+// Choosing and claiming a spot happen under one lock, so two cars can't be given the same spot.
 func (l *ParkingLot) Park(v *Vehicle) (*Ticket, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	spot, ok := l.selector.Select(l.freeSpotsFor(v), v)
 	if !ok {
 		return nil, ErrLotFull

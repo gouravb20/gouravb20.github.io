@@ -1,7 +1,7 @@
 // Deep dive: Chapter 5, Design patterns. Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
 window.DEEP = window.DEEP || {};
 DEEP.ch5 = {
-  hook: `<p>Design patterns are names for solutions that keep reappearing. Their real value in an interview is vocabulary: "pricing is a Strategy" tells the interviewer the whole structure in four words. Their danger is that they tempt you to add structure the problem doesn't need. This chapter covers the patterns that actually come up in LLD problems. For each one: the problem it solves, a compact Java shape, and the signal that it's the right tool.</p>`,
+  hook: `<p>Design patterns are names for solutions that keep reappearing. Their real value in an interview is vocabulary: "pricing is a Strategy" tells the interviewer the whole structure in four words. Their danger is that they tempt you to add structure the problem doesn't need. This chapter covers the patterns that actually come up in LLD problems. For each one: the problem it solves, a compact Java shape, and the signal that it's the right tool. Every example is written to be safe when many threads call it at once, because LLD follow-ups almost always ask "what if two users do this at the same time?"</p>`,
   sections: [
     {
       id: "how-to-use",
@@ -18,6 +18,15 @@ DEEP.ch5 = {
           ["Creational", "Factory, Builder, Singleton", "Vehicle and piece creation, complex requests, global controllers"],
           ["Structural", "Adapter, Decorator, Facade, Composite", "Payment providers, add-ons, booking flows, file systems"],
           ["Behavioural", "Strategy, Observer, State, Command, Chain of Responsibility, Template Method, Iterator", "Pricing, notifications, vending machines, undo, approvals"]
+        ] },
+        { type: "table", title: "Keeping each pattern thread-safe", headers: ["Pattern", "What can race", "How the examples stay safe"], rows: [
+          ["Singleton", "Two threads both see no instance and both create one", "Enum or holder class (the JVM initialises a class once); double-checked locking only with <code>volatile</code>; Go: <code>sync.Once</code>"],
+          ["Factory, Strategy, Adapter, Decorator, Template Method", "Nothing, as long as they hold no mutable state", "<code>final</code> fields, immutable maps and records, stateless helpers"],
+          ["Builder", "A builder shared between threads", "Each thread uses its own builder; the built object is immutable"],
+          ["Composite, Iterator", "The structure changing while someone walks it", "Defensive copies, or iterate a snapshot taken under a lock"],
+          ["State, Command", "Two events reading and replacing the current state or history at once", "One lock around each transition (<code>synchronized</code>, a mutex)"],
+          ["Observer", "Listeners added during a publish; counters updated by two threads", "<code>CopyOnWriteArrayList</code> for listeners, an atomic or lock for the state, notify outside the lock"],
+          ["Chain of Responsibility", "The chain being rewired while a request walks it", "Build the chain once with <code>final</code> links; keep per-request data in parameters"]
         ] }
       ]
     },
@@ -32,7 +41,7 @@ final class SmsNotifier   implements Notifier { ... }
 final class PushNotifier  implements Notifier { ... }
 
 final class NotifierFactory {
-    private final Map<Channel, Notifier> byChannel;
+    private final Map<Channel, Notifier> byChannel;    // immutable, so any thread can call forUser
     NotifierFactory(EmailNotifier e, SmsNotifier s, PushNotifier p) {
         byChannel = Map.of(Channel.EMAIL, e, Channel.SMS, s, Channel.PUSH, p);
     }
@@ -66,14 +75,45 @@ final class NotifierFactory {
     }
 }
 
-FlightSearch q = FlightSearch.from("BLR", "SFO").on(LocalDate.of(2026, 12, 20)).cabin(Cabin.BUSINESS).build();` },
+FlightSearch q = FlightSearch.from("BLR", "SFO").on(LocalDate.of(2026, 12, 20)).cabin(Cabin.BUSINESS).build();
+// A builder is used by one thread; the FlightSearch it returns has only final fields, so it is safe to share.` },
         { type: "code", lang: "java", title: "Singleton, if you must: let the JVM make it thread-safe", code: `enum LotController {
     INSTANCE;
-    private final Map<String, Gate> gates = new ConcurrentHashMap<>();
+    private final Map<String, Gate> gates = new ConcurrentHashMap<>();   // its state must be thread-safe too
     void register(Gate g) { gates.put(g.id(), g); }
 }
 // Usually better: create one controller at startup and pass it to whoever needs it.` },
-        { type: "callout", tone: "warning", html: `<p>Singleton is the pattern interviewers most often push back on. It is global state: dependencies are hidden inside method bodies, tests can't swap in a fake, and tests leak state into each other. If the prompt says "there is one X", say "one instance, created at startup and injected" rather than reaching for a static <code>getInstance()</code>.</p>` }
+        { type: "text", html: `<p>A singleton has two separate thread-safety jobs. <strong>Creation</strong>: exactly one instance must be made even if many threads ask for it at the same moment. <strong>Use</strong>: the one instance is shared by every thread, so its own fields need thread-safe types or locks. The enum handles creation and the <code>ConcurrentHashMap</code> handles use. When creation is expensive and should be lazy, use one of these:</p>` },
+        { type: "code", lang: "java", title: "Lazy and thread-safe: holder idiom and double-checked locking", code: `// 1. Holder idiom (preferred): Holder is initialised on the first getInstance() call,
+//    and the JVM guarantees class initialisation runs exactly once, with no locking afterwards.
+final class PricingEngine {
+    private PricingEngine() { /* load rules... */ }
+    private static final class Holder { static final PricingEngine INSTANCE = new PricingEngine(); }
+    static PricingEngine getInstance() { return Holder.INSTANCE; }
+}
+
+// 2. Double-checked locking: only correct because the field is volatile.
+final class AuditLog {
+    private static volatile AuditLog instance;
+    private AuditLog() {}
+    static AuditLog getInstance() {
+        AuditLog local = instance;                 // one volatile read on the fast path
+        if (local == null) {
+            synchronized (AuditLog.class) {
+                local = instance;
+                if (local == null) instance = local = new AuditLog();
+            }
+        }
+        return local;
+    }
+}` },
+        { type: "compare", title: "Lazy singletons, safe and unsafe", items: [
+          { title: "if (instance == null) instance = new X();", tone: "bad", html: `<p>Two threads can both see <code>null</code> and both construct, so callers end up holding different instances.</p>` },
+          { title: "synchronized getInstance()", tone: "warn", html: `<p>Correct, but every call takes the lock, even long after the instance exists.</p>` },
+          { title: "Double-checked locking without volatile", tone: "bad", html: `<p>Another thread can see the reference before the constructor's writes are visible and use a half-built object.</p>` },
+          { title: "Enum, holder idiom, or volatile with double-checked locking", tone: "ok", html: `<p>Exactly one instance and no lock on the fast path. In Go, <code>sync.Once</code> gives the same guarantee.</p>` }
+        ] },
+        { type: "callout", tone: "warning", html: `<p>Singleton is the pattern interviewers most often push back on. It is global state: dependencies are hidden inside method bodies, tests can't swap in a fake, and tests leak state into each other. If the prompt says "there is one X", say "one instance, created at startup and injected" rather than reaching for a static <code>getInstance()</code>. If you do use one, say how it stays thread-safe for both creation and use.</p>` }
       ]
     },
     {
@@ -112,6 +152,7 @@ DataSource out = new Encrypted(new Compressed(new FileDataSource(path)), key);  
 record File(String name, long size) implements Node {}
 
 record Folder(String name, List<Node> children) implements Node {
+    Folder { children = List.copyOf(children); }   // immutable copy: no thread can change it mid-walk
     public long size() { return children.stream().mapToLong(Node::size).sum(); }   // recursion for free
 }` },
         { type: "text", html: `<p><strong>Facade</strong> needs no code sketch: it's one class with a few high-level methods (<code>BookingFacade.book(show, seats, payment)</code>) that coordinates a subsystem (seat holds, payment, ticket generation, notifications), so clients don't have to know the order of calls.</p>` },
@@ -143,9 +184,9 @@ final class LeastBusy implements DispatchStrategy {
 }
 
 final class Dispatcher {
-    private final DispatchStrategy strategy;           // chosen by configuration
+    private final DispatchStrategy strategy;           // chosen by configuration; strategies are stateless
     Dispatcher(DispatchStrategy s) { this.strategy = s; }
-    void handle(Request r, List<Elevator> cars) { strategy.choose(cars, r).addStop(r.floor()); }
+    void handle(Request r, List<Elevator> cars) { strategy.choose(cars, r).addStop(r.floor()); }   // addStop locks the car
 }` },
         { type: "code", lang: "java", title: "State: the object's state picks the behaviour", code: `interface VendingState {
     VendingState insertCoin(Machine m, Money coin);
@@ -171,11 +212,12 @@ final class HasCredit implements VendingState {
 }
 
 final class Machine {
-    private VendingState state = new Idle();
-    void insertCoin(Money c) { state = state.insertCoin(this, c); }
-    void select(String slot) { state = state.select(this, slot); }
-    void cancel()            { state = state.cancel(this); }
-    // addCredit, canAfford, dispense, refund, display...
+    private VendingState state = new Idle();           // guarded by this
+    // One lock per transition: two buttons pressed at once can't both act on the same state.
+    synchronized void insertCoin(Money c) { state = state.insertCoin(this, c); }
+    synchronized void select(String slot) { state = state.select(this, slot); }
+    synchronized void cancel()            { state = state.cancel(this); }
+    // addCredit, canAfford, dispense, refund, display: only called from inside a transition
 }` },
         { type: "table", headers: ["", "Strategy", "State"], rows: [
           ["Who switches the helper", "The client or configuration", "The states themselves, as events happen"],
@@ -196,14 +238,14 @@ final class Machine {
 final class Floor {
     private final String id;
     private final List<SpotListener> listeners = new CopyOnWriteArrayList<>();
-    private int free;
+    private final AtomicInteger free = new AtomicInteger();
 
     void subscribe(SpotListener l)   { listeners.add(l); }
     void unsubscribe(SpotListener l) { listeners.remove(l); }
 
-    void occupy() { free--; publish(); }
-    void vacate() { free++; publish(); }
-    private void publish() { listeners.forEach(l -> l.onChange(id, free)); }
+    void occupy() { publish(free.decrementAndGet()); }   // atomic: two cars can't lose an update
+    void vacate() { publish(free.incrementAndGet()); }
+    private void publish(int now) { listeners.forEach(l -> l.onChange(id, now)); }
 }
 
 floor.subscribe((id, n) -> entranceBoard.show(id, n));
@@ -216,17 +258,19 @@ record InsertText(Document doc, int at, String text) implements EditCommand {
 }
 
 final class Editor {
+    // ArrayDeque isn't thread-safe, and each method must change the document and both stacks together,
+    // so every method holds the editor's lock.
     private final Deque<EditCommand> done = new ArrayDeque<>(), undone = new ArrayDeque<>();
-    void run(EditCommand c) { c.execute(); done.push(c); undone.clear(); }
-    void undo() { if (!done.isEmpty()) { EditCommand c = done.pop(); c.undo(); undone.push(c); } }
-    void redo() { if (!undone.isEmpty()) { EditCommand c = undone.pop(); c.execute(); done.push(c); } }
+    synchronized void run(EditCommand c) { c.execute(); done.push(c); undone.clear(); }
+    synchronized void undo() { if (!done.isEmpty()) { EditCommand c = done.pop(); c.undo(); undone.push(c); } }
+    synchronized void redo() { if (!undone.isEmpty()) { EditCommand c = undone.pop(); c.execute(); done.push(c); } }
 }` },
         { type: "code", lang: "java", title: "Chain of Responsibility: an ATM paying out notes", code: `final class NoteDispenser {
     private final int note;
-    private NoteDispenser next;
-    NoteDispenser(int note) { this.note = note; }
-    NoteDispenser then(NoteDispenser n) { this.next = n; return n; }
+    private final NoteDispenser next;                  // fixed at construction, so the chain is safe to share
+    NoteDispenser(int note, NoteDispenser next) { this.note = note; this.next = next; }
 
+    // Per-request data travels in parameters, never in fields, so concurrent withdrawals don't mix.
     void dispense(int amount, Map<Integer, Integer> out) {
         int count = amount / note;
         if (count > 0) out.put(note, count);
@@ -238,8 +282,7 @@ final class Editor {
     }
 }
 
-NoteDispenser chain = new NoteDispenser(500);
-chain.then(new NoteDispenser(200)).then(new NoteDispenser(100));
+NoteDispenser chain = new NoteDispenser(500, new NoteDispenser(200, new NoteDispenser(100, null)));
 chain.dispense(1700, result);      // 3 x 500, 1 x 200` },
         { type: "callout", tone: "warning", html: `<p>Observer pitfalls worth mentioning: listeners that are never unsubscribed leak memory; a slow listener blocks the publisher if called synchronously (hand events to an executor); and listeners shouldn't depend on notification order. <code>CopyOnWriteArrayList</code> makes subscribe and publish safe across threads when publishing is far more common than subscribing.</p>` }
       ]
@@ -263,13 +306,17 @@ chain.dispense(1700, result);      // 3 x 500, 1 x 200` },
 }
 
 final class CsvExporter extends ReportExporter { ... }
-final class PdfExporter extends ReportExporter { ... }` },
+final class PdfExporter extends ReportExporter { ... }
+// Keep per-export state in locals and parameters, not fields, and one exporter can serve many threads.` },
         { type: "code", lang: "java", title: "Iterator: walk a structure without exposing it", code: `final class Board implements Iterable<Cell> {
-    private final Cell[][] cells;
+    private final Cell[][] cells;                      // guarded by this
     Board(int rows, int cols) { cells = new Cell[rows][cols]; }
 
-    public Iterator<Cell> iterator() {
-        return Arrays.stream(cells).flatMap(Arrays::stream).iterator();
+    synchronized void place(int row, int col, Cell c) { cells[row][col] = c; }
+
+    // Returns an iterator over a snapshot taken under the lock, so a concurrent place() can't break the loop.
+    public synchronized Iterator<Cell> iterator() {
+        return Arrays.stream(cells).flatMap(Arrays::stream).toList().iterator();
     }
 }
 
@@ -294,7 +341,9 @@ for (Cell c : board) { ... }      // callers never touch the 2D array` },
   ],
   takeaways: [
     "Start from a force in the design; name the pattern that resolves it in one sentence; keep it minimal.",
-    "Factory centralises which class to create; Builder handles many optional parts; avoid Singleton in favour of injection.",
+    "Factory centralises which class to create; Builder handles many optional parts; prefer injecting one instance to a Singleton.",
+    "If you do use a Singleton, make creation thread-safe (enum, holder idiom, double-checked locking with volatile, or Go's sync.Once) and make its state thread-safe too.",
+    "Every pattern must survive concurrent callers: immutable fields and copies for shared structure, one lock around each state transition, atomics or thread-safe collections for shared counters and lists.",
     "Adapter changes an interface, Decorator adds behaviour behind the same one, Facade simplifies many, Composite treats groups like items.",
     "Strategy: the client picks the algorithm. State: the current state picks the behaviour.",
     "Observer decouples events from reactions; Command makes requests undoable and queueable; Chain of Responsibility passes a request along handlers.",

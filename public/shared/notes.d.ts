@@ -48,6 +48,11 @@ interface Chapter {
   cheatsheet: Cheatsheet[];
   interview: QA[];
   /**
+   * The chapter's Main tab, set from main/<chapter id>.js: the essentials, read before the Deep Dive. Without it the
+   * page opens on the Deep Dive. Not used by problem breakdowns, whose Problem and Solution play that role.
+   */
+  main?: DeepSection[];
+  /**
    * Problem breakdowns only. A chapter with `problem` is one interview problem: its page opens on the Problem tab, then
    * Solution, Deep Dives (its deep/<id>.js), Core Concepts, Interview Q&A, Levels and Cheatsheet, with labs embedded
    * in the sections instead of a Labs tab. Section ids must be unique across the three arrays.
@@ -142,5 +147,7 @@ type DeepBlock =
 declare var DATA: NotesData;
 declare var DEMOS: Record<string, Lab>;
 declare var DEEP: Record<string, DeepDive>;
+/** main/<chapter id>.js: MAIN[chapterId] = the chapter's Main sections. */
+declare var MAIN: Record<string, DeepSection[]>;
 /** alt/<chapter id>.js: ALT[chapterId][lang][code block title] = code. */
 declare var ALT: Record<string, Record<string, Record<string, string>>>;

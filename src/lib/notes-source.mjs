@@ -92,19 +92,35 @@ export function loadApp(app) {
     run(file);
     for (const id of Object.keys(ctx.DEEP)) if (!before.has(id)) deepFiles[id] = file;
   }
+  ctx.MAIN = {};
+  for (const file of folderScripts(app.dir, "main")) run(file);
   ctx.ALT = {};
-  for (const file of altScripts(app.dir)) run(file);
-  if (ctx.DATA) mergeAlternatives(ctx.DATA, ctx.DEEP, ctx.ALT, errors);
+  for (const file of folderScripts(app.dir, "alt")) run(file);
+  if (ctx.DATA) {
+    attachMain(ctx.DATA, ctx.MAIN, errors);
+    mergeAlternatives(ctx.DATA, ctx.DEEP, ctx.ALT, errors);
+  }
   return { DATA: ctx.DATA, DEMOS: ctx.DEMOS || {}, DEEP: ctx.DEEP, deepFiles, errors };
 }
 
 /**
- * The app's code in other languages, alt/<chapter id>.js: `ALT[chapterId] = { go: { "<code block title>": "..." } }`.
- * @param {string} dir
+ * The scripts in one of an app's optional folders, in name order:
+ * main/<chapter id>.js sets `MAIN[chapterId] = [sections]`, the chapter's Main tab;
+ * alt/<chapter id>.js sets `ALT[chapterId] = { go: { "<code block title>": "..." } }`, its code in other languages.
+ * @param {string} dir @param {string} folder
  */
-function altScripts(dir) {
-  const altDir = path.join(dir, "alt");
-  return fs.existsSync(altDir) ? fs.readdirSync(altDir).filter(n => n.endsWith(".js")).sort().map(n => path.join(altDir, n)) : [];
+function folderScripts(dir, folder) {
+  const sub = path.join(dir, folder);
+  return fs.existsSync(sub) ? fs.readdirSync(sub).filter(n => n.endsWith(".js")).sort().map(n => path.join(sub, n)) : [];
+}
+
+/** @param {any} DATA @param {Record<string, any[]>} MAIN @param {string[]} errors */
+function attachMain(DATA, MAIN, errors) {
+  for (const [chapterId, sections] of Object.entries(MAIN)) {
+    const ch = (DATA.chapters || []).find((/** @type {any} */ c) => c.id === chapterId);
+    if (!ch) errors.push(`main/${chapterId}.js: no chapter has id "${chapterId}"`);
+    else ch.main = sections;
+  }
 }
 
 /**
@@ -121,7 +137,7 @@ function mergeAlternatives(DATA, DEEP, ALT, errors) {
     /** @type {Map<string, any[]>} */
     const byTitle = new Map();
     const add = (/** @type {string} */ title, /** @type {any} */ block) => byTitle.set(title, [...(byTitle.get(title) || []), block]);
-    const sections = [...(ch.problem || []), ...(ch.solution || []), ...(ch.levels || []), ...((DEEP[chapterId] || {}).sections || [])];
+    const sections = [...(ch.main || []), ...(ch.problem || []), ...(ch.solution || []), ...(ch.levels || []), ...((DEEP[chapterId] || {}).sections || [])];
     for (const s of sections) for (const b of s.blocks) if (b.type === "code" && b.title) add(b.title, b);
     for (const cs of ch.cheatsheet || []) if (cs.type === "code") add(cs.title, cs);
     for (const [lang, snippets] of Object.entries(byLang)) {

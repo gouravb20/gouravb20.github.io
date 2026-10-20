@@ -290,33 +290,6 @@ body.light .q-how { color: #1d4ed8; }
 .tab-count { display: inline-block; background: var(--bg-3); border-radius: 999px; padding: 2px 8px; font-size: 11px; margin-left: 6px; }
 
 /* ============================================
-   Main (chapter overview)
-   ============================================ */
-.main-panel { display: grid; gap: 16px; max-width: 900px; }
-.main-block { background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; }
-.main-block h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 12px; }
-.main-points { padding-left: 22px; display: grid; gap: 10px; font-size: 15px; line-height: 1.6; }
-.main-points li::marker { color: var(--accent); font-weight: 700; }
-.main-toc { list-style: none; display: grid; gap: 4px; counter-reset: toc; margin-bottom: 14px; }
-.main-toc li { counter-increment: toc; }
-.main-toc a {
-  display: flex; align-items: baseline; gap: 10px; padding: 8px 10px; border-radius: 8px;
-  color: var(--text); text-decoration: none; transition: background 0.15s;
-}
-.main-toc a::before { content: counter(toc); min-width: 1.6em; color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
-.main-toc a:hover { background: var(--bg-3); }
-.main-kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-2); white-space: nowrap; }
-.main-cta { display: inline-block; text-decoration: none; }
-.main-terms { display: flex; flex-wrap: wrap; gap: 8px; }
-.main-term {
-  padding: 5px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-3);
-  color: var(--text); font-size: 13px; text-decoration: none; transition: border-color 0.15s, color 0.15s;
-}
-.main-term:hover { border-color: var(--accent); color: var(--accent); }
-.main-links { display: flex; flex-wrap: wrap; gap: 10px; }
-.main-links .iconbtn { text-decoration: none; }
-
-/* ============================================
    Concepts
    ============================================ */
 .concepts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 16px; }
