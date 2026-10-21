@@ -63,7 +63,7 @@ function appFiles(publicDir, dir, track, slug) {
     .sort((a, b) => partNumber(a) - partNumber(b))
     .map(n => path.join(dir, n));
   const labs = [path.join(publicDir, "shared", "highlight.js"), path.join(publicDir, "shared", "labkit.js"), ...pick("demos")];
-  return { dir, track, slug, legacy: false, scripts: [...pick("data"), ...labs], labScripts: labs.map(toPublic), deepScripts };
+  return { dir, track, slug, legacy: false, scripts: [...pick("data"), ...folderScripts(dir, "chapters"), ...labs], labScripts: labs.map(toPublic), deepScripts };
 }
 
 /**
@@ -97,6 +97,7 @@ export function loadApp(app) {
   ctx.ALT = {};
   for (const file of folderScripts(app.dir, "alt")) run(file);
   if (ctx.DATA) {
+    applyChapterOrder(ctx.DATA, errors);
     attachMain(ctx.DATA, ctx.MAIN, errors);
     mergeAlternatives(ctx.DATA, ctx.DEEP, ctx.ALT, errors);
   }
@@ -105,6 +106,7 @@ export function loadApp(app) {
 
 /**
  * The scripts in one of an app's optional folders, in name order:
+ * chapters/<id>.js pushes one chapter onto DATA.chapters (apps that keep a chapter per file);
  * main/<chapter id>.js sets `MAIN[chapterId] = [sections]`, the chapter's Main tab;
  * alt/<chapter id>.js sets `ALT[chapterId] = { go: { "<code block title>": "..." } }`, its code in other languages.
  * @param {string} dir @param {string} folder
@@ -112,6 +114,21 @@ export function loadApp(app) {
 function folderScripts(dir, folder) {
   const sub = path.join(dir, folder);
   return fs.existsSync(sub) ? fs.readdirSync(sub).filter(n => n.endsWith(".js")).sort().map(n => path.join(sub, n)) : [];
+}
+
+/**
+ * An app whose chapters live one per file (chapters/<id>.js) lists their order in DATA.chapterOrder;
+ * the chapters are sorted into that order and numbered 1, 2, 3...
+ * @param {any} DATA @param {string[]} errors
+ */
+function applyChapterOrder(DATA, errors) {
+  const order = DATA.chapterOrder;
+  if (!Array.isArray(order)) return;
+  const ids = new Set((DATA.chapters || []).map((/** @type {any} */ c) => c.id));
+  for (const id of order) if (!ids.has(id)) errors.push(`chapterOrder: no chapter has id "${id}"`);
+  for (const id of ids) if (!order.includes(id)) errors.push(`chapterOrder: chapter "${id}" is missing from the order`);
+  DATA.chapters.sort((/** @type {any} */ a, /** @type {any} */ b) => order.indexOf(a.id) - order.indexOf(b.id));
+  DATA.chapters.forEach((/** @type {any} */ ch, /** @type {number} */ i) => { ch.number = i + 1; });
 }
 
 /** @param {any} DATA @param {Record<string, any[]>} MAIN @param {string[]} errors */

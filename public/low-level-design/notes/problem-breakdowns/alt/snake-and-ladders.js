@@ -1,13 +1,71 @@
 // Go versions of the Snake and Ladders code blocks, matched to the Java blocks by title. Imports are omitted.
 window.ALT = window.ALT || {};
 ALT["snake-and-ladders"] = { go: {
-"Public API": `func NewBoard(size int, snakes, ladders map[int]int) (*Board, error) // validates
+"Snake, Ladder and Player": `// Snake must go down and Ladder must go up. Go structs have no constructors, so each type
+// can check itself and NewBoard calls the check before accepting it.
+type Snake struct{ Head, Tail int }
+
+func (s Snake) validate() error {
+	if s.Tail >= s.Head {
+		return fmt.Errorf("snake at %d must go down", s.Head)
+	}
+	return nil
+}
+
+type Ladder struct{ Foot, Top int }
+
+func (l Ladder) validate() error {
+	if l.Top <= l.Foot {
+		return fmt.Errorf("ladder at %d must go up", l.Foot)
+	}
+	return nil
+}
+
+// Player is a plain value; the position lives in Game.
+type Player struct{ Name string }`,
+
+"Final class design": `type Snake struct{ Head, Tail int }  // checked: Head > Tail
+type Ladder struct{ Foot, Top int }  // checked: Top > Foot
+type Player struct{ Name string }
+
+type TurnResult struct {
+	Player     Player
+	Roll       int
+	From, To   int
+	Kind       MoveKind // Normal, Snake, Ladder, Overshoot, Forfeit, Finished
+	RollsAgain bool
+}
+
+// Board is never written after NewBoard returns.
+type Board struct {
+	size  int
+	jumps map[int]int // start cell -> destination, snakes and ladders alike
+}
+
+func NewBoard(size int, snakes []Snake, ladders []Ladder) (*Board, error) // validates the whole board
+func (b *Board) Size() int
+func (b *Board) Resolve(cell int) int
+
+type Dice interface{ Roll() int } // RandomDice to play, ScriptedDice to test
+
+// Game: every exported method holds mu.
+type Game struct {
+	mu               sync.Mutex
+	board            *Board
+	dice             Dice
+	turns            []Player // turns[0] moves next
+	positions        map[Player]int
+	ranking          []Player
+	state            GameState // InProgress or Finished
+	sixes, turnStart int       // memory for the current turn
+}
+
 func NewGame(board *Board, dice Dice, players []Player) (*Game, error)
-func (g *Game) PlayTurn() (TurnResult, error) // one roll for the current player; error once finished
+func (g *Game) PlayTurn() (TurnResult, error)
 func (g *Game) State() GameState
-func (g *Game) CurrentPlayer() (Player, bool) // false once finished
-func (g *Game) Position(p Player) (int, bool) // 0 = not on the board yet
-func (g *Game) Ranking() []Player             // finishing order so far`,
+func (g *Game) CurrentPlayer() (Player, bool)
+func (g *Game) Position(p Player) (int, bool)
+func (g *Game) Ranking() []Player`,
 
 "Board": `// Board is never written after NewBoard returns, so any number of goroutines may read it
 // without locking (concurrent reads of a Go map are safe when nothing writes).
@@ -16,7 +74,7 @@ type Board struct {
 	jumps map[int]int // start cell -> destination, for snakes and ladders alike
 }
 
-func NewBoard(size int, snakes, ladders map[int]int) (*Board, error) {
+func NewBoard(size int, snakes []Snake, ladders []Ladder) (*Board, error) {
 	if size < 2 {
 		return nil, errors.New("a board needs at least 2 cells")
 	}
@@ -31,19 +89,19 @@ func NewBoard(size int, snakes, ladders map[int]int) (*Board, error) {
 		all[from] = to
 		return nil
 	}
-	for head, tail := range snakes {
-		if tail >= head {
-			return nil, fmt.Errorf("snake at %d must go down", head)
+	for _, s := range snakes {
+		if err := s.validate(); err != nil {
+			return nil, err
 		}
-		if err := add(head, tail); err != nil {
+		if err := add(s.Head, s.Tail); err != nil {
 			return nil, err
 		}
 	}
-	for foot, top := range ladders {
-		if top <= foot {
-			return nil, fmt.Errorf("ladder at %d must go up", foot)
+	for _, l := range ladders {
+		if err := l.validate(); err != nil {
+			return nil, err
 		}
-		if err := add(foot, top); err != nil {
+		if err := add(l.Foot, l.Top); err != nil {
 			return nil, err
 		}
 	}
@@ -86,6 +144,7 @@ func (d *RandomDice) Roll() int {
 }
 
 // ScriptedDice returns the given rolls in order, for tests, and panics when they run out.
+// It is not safe for concurrent use on its own; the game only rolls it while holding its mutex.
 type ScriptedDice struct{ rolls []int }
 
 func NewScriptedDice(rolls ...int) *ScriptedDice { return &ScriptedDice{rolls: rolls} }
@@ -120,8 +179,6 @@ const (
 func (k MoveKind) String() string {
 	return [...]string{"NORMAL", "SNAKE", "LADDER", "OVERSHOOT", "FORFEIT", "FINISHED"}[k]
 }
-
-type Player struct{ Name string }
 
 type TurnResult struct {
 	Player     Player
@@ -199,7 +256,7 @@ func (g *Game) PlayTurn() (TurnResult, error) {
 		return TurnResult{p, roll, from, to, KindFinished, false}, nil
 	}
 	again := roll == six
-	if !again {
+	if !again { // after a six the same player rolls next
 		g.passTurn()
 	}
 	return TurnResult{p, roll, from, to, g.kind(target, to), again}, nil
@@ -262,8 +319,8 @@ func (g *Game) Ranking() []Player {
 }`,
 
 "Running a game": `board, err := NewBoard(100,
-	map[int]int{99: 54, 70: 55, 52: 42, 25: 2, 95: 72}, // snakes: head -> tail
-	map[int]int{6: 27, 11: 40, 60: 85, 46: 90, 17: 69}) // ladders: foot -> top
+	[]Snake{{99, 54}, {70, 55}, {52, 42}, {25, 2}, {95, 72}},
+	[]Ladder{{6, 27}, {11, 40}, {60, 85}, {46, 90}, {17, 69}})
 if err != nil {
 	log.Fatal(err)
 }
@@ -281,6 +338,29 @@ for game.State() == InProgress {
 	fmt.Println(t.Player.Name, "rolled", t.Roll, ":", t.From, "to", t.To, t.Kind)
 }
 fmt.Println("Ranking:", game.Ranking())`,
+
+"Snake and Ladders in one screen": `type Snake struct{ Head, Tail int } // checked: Head > Tail
+type Ladder struct{ Foot, Top int } // checked: Top > Foot
+
+type Board struct { // immutable: share freely
+	size  int
+	jumps map[int]int
+}
+
+func NewBoard(size int, snakes []Snake, ladders []Ladder) (*Board, error) // rejects overlaps, chains, off-board
+func (b *Board) Resolve(cell int) int                                      // jumps[cell], or cell
+
+type Dice interface{ Roll() int } // RandomDice(seed) to play, ScriptedDice to test
+
+type Game struct { // a sync.Mutex per game
+	mu               sync.Mutex
+	turns            []Player
+	positions        map[Player]int
+	ranking          []Player
+	sixes, turnStart int // memory for the current turn
+}
+
+func (g *Game) PlayTurn() (TurnResult, error) // over? roll; third six? overshoot? resolve; finish, stay or pass`,
 
 "Allowing chains, rejecting cycles": `// flatten allows a jump to land on another jump's start: it follows each chain once at build
 // time and rejects cycles, so Resolve stays a single lookup.
@@ -303,7 +383,10 @@ func flatten(jumps map[int]int) (map[int]int, error) {
 		flat[start] = cell
 	}
 	return flat, nil
-}`,
+}
+
+// In NewBoard, the "lands on another jump" check is replaced by:
+//	jumps, err := flatten(all)`,
 
 "Crooked dice": `// CrookedDice only rolls even numbers. One new type; Game is untouched.
 type CrookedDice struct{ rng *rand.Rand }
@@ -315,7 +398,7 @@ func NewCrookedDice(seed int64) *CrookedDice {
 func (d *CrookedDice) Roll() int { return 2 * (d.rng.Intn(3) + 1) } // 2, 4 or 6`,
 
 "Deterministic tests with scripted dice": `func TestLadderOvershootAndRanking(t *testing.T) {
-	board, _ := NewBoard(10, map[int]int{9: 2}, map[int]int{3: 8})
+	board, _ := NewBoard(10, []Snake{{9, 2}}, []Ladder{{3, 8}})
 	a, b := Player{"A"}, Player{"B"}
 	game, _ := NewGame(board, NewScriptedDice(3, 1, 4, 2, 2), []Player{a, b})
 
@@ -362,7 +445,7 @@ var (
 	FinishAnyway Overshoot = func(from, roll, size int) int { return size }
 )
 
-// Rules: knobs that are only numbers or on/off stay plain data.
+// Rules: knobs that are only numbers or on/off stay plain data. Passed by value, so games can't change each other's.
 type Rules struct {
 	MaxSixes         int
 	ExtraTurnOnSix   bool
@@ -381,6 +464,45 @@ if target > g.board.Size() {
 }
 to := g.board.Resolve(cell)
 again := g.rules.ExtraTurnOnSix && roll == six`,
+
+"Special cells as effects": `// CellEffect is what landing on a cell does. The unexported method closes the set of kinds.
+type CellEffect interface{ isCellEffect() }
+
+type Jump struct{ To int } // snakes and ladders
+type SkipNextTurn struct{}
+type RollAgain struct{}
+
+func (Jump) isCellEffect()         {}
+func (SkipNextTurn) isCellEffect() {}
+func (RollAgain) isCellEffect()    {}
+
+// Board: the jump map becomes a map of effects, built and validated once and never written again.
+//	effects map[int]CellEffect
+func (b *Board) EffectAt(cell int) CellEffect { return b.effects[cell] } // nil for a plain cell
+
+// Game: one more field, guarded by mu like the others.
+//	skipping map[Player]bool
+
+// In PlayTurn, replacing the resolve step (overshoot already handled):
+effect := g.board.EffectAt(target)
+to := target
+if j, ok := effect.(Jump); ok {
+	to = j.To
+}
+_, rollAgain := effect.(RollAgain)
+again := roll == six || rollAgain
+if _, ok := effect.(SkipNextTurn); ok {
+	g.skipping[p] = true
+}
+
+func (g *Game) passTurn() {
+	g.turns = append(g.turns[1:], g.turns[0])
+	g.sixes = 0
+	for g.skipping[g.turns[0]] { // a skipped player loses one turn, then is cleared
+		delete(g.skipping, g.turns[0])
+		g.turns = append(g.turns[1:], g.turns[0])
+	}
+}`,
 
 "A timer-driven driver": `// AutoPlay plays one turn per tick on its own goroutine while the UI goroutine reads State;
 // Game's mutex makes that safe. It stops when PlayTurn reports the game is over.
@@ -473,24 +595,5 @@ func AverageTurns(board *Board, players []Player, games, workers int) float64 {
 		total += n
 	}
 	return float64(total) / float64(games)
-}`,
-
-"Snake and Ladders in one screen": `type Board struct { // immutable: share freely
-	size  int
-	jumps map[int]int
-}
-
-func NewBoard(size int, snakes, ladders map[int]int) (*Board, error) // validates
-func (b *Board) Resolve(cell int) int                                // jumps[cell], or cell
-
-type Dice interface{ Roll() int } // RandomDice(seed) to play, ScriptedDice to test
-
-type Game struct { // a sync.Mutex per game
-	mu        sync.Mutex
-	turns     []Player
-	positions map[Player]int
-	ranking   []Player
-}
-
-func (g *Game) PlayTurn() (TurnResult, error) // over? roll; third six? overshoot? resolve; finish or pass`
+}`
 } };

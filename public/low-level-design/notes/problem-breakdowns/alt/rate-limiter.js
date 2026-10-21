@@ -1,18 +1,21 @@
 // Go versions of the Rate Limiter code blocks, matched to the Java blocks by title. Imports are omitted.
 window.ALT = window.ALT || {};
 ALT["rate-limiter"] = { go: {
-"Types and signatures": `// Result returned to the gateway
+"RateLimitResult": `// Result is what the gateway gets back for one request.
 type Result struct {
 	Allowed      bool
-	Remaining    int
-	RetryAfterMs *int64 // nil when allowed
+	Remaining    int   // requests still allowed right now
+	RetryAfterMs int64 // 0 when allowed
 }
 
 func allow(remaining int) Result     { return Result{Allowed: true, Remaining: remaining} }
-func deny(retryAfterMs int64) Result { return Result{RetryAfterMs: &retryAfterMs} }
+func deny(retryAfterMs int64) Result { return Result{RetryAfterMs: retryAfterMs} }`,
 
-// Typed, per-algorithm parameters. The unexported method "seals" the interface: only this package can add kinds.
-type LimitParams interface{ isLimitParams() }
+"Typed configuration": `// LimitParams is sealed by its unexported method: only this package can add kinds.
+type LimitParams interface {
+	Validate() error
+	isLimitParams()
+}
 
 type TokenBucketParams struct {
 	Capacity        int
@@ -21,141 +24,221 @@ type TokenBucketParams struct {
 
 type SlidingWindowLogParams struct {
 	MaxRequests int
-	Window      time.Duration
+	WindowMs    int64
 }
 
 type FixedWindowParams struct {
 	MaxRequests int
-	Window      time.Duration
+	WindowMs    int64
 }
 
 func (TokenBucketParams) isLimitParams()      {}
 func (SlidingWindowLogParams) isLimitParams() {}
 func (FixedWindowParams) isLimitParams()      {}
 
+// Validate is called by the parser and by the factory, so a bad rule fails at startup.
+func (p TokenBucketParams) Validate() error {
+	if p.Capacity < 1 || p.RefillPerSecond <= 0 {
+		return errors.New("token bucket: capacity >= 1, refill > 0")
+	}
+	return nil
+}
+
+func (p SlidingWindowLogParams) Validate() error { return validateWindow("sliding log", p.MaxRequests, p.WindowMs) }
+func (p FixedWindowParams) Validate() error      { return validateWindow("fixed window", p.MaxRequests, p.WindowMs) }
+
+func validateWindow(kind string, maxRequests int, windowMs int64) error {
+	if maxRequests < 1 || windowMs < 1 {
+		return fmt.Errorf("%s: maxRequests >= 1, windowMs >= 1", kind)
+	}
+	return nil
+}
+
+type EndpointRule struct {
+	Endpoint string
+	Params   LimitParams
+}`,
+
+"Final class design": `type RateLimiter struct {
+	byEndpoint map[string]Limiter // read-only after construction
+	fallback   Limiter            // for endpoints with no rule
+}
+
+func NewRateLimiter(rules []EndpointRule, defaultParams LimitParams, factory *LimiterFactory) (*RateLimiter, error)
+func (r *RateLimiter) Check(clientID, endpoint string) (Result, error)
+
+type Limiter interface {
+	TryAcquire(clientID string) Result // decide for one client and record it
+}
+
+type TokenBucketLimiter struct {
+	buckets sync.Map // client ID -> *bucket
+}
+
+type SlidingWindowLogLimiter struct {
+	logs sync.Map // client ID -> *clientLog
+}
+
+type FixedWindowLimiter struct {
+	windows sync.Map // client ID -> *window
+}
+
+type LimiterFactory struct {
+	nowMs func() int64
+}
+
+func (f *LimiterFactory) Create(p LimitParams) (Limiter, error) // type switch over the params
+
+type LimitParams interface { // TokenBucketParams, SlidingWindowLogParams, FixedWindowParams
+	Validate() error
+	isLimitParams()
+}
+
 type EndpointRule struct {
 	Endpoint string
 	Params   LimitParams
 }
 
-// The axis of variation
-type Limiter interface {
-	TryAcquire(clientID string) Result
-}
+type Result struct {
+	Allowed      bool
+	Remaining    int
+	RetryAfterMs int64
+}`,
 
-func NewLimiter(p LimitParams, nowMs func() int64) (Limiter, error)
-
-func NewRateLimiter(rules []EndpointRule, defaultParams LimitParams, nowMs func() int64) (*RateLimiter, error)
-func (r *RateLimiter) Check(clientID, endpoint string) Result`,
-
-"RateLimiter and the factory": `type RateLimiter struct {
-	byEndpoint map[string]Limiter // built once, read-only afterwards
+"RateLimiter and LimiterFactory": `type RateLimiter struct {
+	byEndpoint map[string]Limiter // never written after construction, so safe for concurrent reads
 	fallback   Limiter
 }
 
-func NewRateLimiter(rules []EndpointRule, defaultParams LimitParams, nowMs func() int64) (*RateLimiter, error) {
+func NewRateLimiter(rules []EndpointRule, defaultParams LimitParams, factory *LimiterFactory) (*RateLimiter, error) {
 	r := &RateLimiter{byEndpoint: make(map[string]Limiter, len(rules))}
 	for _, rule := range rules {
-		l, err := NewLimiter(rule.Params, nowMs)
+		if _, dup := r.byEndpoint[rule.Endpoint]; dup {
+			return nil, fmt.Errorf("two rules for %s", rule.Endpoint)
+		}
+		l, err := factory.Create(rule.Params)
 		if err != nil {
 			return nil, fmt.Errorf("endpoint %s: %w", rule.Endpoint, err)
 		}
 		r.byEndpoint[rule.Endpoint] = l
 	}
-	fallback, err := NewLimiter(defaultParams, nowMs)
+	fallback, err := factory.Create(defaultParams)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("default rule: %w", err)
 	}
 	r.fallback = fallback
 	return r, nil
 }
 
-func (r *RateLimiter) Check(clientID, endpoint string) Result {
-	if l, ok := r.byEndpoint[endpoint]; ok {
-		return l.TryAcquire(clientID)
+// Check is safe from any goroutine: the map is read-only, and each limiter makes its own updates atomic.
+func (r *RateLimiter) Check(clientID, endpoint string) (Result, error) {
+	if strings.TrimSpace(clientID) == "" || endpoint == "" {
+		return Result{}, errors.New("clientID and endpoint are required")
 	}
-	return r.fallback.TryAcquire(clientID)
+	if l, ok := r.byEndpoint[endpoint]; ok {
+		return l.TryAcquire(clientID), nil
+	}
+	return r.fallback.TryAcquire(clientID), nil
 }
 
-// NewLimiter is the factory. Go has no exhaustive switch, so the default case reports params it doesn't know.
-func NewLimiter(p LimitParams, nowMs func() int64) (Limiter, error) {
+type LimiterFactory struct {
+	nowMs func() int64 // monotonic milliseconds in production
+}
+
+// Create: Go has no exhaustive switch, so the default case reports params it doesn't know.
+func (f *LimiterFactory) Create(p LimitParams) (Limiter, error) {
+	if p == nil {
+		return nil, errors.New("missing params")
+	}
+	if err := p.Validate(); err != nil {
+		return nil, err
+	}
 	switch p := p.(type) {
 	case TokenBucketParams:
-		return NewTokenBucketLimiter(p, nowMs), nil
+		return NewTokenBucketLimiter(p, f.nowMs), nil
 	case SlidingWindowLogParams:
-		return NewSlidingWindowLogLimiter(p, nowMs), nil
+		return NewSlidingWindowLogLimiter(p, f.nowMs), nil
 	case FixedWindowParams:
-		return NewFixedWindowLimiter(p, nowMs), nil
+		return NewFixedWindowLimiter(p, f.nowMs), nil
 	default:
 		return nil, fmt.Errorf("unsupported limiter params %T", p)
 	}
 }`,
 
 "Token bucket": `type bucket struct {
+	mu     sync.Mutex // guards tokens and lastMs
 	tokens float64
 	lastMs int64
 }
 
 type TokenBucketLimiter struct {
-	capacity    float64
-	refillPerMs float64
-	nowMs       func() int64
-	buckets     map[string]*bucket
+	capacity        float64
+	refillPerSecond float64
+	nowMs           func() int64
+	buckets         sync.Map // client ID -> *bucket
 }
 
 func NewTokenBucketLimiter(p TokenBucketParams, nowMs func() int64) *TokenBucketLimiter {
-	return &TokenBucketLimiter{
-		capacity:    float64(p.Capacity),
-		refillPerMs: p.RefillPerSecond / 1000,
-		nowMs:       nowMs,
-		buckets:     map[string]*bucket{},
-	}
+	return &TokenBucketLimiter{capacity: float64(p.Capacity), refillPerSecond: p.RefillPerSecond, nowMs: nowMs}
 }
 
 func (l *TokenBucketLimiter) TryAcquire(clientID string) Result {
-	now := l.nowMs()
-	b, ok := l.buckets[clientID]
-	if !ok {
-		b = &bucket{tokens: l.capacity, lastMs: now}
-		l.buckets[clientID] = b
+	v, ok := l.buckets.Load(clientID)
+	if !ok { // new clients start full; LoadOrStore keeps exactly one bucket per client
+		v, _ = l.buckets.LoadOrStore(clientID, &bucket{tokens: l.capacity, lastMs: l.nowMs()})
 	}
-	b.tokens = math.Min(l.capacity, b.tokens+float64(now-b.lastMs)*l.refillPerMs) // lazy refill
+	b := v.(*bucket)
+	b.mu.Lock() // only this client's requests wait here
+	defer b.mu.Unlock()
+	now := max(b.lastMs, l.nowMs())                                                          // never run time backwards
+	b.tokens = math.Min(l.capacity, b.tokens+float64(now-b.lastMs)*l.refillPerSecond/1000) // lazy refill, capped
 	b.lastMs = now
 	if b.tokens >= 1 {
 		b.tokens--
-		return allow(int(b.tokens))
+		return allow(int(b.tokens)) // whole tokens left
 	}
-	return deny(int64(math.Ceil((1 - b.tokens) / l.refillPerMs)))
+	return deny(int64(math.Ceil((1 - b.tokens) * 1000 / l.refillPerSecond))) // earn the missing fraction
 }`,
 
-"Sliding window log and fixed window": `type SlidingWindowLogLimiter struct {
+"Sliding window log": `type clientLog struct {
+	mu    sync.Mutex // guards times
+	times []int64    // accepted request times, oldest first
+}
+
+type SlidingWindowLogLimiter struct {
 	max      int
 	windowMs int64
 	nowMs    func() int64
-	logs     map[string][]int64 // oldest first
+	logs     sync.Map // client ID -> *clientLog
 }
 
 func NewSlidingWindowLogLimiter(p SlidingWindowLogParams, nowMs func() int64) *SlidingWindowLogLimiter {
-	return &SlidingWindowLogLimiter{max: p.MaxRequests, windowMs: p.Window.Milliseconds(), nowMs: nowMs, logs: map[string][]int64{}}
+	return &SlidingWindowLogLimiter{max: p.MaxRequests, windowMs: p.WindowMs, nowMs: nowMs}
 }
 
 func (l *SlidingWindowLogLimiter) TryAcquire(clientID string) Result {
+	v, ok := l.logs.Load(clientID)
+	if !ok {
+		v, _ = l.logs.LoadOrStore(clientID, &clientLog{})
+	}
+	c := v.(*clientLog)
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	now := l.nowMs()
-	log := l.logs[clientID]
 	i := 0
-	for i < len(log) && log[i] <= now-l.windowMs { // drop expired
+	for i < len(c.times) && c.times[i] <= now-l.windowMs { // drop what left the window
 		i++
 	}
-	log = log[i:]
-	if len(log) < l.max {
-		l.logs[clientID] = append(log, now)
-		return allow(l.max - len(log) - 1)
+	c.times = c.times[i:]
+	if len(c.times) < l.max {
+		c.times = append(c.times, now)
+		return allow(l.max - len(c.times))
 	}
-	l.logs[clientID] = log
-	return deny(log[0] + l.windowMs - now) // when the oldest expires
-}
+	return deny(c.times[0] + l.windowMs - now) // when the oldest leaves the window
+}`,
 
-type window struct {
+"Fixed window": `type window struct {
+	mu    sync.Mutex // guards start and count
 	start int64
 	count int
 }
@@ -164,63 +247,66 @@ type FixedWindowLimiter struct {
 	max      int
 	windowMs int64
 	nowMs    func() int64
-	windows  map[string]*window
+	windows  sync.Map // client ID -> *window
 }
 
 func NewFixedWindowLimiter(p FixedWindowParams, nowMs func() int64) *FixedWindowLimiter {
-	return &FixedWindowLimiter{max: p.MaxRequests, windowMs: p.Window.Milliseconds(), nowMs: nowMs, windows: map[string]*window{}}
+	return &FixedWindowLimiter{max: p.MaxRequests, windowMs: p.WindowMs, nowMs: nowMs}
 }
 
 func (l *FixedWindowLimiter) TryAcquire(clientID string) Result {
-	now := l.nowMs()
-	start := now - now%l.windowMs
-	w, ok := l.windows[clientID]
+	v, ok := l.windows.Load(clientID)
 	if !ok {
-		w = &window{start: start}
-		l.windows[clientID] = w
+		v, _ = l.windows.LoadOrStore(clientID, &window{})
 	}
-	if w.start != start { // new window: reset
+	w := v.(*window)
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	now := l.nowMs()
+	start := now - now%l.windowMs // the calendar window this request falls in
+	if w.start != start {         // a new window: reset
 		w.start, w.count = start, 0
 	}
 	if w.count < l.max {
 		w.count++
 		return allow(l.max - w.count)
 	}
-	return deny(start + l.windowMs - now)
+	return deny(start + l.windowMs - now) // when this window ends
 }`,
 
-"Thread-safe token bucket: per-client locking": `type bucket struct {
-	mu     sync.Mutex
-	tokens float64
-	lastMs int64
+"Rate limiter in one screen": `type Result struct {
+	Allowed      bool
+	Remaining    int
+	RetryAfterMs int64 // 0 when allowed
 }
 
-type TokenBucketLimiter struct {
-	capacity    float64
-	refillPerMs float64
-	nowMs       func() int64
-	buckets     sync.Map // client ID -> *bucket
+type LimitParams interface { // TokenBucketParams, SlidingWindowLogParams, FixedWindowParams
+	Validate() error
+	isLimitParams()
 }
 
-func (l *TokenBucketLimiter) TryAcquire(clientID string) Result {
-	v, ok := l.buckets.Load(clientID)
-	if !ok {
-		v, _ = l.buckets.LoadOrStore(clientID, &bucket{tokens: l.capacity, lastMs: l.nowMs()}) // one bucket per client
-	}
-	b := v.(*bucket)
-	b.mu.Lock() // only this client's requests wait here
-	defer b.mu.Unlock()
-	now := l.nowMs()
-	b.tokens = math.Min(l.capacity, b.tokens+float64(now-b.lastMs)*l.refillPerMs)
-	b.lastMs = now
-	if b.tokens >= 1 {
-		b.tokens--
-		return allow(int(b.tokens))
-	}
-	return deny(int64(math.Ceil((1 - b.tokens) / l.refillPerMs)))
-}`,
+type EndpointRule struct {
+	Endpoint string
+	Params   LimitParams
+}
 
-"The lock-free alternative": `type state struct {
+type Limiter interface{ TryAcquire(clientID string) Result }
+
+type RateLimiter struct {
+	byEndpoint map[string]Limiter // read-only after construction
+	fallback   Limiter
+}
+
+func (r *RateLimiter) Check(clientID, endpoint string) (Result, error) // route, or the default
+func (f *LimiterFactory) Create(p LimitParams) (Limiter, error)       // type switch with a default error
+
+// Each limiter: sync.Map of client ID -> state with its own mutex; LoadOrStore, then Lock
+// Token bucket: tokens = min(cap, tokens + elapsed*rate/1000); spend 1; retry = ceil((1-tokens)*1000/rate)
+// Sliding log:  drop t <= now-window; allow if len < max; retry = oldest + window - now
+// Fixed window: start = now - now%window; reset on a new start; retry = start + window - now`,
+
+"Lock-free token bucket with compare-and-set": `// Only TokenBucketLimiter's internals change; Limiter, RateLimiter and the factory don't.
+type state struct {
 	tokens float64
 	lastMs int64
 }
@@ -237,22 +323,58 @@ func (l *TokenBucketLimiter) TryAcquire(clientID string) Result {
 	ref := v.(*atomic.Pointer[state])
 	for {
 		cur := ref.Load()
-		now := l.nowMs()
-		tokens := math.Min(l.capacity, cur.tokens+float64(now-cur.lastMs)*l.refillPerMs)
-		if tokens < 1 {
-			if ref.CompareAndSwap(cur, &state{tokens, now}) {
-				return deny(int64(math.Ceil((1 - tokens) / l.refillPerMs)))
+		now := max(cur.lastMs, l.nowMs())
+		tokens := math.Min(l.capacity, cur.tokens+float64(now-cur.lastMs)*l.refillPerSecond/1000)
+		allowed := tokens >= 1
+		next := &state{tokens: tokens, lastMs: now}
+		if allowed {
+			next.tokens--
+		}
+		if ref.CompareAndSwap(cur, next) { // nobody changed it since we read it: our decision stands
+			if allowed {
+				return allow(int(next.tokens))
 			}
-			continue
-		}
-		if ref.CompareAndSwap(cur, &state{tokens - 1, now}) {
-			return allow(int(tokens - 1))
-		}
+			return deny(int64(math.Ceil((1 - tokens) * 1000 / l.refillPerSecond)))
+		} // lost the race: re-read and decide again
 	}
 }`,
 
-"A sweeper in a few lines": `type Evictable interface {
+"Evicting idle clients": `type Evictable interface {
 	EvictIdle() // each limiter applies its own TTL rule
+}
+
+// bucket gains "retired bool"; TokenBucketLimiter gains idleTtlMs = ceil(capacity * 1000 / refill): full again by then.
+
+func (l *TokenBucketLimiter) EvictIdle() {
+	now := l.nowMs()
+	l.buckets.Range(func(key, v any) bool {
+		b := v.(*bucket)
+		b.mu.Lock()
+		if now-b.lastMs > l.idleTtlMs {
+			b.retired = true // a request already holding b will fetch a fresh one
+			l.buckets.CompareAndDelete(key, b)
+		}
+		b.mu.Unlock()
+		return true
+	})
+}
+
+func (l *TokenBucketLimiter) TryAcquire(clientID string) Result {
+	for {
+		v, ok := l.buckets.Load(clientID)
+		if !ok {
+			v, _ = l.buckets.LoadOrStore(clientID, &bucket{tokens: l.capacity, lastMs: l.nowMs()})
+		}
+		b := v.(*bucket)
+		b.mu.Lock()
+		if b.retired { // evicted between lookup and lock: try again
+			b.mu.Unlock()
+			continue
+		}
+		r := l.spend(b) // refill and spend exactly as before
+		b.mu.Unlock()
+		return r
+	}
 }
 
 // StartSweeper calls EvictIdle on every limiter until ctx is cancelled.
@@ -275,13 +397,17 @@ func StartSweeper(ctx context.Context, limiters []Evictable, every time.Duration
 
 "Sliding window counter": `type SlidingWindowCounterParams struct {
 	MaxRequests int
-	Window      time.Duration
+	WindowMs    int64
 }
 
 func (SlidingWindowCounterParams) isLimitParams() {}
 
+func (p SlidingWindowCounterParams) Validate() error {
+	return validateWindow("counter", p.MaxRequests, p.WindowMs)
+}
+
 type counts struct {
-	mu        sync.Mutex
+	mu        sync.Mutex // guards the fields below
 	start     int64
 	prev, cur int
 }
@@ -294,7 +420,10 @@ type SlidingWindowCounterLimiter struct {
 }
 
 func (l *SlidingWindowCounterLimiter) TryAcquire(clientID string) Result {
-	v, _ := l.counts.LoadOrStore(clientID, &counts{})
+	v, ok := l.counts.Load(clientID)
+	if !ok {
+		v, _ = l.counts.LoadOrStore(clientID, &counts{})
+	}
 	c := v.(*counts)
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -302,36 +431,97 @@ func (l *SlidingWindowCounterLimiter) TryAcquire(clientID string) Result {
 	start := now - now%l.windowMs
 	if c.start != start {
 		c.prev = 0
-		if start-c.start == l.windowMs { // previous window only if adjacent
+		if start-c.start == l.windowMs { // the previous window counts only if adjacent
 			c.prev = c.cur
 		}
 		c.cur, c.start = 0, start
 	}
-	weight := 1 - float64(now-start)/float64(l.windowMs)
+	weight := 1 - float64(now-start)/float64(l.windowMs) // share of the previous window still inside
 	estimate := float64(c.prev)*weight + float64(c.cur)
 	if estimate+1 <= float64(l.max) {
 		c.cur++
 		return allow(int(math.Floor(float64(l.max) - estimate - 1)))
 	}
-	return deny(start + l.windowMs - now) // conservative upper bound
+	return deny(start + l.windowMs - now) // an estimate: the old previous window drops out then
 }
 
-// The factory gains one case:
-//   case SlidingWindowCounterParams:
-//       return &SlidingWindowCounterLimiter{max: p.MaxRequests, windowMs: p.Window.Milliseconds(), nowMs: nowMs}, nil`,
+// LimiterFactory.Create gains one case:
+//	case SlidingWindowCounterParams:
+//		return &SlidingWindowCounterLimiter{max: p.MaxRequests, windowMs: p.WindowMs, nowMs: f.nowMs}, nil`,
+
+"Per-tier limits": `type Tier int
+
+const (
+	Free Tier = iota
+	Pro
+	Enterprise
+)
+
+// TierLookup is backed by the account service or the verified token; never by a header the client controls.
+type TierLookup interface {
+	TierOf(clientID string) Tier
+}
+
+type TieredParams struct {
+	ByTier    map[Tier]LimitParams
+	Otherwise LimitParams
+}
+
+func (TieredParams) isLimitParams() {}
+
+func (p TieredParams) Validate() error {
+	if p.Otherwise == nil {
+		return errors.New("tiered: a fallback rule is required")
+	}
+	for tier, inner := range p.ByTier {
+		if err := inner.Validate(); err != nil {
+			return fmt.Errorf("tier %d: %w", tier, err)
+		}
+	}
+	return p.Otherwise.Validate()
+}
+
+type TieredLimiter struct {
+	byTier    map[Tier]Limiter // read-only; each inner limiter keeps its own per-client state
+	otherwise Limiter
+	tiers     TierLookup
+}
+
+func (l *TieredLimiter) TryAcquire(clientID string) Result {
+	if inner, ok := l.byTier[l.tiers.TierOf(clientID)]; ok {
+		return inner.TryAcquire(clientID)
+	}
+	return l.otherwise.TryAcquire(clientID)
+}
+
+// LimiterFactory gains a tiers field and one case that builds the inner limiters recursively:
+//	case TieredParams:
+//		byTier := make(map[Tier]Limiter, len(p.ByTier))
+//		for tier, inner := range p.ByTier {
+//			l, err := f.Create(inner)
+//			if err != nil {
+//				return nil, err
+//			}
+//			byTier[tier] = l
+//		}
+//		otherwise, err := f.Create(p.Otherwise)
+//		if err != nil {
+//			return nil, err
+//		}
+//		return &TieredLimiter{byTier: byTier, otherwise: otherwise, tiers: f.tiers}, nil`,
 
 "Composite limiter": `type CompositeLimiter struct {
-	parts []Limiter
+	parts []Limiter // fixed at construction; each part is safe for concurrent use on its own
 }
 
-func (c CompositeLimiter) TryAcquire(clientID string) Result {
+func (c *CompositeLimiter) TryAcquire(clientID string) Result {
 	remaining, allowed := math.MaxInt, true
 	var retry int64
 	for _, l := range c.parts {
 		r := l.TryAcquire(clientID)
 		if !r.Allowed {
 			allowed = false
-			retry = max(retry, *r.RetryAfterMs)
+			retry = max(retry, r.RetryAfterMs)
 		}
 		remaining = min(remaining, r.Remaining)
 	}
@@ -339,104 +529,5 @@ func (c CompositeLimiter) TryAcquire(clientID string) Result {
 		return allow(remaining)
 	}
 	return deny(retry)
-}`,
-
-"A deterministic test": `func TestTokenBucketRefillsAndCaps(t *testing.T) {
-	var clock int64 // fake clock in milliseconds
-	l := NewTokenBucketLimiter(TokenBucketParams{Capacity: 3, RefillPerSecond: 1}, func() int64 { return clock })
-
-	for i := 1; i <= 3; i++ {
-		if !l.TryAcquire("a").Allowed {
-			t.Fatalf("request %d should be allowed", i)
-		}
-	}
-	denied := l.TryAcquire("a")
-	if denied.Allowed || *denied.RetryAfterMs != 1000 { // one token per second
-		t.Fatalf("got %+v, want denied with retry after 1000 ms", denied)
-	}
-
-	clock += 1000
-	if !l.TryAcquire("a").Allowed { // exactly one refilled
-		t.Fatal("one token should have refilled")
-	}
-
-	clock += 60_000
-	if r := l.TryAcquire("a"); r.Remaining != 2 { // capped at capacity, minus this one
-		t.Fatalf("remaining = %d, want 2", r.Remaining)
-	}
-	if !l.TryAcquire("b").Allowed { // other clients are independent
-		t.Fatal("client b should be allowed")
-	}
-}`,
-
-"Swap an immutable map": `type rules struct {
-	byEndpoint map[string]Limiter
-	params     map[string]LimitParams
-	fallback   Limiter
-}
-
-type RateLimiter struct {
-	current atomic.Pointer[rules] // replaced whole, read lock-free
-	nowMs   func() int64
-}
-
-func (r *RateLimiter) Reload(newRules []EndpointRule, defaultParams LimitParams) error {
-	old := r.current.Load()
-	next := &rules{byEndpoint: map[string]Limiter{}, params: map[string]LimitParams{}}
-	for _, rule := range newRules {
-		if old != nil && old.params[rule.Endpoint] == rule.Params { // params structs compare by value: keep state
-			next.byEndpoint[rule.Endpoint] = old.byEndpoint[rule.Endpoint]
-		} else {
-			l, err := NewLimiter(rule.Params, r.nowMs)
-			if err != nil {
-				return err
-			}
-			next.byEndpoint[rule.Endpoint] = l
-		}
-		next.params[rule.Endpoint] = rule.Params
-	}
-	fallback, err := NewLimiter(defaultParams, r.nowMs)
-	if err != nil {
-		return err
-	}
-	next.fallback = fallback
-	r.current.Store(next)
-	return nil
-}
-
-func (r *RateLimiter) Check(clientID, endpoint string) Result {
-	rs := r.current.Load() // one consistent snapshot per call
-	if l, ok := rs.byEndpoint[endpoint]; ok {
-		return l.TryAcquire(clientID)
-	}
-	return rs.fallback.TryAcquire(clientID)
-}`,
-
-"Class sketch": `type Result struct {
-	Allowed      bool
-	Remaining    int
-	RetryAfterMs *int64
-}
-
-type LimitParams interface{ isLimitParams() } // TokenBucketParams, SlidingWindowLogParams, FixedWindowParams
-
-type EndpointRule struct {
-	Endpoint string
-	Params   LimitParams
-}
-
-type Limiter interface{ TryAcquire(clientID string) Result }
-
-type TokenBucketLimiter struct{ buckets map[string]*bucket }
-type SlidingWindowLogLimiter struct{ logs map[string][]int64 }
-type FixedWindowLimiter struct{ windows map[string]*window }
-
-func NewLimiter(p LimitParams, nowMs func() int64) (Limiter, error) // type switch over the params
-
-type RateLimiter struct {
-	byEndpoint map[string]Limiter
-	fallback   Limiter
-}
-
-func (r *RateLimiter) Check(clientID, endpoint string) Result`
+}`
 } };

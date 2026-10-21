@@ -1,174 +1,274 @@
-// Deep dives: File System (LLD). Format: DeepDive in public/shared/notes.d.ts; guide: "Writing a deep dive" in README.md.
+// Deep dives: File System (LLD practice set). Format: DeepDive in public/shared/notes.d.ts.
 window.DEEP = window.DEEP || {};
 DEEP["file-system"] = {
-  hook: `<p>The Solution tab's tree handles the required operations in time proportional to path depth. The follow-ups probe whether that design holds up: how paths are parsed, why nodes don't store their own paths, what makes a move safe, which collection holds children, how to make it thread-safe, and how to add sizes, relative paths, symlinks and search without breaking the structure.</p>`,
+  hook: `<p>Once the core works, interviewers add twists to see whether the design bends without breaking. You rarely implement them in full; you show which class changes and why the rest doesn't. In this design almost every follow-up lands in one of three places: a new <code>Node</code> type, a new method on the <code>FileSystem</code> facade, or a new class that sits in front of it. Mid-level candidates may get one or two of these, senior candidates several, in more depth.</p>`,
   sections: [
     {
-      id: "path-from-reference",
-      title: "Full path from a reference: why parent pointers",
-      kicker: "The key decision",
-      blocks: [
-        { type: "text", html: `<p>Two requirements pull against each other: "get the full path of any node" and "move and rename folders". There are three ways to know a node's path, and they price those two operations very differently.</p>` },
-        { type: "compare", items: [
-          { title: "Parent pointers (chosen)", tone: "ok", html: `<p>Each node knows only its parent. <code>path()</code> walks up: O(depth). A move re-links one node: O(1) plus the cycle check. Paths can never be stale.</p>` },
-          { title: "Stored path in each node", tone: "warn", html: `<p><code>path()</code> is O(1), but moving or renaming a folder must rewrite the stored path of every descendant: O(subtree). A missed update leaves a node reporting a wrong path.</p>` },
-          { title: "Global path index", tone: "bad", html: `<p>A <code>Map&lt;String, Node&gt;</code> of every full path makes resolve O(1), but every move re-keys every descendant in the map, and the index must stay in sync with the tree forever.</p>` }
-        ] },
-        { type: "lab", id: "pathDesigns", caption: "Make moved folders large and moves frequent, then try very deep paths with almost no moves, and see when caching paths would ever pay off." },
-        { type: "callout", tone: "interview", html: `<p>The sentence to say: "Depth is small and bounded in practice, subtrees can be huge. I'd rather pay O(depth) on every path call than O(subtree) on a move, and I never have to keep stored paths consistent."</p>` }
-      ]
-    },
-    {
-      id: "path-parsing",
-      title: "Parsing and validating paths",
-      kicker: "Edge cases",
-      blocks: [
-        { type: "text", html: `<p>Every operation starts from a string, so parsing deserves one class (<code>FsPath</code>) and a deliberate answer for each odd input. Decide the policy, state it, and test it.</p>` },
-        { type: "table", headers: ["Input", "Policy", "Why"], rows: [
-          ["<code>/</code>", "The root: zero segments", "Resolves to the root; create, delete, move and rename on it are refused"],
-          ["<code>/home//ana/</code>", "Collapse empty segments: [home, ana]", "Matches Unix behaviour and is forgiving"],
-          ["<code>home/ana</code>", "InvalidPathException", "Relative paths are out of scope"],
-          ["<code>/home/./ana</code>, <code>/home/../etc</code>", "InvalidPathException", "No relative segments in scope; support them in a Session later"],
-          ["<code>\"\"</code> or null", "InvalidPathException", "Fail fast with a clear message"],
-          ["Name containing <code>/</code> (rename)", "InvalidPathException", "A name is one segment by definition"]
-        ] },
-        { type: "callout", tone: "tip", html: `<p>Keep parsing (string to segments) separate from resolution (segments to nodes). Parsing never touches the tree, so it can be unit-tested on its own, and resolution can assume clean input.</p>` }
-      ]
-    },
-    {
-      id: "moving-safely",
-      title: "Moving without breaking the tree",
-      kicker: "Correctness",
-      blocks: [
-        { type: "problem", html: `<p><code>move("/a", "/a/b/c")</code> would make <code>a</code> a child of its own descendant. Detaching <code>a</code> from its parent and attaching it under <code>c</code> leaves a loop of folders that no longer connects to the root: the whole subtree is lost, and any code that walks up from it loops forever.</p>` },
-        { type: "steps", title: "The order of checks in move", items: [
-          "Resolve the source; refuse if it is the root.",
-          "Resolve the destination; it must be a directory.",
-          "Walk up from the destination to the root; if you meet the source, refuse (cycle).",
-          "Refuse if the destination already contains a child with the source's name (or define an overwrite policy explicitly).",
-          "Only now mutate: remove from the old parent's map, add to the new one, update the parent pointer."
-        ] },
-        { type: "code", lang: "java", title: "The cycle check is a short upward walk", code: `private static boolean isAncestorOrSelf(Node candidate, Directory start) {
-    for (Directory d = start; d != null; d = d.parent()) {
-        if (d == candidate) return true;
-    }
-    return false;                    // O(depth of the destination)
-}` },
-        { type: "keypoints", items: [
-          "Moving a <em>file</em> can't create a cycle, but running the same check costs nothing and keeps the code uniform.",
-          "Moving a node to the folder it is already in is a no-op or an AlreadyExists error; pick one and say which.",
-          "Rename is a move to the same parent under a new name: same conflict check, and the parent's map must be re-keyed, not just the node's field."
-        ] },
-        { type: "callout", tone: "mistake", html: `<p>Changing <code>node.name</code> without re-keying the parent's map. The map still files the node under its old name: lookups by the new name fail and the old name looks taken. Remove, rename, then add.</p>` }
-      ]
-    },
-    {
-      id: "children-collection",
-      title: "Choosing the children collection",
-      kicker: "Data structures",
-      blocks: [
-        { type: "table", headers: ["Collection", "Lookup by name", "Listing", "Use when"], rows: [
-          ["<code>HashMap</code>", "O(1)", "Unordered; sort on demand, O(k log k)", "Default: lookups dominate (every path segment)"],
-          ["<code>TreeMap</code>", "O(log k)", "Already sorted", "Listings are frequent and must be sorted"],
-          ["<code>LinkedHashMap</code>", "O(1)", "Insertion order", "\"Order created\" listings"],
-          ["<code>ArrayList</code>", "O(k) scan", "Insertion order", "Tiny folders only; breaks down with thousands of entries"]
-        ] },
-        { type: "text", html: `<p>With tens of thousands of entries, some folders will have thousands of children, and every path resolution does one lookup per level. A list turns that into a scan per level. A map keeps resolution O(depth) regardless of folder size, and enforces unique names as a side effect.</p>` },
-        { type: "callout", tone: "insight", html: `<p>Return listings as an unmodifiable copy or a stream of names, never the internal map. Handing out the map lets callers add children that bypass every check in <code>FileSystem</code>.</p>` }
-      ]
-    },
-    {
       id: "thread-safety",
-      title: "Making it thread-safe",
+      title: "\"Many threads share one instance. Is that safe, and could it be faster?\"",
       kicker: "Follow-up: concurrency",
       blocks: [
-        { type: "problem", html: `<p>Two threads move folders at the same time, or one lists a folder while another deletes from it. A plain <code>HashMap</code> can be corrupted by concurrent writes, and two concurrent moves can each pass the cycle check and together create a cycle (a into b while b moves into a).</p>` },
-        { type: "code", lang: "java", title: "One read-write lock around the tree", code: `public final class FileSystem {
-    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-    private final Directory root = new Directory("");
+        { type: "text", html: `<p>The solution already puts every public method under one <code>ReentrantReadWriteLock</code>. The follow-up usually probes two things: whether finer locking would help, and whether anything leaks out of the lock.</p>` },
+        { type: "compare", items: [
+          { title: "One read-write lock (the solution)", tone: "ok", html: `<p>Reads run in parallel; changes run one at a time. Every check-then-act (name free, no cycle) is atomic because the whole operation holds the lock. Only <code>FileSystem</code> changes; nodes stay plain.</p>` },
+          { title: "A lock per folder", tone: "warn", html: `<p>Writes in different folders run in parallel. But a move touches the source's parent, the destination and every ancestor of the destination (the cycle check), and those locks must be taken in one global order to avoid deadlock. Get the set wrong and two moves can pass their checks together.</p>` },
+          { title: "Copy-on-write snapshots", tone: "info", html: `<p>Readers take an immutable tree from an <code>AtomicReference</code> with no lock; a writer copies the nodes along one path and swaps the root. Great for read-heavy loads, but a shared, immutable node can't have one parent pointer, so <code>pathOf</code> and the cycle check need a different approach.</p>` }
+        ] },
+        { type: "text", html: `<p>Stay with the single lock unless the interviewer gives you measured write contention. The other leak to close is <em>live nodes</em>: a caller holding a <code>Node</code> outside the lock could watch its parent change mid-walk. The solution already keeps node mutators package-private and answers paths through <code>pathOf</code>. For richer queries, return plain values built under the lock.</p>` },
+        { type: "code", lang: "java", title: "Hand out snapshots, not live nodes", code: `/** What callers get back: plain values, safe to keep and read on any thread. */
+public record Entry(String path, boolean directory, int size) {}
 
-    public List<String> list(String path) {
-        lock.readLock().lock();
-        try { return asDirectory(get0(path), path).list().stream().map(Node::name).toList(); }
-        finally { lock.readLock().unlock(); }
-    }
-
-    public void move(String src, String destDir) {
-        lock.writeLock().lock();
-        try { move0(src, destDir); }               // the single-threaded logic, unchanged
-        finally { lock.writeLock().unlock(); }
-    }
-    // ...same pattern for every public method
+// In FileSystem
+public Entry stat(String path) {
+    return reading(() -> {
+        Node n = resolve(path);
+        int size = n instanceof File f ? f.content().length() : 0;
+        return new Entry(FsPath.parse(path).toString(), n instanceof Directory, size);
+    });
 }` },
-        { type: "tradeoffs", title: "Global read-write lock vs per-directory locks", prosLabel: "Global read-write lock", consLabel: "Per-directory locks", pros: ["Correct by construction: every invariant checked under one lock", "Reads run in parallel", "The single-threaded code is reused unchanged"], cons: ["More parallelism for writes in different folders", "A move must lock source parent, destination and the ancestor chain for the cycle check, in a global order to avoid deadlock", "Much harder to get right; only worth it with proven write contention"] },
-        { type: "callout", tone: "warning", html: `<p>Don't return live <code>Node</code> objects to callers who then read them outside the lock: a concurrent move could change <code>parent</code> mid-walk. Either return immutable snapshots (names, paths, content) or document that nodes are only safe to use under the lock.</p>` }
+        { type: "keypoints", items: [
+          "Only <code>FileSystem</code> changes: one new method and one record. Nodes and paths are untouched.",
+          "Callers that need a path from a held reference still go through <code>pathOf</code>, which walks under the read lock.",
+          "If writes do become the bottleneck, shard first (several independent trees, for example one per user) before attempting per-folder locks."
+        ] },
+        { type: "quiz", q: "With a lock per folder, thread 1 runs <code>move(\"/x/a\", \"/y/b\")</code> while thread 2 runs <code>move(\"/y/b\", \"/x/a\")</code>. Each locks only the source's parent and the destination. What can happen?", options: [
+          "Nothing: the two moves lock different folders, so they don't interfere",
+          "A deadlock, every time",
+          "Both cycle checks pass before either move lands, so a ends up inside b and b inside a, a loop cut off from the root",
+          "The second move always fails with AlreadyExistsException"
+        ], answer: 2, explain: `<p>Thread 1 locks <code>x</code> and <code>b</code>; thread 2 locks <code>y</code> and <code>a</code>. The sets don't overlap, so both proceed. Thread 1 walks up from <code>b</code> (b, y, root) and doesn't meet <code>a</code>; thread 2 walks up from <code>a</code> (a, x, root) and doesn't meet <code>b</code>. Both move, and the two folders now contain each other. A move must also lock the ancestor chain it checks, which is why the single lock is the sensible default.</p>` }
       ]
     },
     {
       id: "sizes",
-      title: "Folder sizes",
+      title: "\"How big is /home?\"",
       kicker: "Follow-up: aggregates",
       blocks: [
-        { type: "text", html: `<p>"How big is <code>/home</code>?" is the classic Composite operation: a file's size is its content length, a folder's size is the sum of its children's sizes.</p>` },
-        { type: "code", lang: "java", title: "Recursive version (simple, O(subtree))", code: `public sealed abstract class Node permits File, Directory {
-    public abstract long size();
+        { type: "text", html: `<p>Folder size is the classic Composite operation: a file's size is its content length; a folder's is the sum of its children. Start with the recursive version, then offer the cached one if sizes are read often.</p>` },
+        { type: "code", lang: "java", title: "Folder sizes: recursive", code: `public abstract sealed class Node permits File, Directory {
+    abstract long size();                              // called under the FileSystem lock
 }
-public final class File extends Node {
-    public long size() { return content.length(); }
-}
-public final class Directory extends Node {
-    public long size() { return children.values().stream().mapToLong(Node::size).sum(); }
-}` },
-        { type: "code", lang: "java", title: "Cached version (O(1) reads, O(depth) updates)", code: `public final class Directory extends Node {
-    private long totalSize;                          // sum of everything below
-    public long size() { return totalSize; }
 
-    void adjustSize(long delta) {                    // walk up, applying the change
+public final class File extends Node {
+    long size() { return content().length(); }
+}
+
+public final class Directory extends Node {
+    long size() { return children.values().stream().mapToLong(Node::size).sum(); }   // O(subtree)
+}
+
+// In FileSystem
+public long size(String path) { return reading(() -> resolve(path).size()); }` },
+        { type: "code", lang: "java", title: "Folder sizes: cached along the parent chain", code: `public final class Directory extends Node {
+    private long totalSize;                            // everything below; guarded by the FileSystem lock
+
+    long size() { return totalSize; }                  // O(1)
+
+    void add(Node n)    { children.put(n.name(), n); n.setParent(this); adjust(n.size()); }
+    void remove(Node n) { children.remove(n.name()); adjust(-n.size()); n.setParent(null); }
+
+    void adjust(long delta) {                          // the same upward walk as pathOf
         for (Directory d = this; d != null; d = d.parent()) d.totalSize += delta;
     }
 }
 
-// FileSystem calls it on every change:
-//   write:  file.parent().adjustSize(newLength - oldLength)
-//   add:    parent.adjustSize(node.size())
-//   remove: oldParent.adjustSize(-node.size())     (a move is remove + add)` },
-        { type: "callout", tone: "tip", html: `<p>Parent pointers pay off again: propagating a size change is the same upward walk as computing a path. Mention the trade-off: every write now costs O(depth), which is fine when reads of sizes are frequent.</p>` }
+public final class File extends Node {
+    void setContent(String c) {
+        long delta = c.length() - content.length();
+        content = c;
+        if (parent() != null) parent().adjust(delta);
+    }
+}` },
+        { type: "keypoints", items: [
+          "The change stays inside the nodes: <code>add</code>, <code>remove</code> and <code>setContent</code> already run on every structural change, so <code>FileSystem</code> only gains a <code>size(path)</code> method.",
+          "A move is a remove plus an add, so the old ancestors lose the subtree's size and the new ones gain it. A rename does both on the same parent and nets to zero.",
+          "The cost moves from reads to writes: every change now walks O(depth) up. Worth it when sizes are read far more often than files change.",
+          "Thread safety is unchanged: <code>totalSize</code> is only touched inside operations that already hold the write lock."
+        ] }
       ]
     },
     {
-      id: "extensions",
-      title: "Relative paths, symlinks and search",
-      kicker: "Follow-ups: features",
+      id: "working-directory",
+      title: "\"How would you add a current directory, with . and ..?\"",
+      kicker: "Follow-up: relative paths",
       blocks: [
-        { type: "table", headers: ["Feature", "Design change", "Watch out for"], rows: [
-          ["Working directory and relative paths", "A <code>Session</code> holding a current <code>Directory</code>; resolve from it instead of the root; <code>..</code> follows the parent pointer, <code>.</code> stays", "<code>..</code> at the root stays at the root; the current folder might be deleted by someone else"],
-          ["<code>mkdir -p</code>", "<code>createDirectories(path)</code>: walk segments, creating missing folders", "A file in the middle of the path is still NotADirectory"],
-          ["Symbolic links", "A third node type, <code>Symlink</code>, storing a target path; resolution follows it", "Loops (a link to its own ancestor): cap the number of links followed"],
-          ["Search by name", "DFS from a folder, or an index <code>Map&lt;String, Set&lt;Node&gt;&gt;</code> from name to nodes", "The index must be updated on create, delete and rename (moves don't change names)"],
-          ["Permissions, timestamps", "Fields on <code>Node</code>, checked in <code>FileSystem</code> before each operation", "Directory permissions apply along the whole path during resolution"]
-        ] },
-        { type: "callout", tone: "insight", html: `<p>A search index keyed by <em>name</em> survives moves untouched, because a move changes a node's parent, not its name. An index keyed by <em>full path</em> has to be rewritten for the whole subtree. The same parent-pointer reasoning applies.</p>` },
-        { type: "quiz", q: "A candidate stores each node's full path as a field so that <code>path()</code> is O(1). The interviewer asks them to move <code>/home</code>, which contains 40,000 files, to <code>/users/home</code>. What is the main problem?", options: [
-          "Nothing: the move only changes /home's own path field",
-          "Every one of the 40,000 descendants has a stale stored path that must be rewritten, so the move costs O(subtree) and any missed update leaves wrong paths",
-          "HashMap can't hold 40,000 entries",
-          "The cycle check becomes O(subtree)"
-        ], answer: 1, explain: `<p>Each descendant's stored path still starts with /home. The move must visit and rewrite all 40,000 of them, and any bug leaves nodes reporting paths that don't exist. With parent pointers, the move re-links one node and every descendant's computed path is automatically correct; the cycle check only walks up from the destination, O(depth).</p>` }
+        { type: "text", html: `<p>A current directory belongs to a user's shell, not to the file system, so put it in a new class and leave <code>FileSystem</code> working purely with absolute paths. The <code>Session</code> turns a relative path into an absolute one, then calls the facade as any other caller would.</p>` },
+        { type: "code", lang: "java", title: "A Session with a working directory", code: `/** One user's shell. Not shared between threads, so cwd needs no lock; the tree has FileSystem's lock. */
+public final class Session {
+    private final FileSystem fs;
+    private Node cwd;                                  // a reference, so it follows moves and renames
+
+    public Session(FileSystem fs) { this.fs = fs; this.cwd = fs.get("/"); }
+
+    public void cd(String path) {
+        Node target = fs.get(absolute(path));
+        if (!(target instanceof Directory)) throw new NotADirectoryException(path);
+        cwd = target;
+    }
+
+    public String pwd()                   { return fs.pathOf(cwd); }   // throws if someone deleted it
+    public List<String> ls(String path)   { return fs.list(absolute(path)); }
+    public String cat(String path)        { return fs.read(absolute(path)); }
+
+    /** Join onto the working directory and fold . and .. as text; .. at the root stays at the root. */
+    String absolute(String path) {
+        Deque<String> parts = new ArrayDeque<>();
+        if (!path.startsWith("/")) {
+            for (String s : pwd().split("/")) if (!s.isEmpty()) parts.addLast(s);
+        }
+        for (String s : path.split("/")) {
+            if (s.isEmpty() || s.equals(".")) continue;
+            if (s.equals("..")) parts.pollLast();      // does nothing on an empty deque: the root's parent is the root
+            else parts.addLast(s);
+        }
+        return "/" + String.join("/", parts);
+    }
+}` },
+        { type: "keypoints", items: [
+          "<code>FileSystem</code>, <code>FsPath</code> and the nodes don't change. <code>FsPath</code> still rejects <code>.</code> and <code>..</code>, because by the time a path reaches it the <code>Session</code> has folded them away.",
+          "Holding the working directory as a <code>Node</code> rather than a string means it follows a move of that folder, the way a Unix shell does; <code>pathOf</code> gives the current path each time.",
+          "Converting and then calling is two lock acquisitions, so a concurrent move can make the computed path stale and the call fails with <code>PathNotFoundException</code>. That is the same race a real shell has, and it fails loudly rather than touching the wrong file.",
+          "Folding <code>..</code> as text is correct here because there are no symlinks. With symlinks, <code>..</code> should follow the parent pointer of the resolved folder instead."
+        ] }
+      ]
+    },
+    {
+      id: "search",
+      title: "\"Find every .txt file under /home bigger than 1 KB\"",
+      kicker: "Follow-up: search",
+      blocks: [
+        { type: "text", html: `<p>The awesome-low-level-design solution answers this with a search Strategy that runs a chain of filters, each reading its settings from a <code>Map&lt;String, Object&gt;</code>. The idea is right (filters you can combine), but the untyped map lets a typo or a wrong type fail at run time. Java's <code>Predicate</code> already composes with <code>and</code>, <code>or</code> and <code>negate</code>, so a filter can simply be a typed predicate.</p>` },
+        { type: "code", lang: "java", title: "Search with composable filters", code: `/** Typed filters; combine with and(), or() and negate() instead of a hand-written chain. */
+public final class Filters {
+    private Filters() {}
+    public static Predicate<Node> nameMatches(String regex) {
+        Pattern p = Pattern.compile(regex);                // compiled once, not per node
+        return n -> p.matcher(n.name()).matches();
+    }
+    public static Predicate<Node> isFile() { return n -> n instanceof File; }
+    public static Predicate<Node> sizeAtLeast(long bytes) {
+        return n -> n instanceof File f && f.content().length() >= bytes;
+    }
+}
+
+// In FileSystem: one walk under the read lock, returning paths rather than live nodes.
+public List<String> search(String dirPath, Predicate<Node> filter) {
+    return reading(() -> {
+        FsPath p = FsPath.parse(dirPath);
+        List<String> found = new ArrayList<>();
+        collect(asDirectory(resolve(p), dirPath), p.isRoot() ? "" : p.toString(), filter, found);
+        return found;
+    });
+}
+
+private void collect(Directory dir, String prefix, Predicate<Node> filter, List<String> out) {
+    for (String name : dir.names()) {                      // sorted, so results are deterministic
+        Node child = dir.child(name);
+        String path = prefix + "/" + name;
+        if (filter.test(child)) out.add(path);
+        if (child instanceof Directory d) collect(d, path, filter, out);
+    }
+}
+
+// fs.search("/home", Filters.isFile().and(Filters.nameMatches(".*[.]txt")).and(Filters.sizeAtLeast(1024)));` },
+        { type: "keypoints", items: [
+          "<code>FileSystem</code> gains one method; <code>Filters</code> is new; nodes don't change. A new kind of filter is a new static method, with no chain class to edit.",
+          "Results are paths built during the walk, so callers never hold live nodes and the walk never calls <code>pathOf</code> per hit.",
+          "Filters run while the read lock is held, so they must be quick and must never call back into the file system to write: a read lock can't be upgraded and the thread would block forever.",
+          "A full walk is O(subtree). For frequent searches by name, keep an index from name to nodes; a move doesn't change names, so only create, delete and rename have to update it."
+        ] }
+      ]
+    },
+    {
+      id: "symlinks",
+      title: "\"How would you add symbolic links?\"",
+      kicker: "Follow-up: a new node type",
+      blocks: [
+        { type: "text", html: `<p>A symlink is a node whose content is another path. That is a third kind of node, so it goes into the Composite's <code>permits</code> list, and path resolution learns to follow it. Two policies need stating: which operations follow a link (read and list do; delete and rename act on the link itself, like Unix), and how to stop a loop of links.</p>` },
+        { type: "code", lang: "java", title: "A symlink is a third kind of node", code: `public abstract sealed class Node permits File, Directory, Symlink { /* unchanged */ }
+
+public final class Symlink extends Node {
+    private final String target;                       // an absolute path, resolved only when used
+    Symlink(String name, String target) { super(name); this.target = target; }
+    String target() { return target; }
+}
+
+// In FileSystem
+private static final int MAX_HOPS = 40;                // the same limit Linux uses
+
+/** Follows links in the middle of a path; the last segment is returned as-is so delete and rename hit the link. */
+private Node resolve(FsPath p, int[] hops) {
+    Node cur = root;
+    for (String part : p.parts()) {
+        Node next = asDirectory(follow(cur, hops), p.toString()).child(part);
+        if (next == null) throw new PathNotFoundException(p.toString());
+        cur = next;
+    }
+    return cur;
+}
+
+private Node follow(Node n, int[] hops) {
+    while (n instanceof Symlink link) {
+        if (++hops[0] > MAX_HOPS) throw new InvalidPathException("too many links: " + link.target());
+        n = resolve(FsPath.parse(link.target()), hops);
+    }
+    return n;
+}
+
+// read and list call follow(resolve(p, hops), hops) so they see the target.` },
+        { type: "keypoints", items: [
+          "<code>Node</code>'s <code>permits</code> list, <code>resolve</code> and a new <code>createSymlink</code> change. <code>File</code>, <code>Directory</code>, move, rename and delete don't: a link is a leaf, so it can never make the tree itself cyclic.",
+          "The hop counter is shared across the whole lookup, so <code>/a</code> linking to <code>/b</code> linking back to <code>/a</code> stops after 40 hops instead of recursing forever.",
+          "A link to a missing path is allowed (it dangles); following it reports <code>PathNotFoundException</code>, which is how Unix behaves too.",
+          "<code>pathOf</code> on a node reached through a link returns its real location, because parent pointers describe the tree, not the route taken."
+        ] }
+      ]
+    },
+    {
+      id: "mkdir-p",
+      title: "\"Can create make the missing parent folders, like mkdir -p?\"",
+      kicker: "Follow-up: convenience",
+      blocks: [
+        { type: "text", html: `<p>The awesome-low-level-design solution's path walk creates missing folders as it goes. Two things go wrong with that version: a file found in the way is silently replaced by a new folder, losing the file, and a failure halfway leaves some folders created. Split the walk in two: first walk the part of the path that already exists, checking types; then create the rest, which can no longer fail.</p>` },
+        { type: "code", lang: "java", title: "createDirectories, like mkdir -p", code: `// In FileSystem
+public Directory createDirectories(String path) {
+    return writing(() -> {
+        List<String> parts = FsPath.parse(path).parts();
+        Directory cur = root;
+        int i = 0;
+        for (; i < parts.size(); i++) {                // walk what exists
+            Node next = cur.child(parts.get(i));
+            if (next == null) break;
+            cur = asDirectory(next, path);             // a file in the way: error, and nothing created yet
+        }
+        for (; i < parts.size(); i++) {                // everything below is new, so no conflicts are possible
+            Directory d = new Directory(parts.get(i));
+            cur.add(d);
+            cur = d;
+        }
+        return cur;                                    // an existing folder if the whole path was there
+    });
+}` },
+        { type: "keypoints", items: [
+          "Only <code>FileSystem</code> changes, by one method. <code>createDirectory</code> keeps its strict behaviour; callers choose.",
+          "Idempotent: calling it twice returns the same folder, matching <code>mkdir -p</code>.",
+          "This is validate-then-mutate again: once the first missing segment is found, every later segment is guaranteed free, so the create loop can't fail halfway.",
+          "One write lock around both loops means no other thread can create a file in the gap between checking and creating."
+        ] }
       ]
     }
   ],
   takeaways: [
-    "Parent pointers trade an O(depth) path() for O(1) moves and paths that can never go stale.",
-    "Parse paths in one class with an explicit policy for every edge case; keep parsing separate from resolution.",
-    "In move: check root, destination type, cycle (walk up from the destination) and name conflict, then mutate.",
-    "Rename must re-key the parent's map, not just change the node's name.",
-    "A HashMap of children keeps resolution O(depth) however large a folder grows; sort on listing.",
-    "A single read-write lock is the simplest correct concurrency story; per-directory locking is hard because moves span folders.",
-    "Sizes, relative paths, symlinks and search are additive, and most reuse the same upward walk."
+    "Follow-ups land in one place each: a new Node type (symlinks), a new facade method (sizes, search, mkdir -p, stat), or a new class in front of the facade (Session).",
+    "One read-write lock is the right default; per-folder locks let two concurrent moves create a cycle unless the whole ancestor chain is locked.",
+    "Return snapshots or paths, not live nodes, so nothing is read outside the lock.",
+    "Cached folder sizes reuse the parent-pointer walk: O(1) reads for O(depth) writes.",
+    "A Session holds the working directory as a node and folds . and .. before calling the facade.",
+    "Search filters are typed predicates combined with and(); symlink resolution needs a hop limit; mkdir -p walks what exists before creating anything."
   ],
   furtherReading: [
     { title: "Hello Interview: File System (LLD) problem breakdown", url: "https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/file-system", note: "The problem these notes follow." },
-    { title: "ReentrantReadWriteLock (Java 21 API)", url: "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantReadWriteLock.html" },
-    { title: "LLD in a Hurry: Design patterns", note: "The Composite pattern section in this site's LLD notes." }
+    { title: "awesome-low-level-design: File directory (Java solution)", url: "https://github.com/ashishps1/awesome-low-level-design/tree/main/solutions/java/src/filedirectory", note: "The reference solution compared in the Solution tab." },
+    { title: "ReentrantReadWriteLock (Java 21 API)", url: "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantReadWriteLock.html" }
   ]
 };

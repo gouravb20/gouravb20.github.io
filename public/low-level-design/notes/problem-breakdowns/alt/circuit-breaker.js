@@ -22,6 +22,109 @@ func (cb *CircuitBreaker) TryAcquirePermission() (Permit, bool)
 func (cb *CircuitBreaker) OnSuccess(p Permit, elapsed time.Duration)
 func (cb *CircuitBreaker) OnError(p Permit, elapsed time.Duration, err error)`,
 
+"States as immutable records": `type State int
+
+const (
+	Closed State = iota
+	Open
+	HalfOpen
+)
+
+func (s State) String() string { return [...]string{"CLOSED", "OPEN", "HALF_OPEN"}[s] }
+
+// breakerState is one period spent in one state. Go has no sealed types, so one struct is tagged by kind and only
+// that kind's fields are set. The breaker swaps whole pointers, so a state and its data change together.
+type breakerState struct {
+	kind        State
+	window      *CountWindow // Closed
+	openUntil   time.Time    // Open
+	permitsLeft atomic.Int32 // HalfOpen
+	successes   atomic.Int32 // HalfOpen
+}
+
+func newHalfOpen(permits int) *breakerState {
+	s := &breakerState{kind: HalfOpen}
+	s.permitsLeft.Store(int32(permits))
+	return s
+}
+
+func (s *breakerState) tryTakePermit() bool {
+	for {
+		n := s.permitsLeft.Load()
+		if n <= 0 {
+			return false
+		}
+		if s.permitsLeft.CompareAndSwap(n, n-1) { // one atomic step: never over-admits
+			return true
+		}
+	}
+}
+
+// Permit proves a call was admitted, and in which state; its outcome is recorded against that state.
+type Permit struct{ admittedIn *breakerState }
+
+var ErrCallNotPermitted = errors.New("circuit breaker is open")`,
+
+"Final class design": `type Config struct {
+	FailureRatePercent, SlowRatePercent, WindowSize, MinimumCalls, HalfOpenPermits int
+	SlowCallThreshold, OpenWait                                                   time.Duration
+	RecordAsFailure                                                               func(error) bool
+}
+
+func DefaultConfig() Config
+func (c Config) Validate() error
+
+type Snapshot struct{ Calls, Failures, SlowCalls int }
+
+func (s Snapshot) FailureRateAtLeast(percent int) bool
+func (s Snapshot) SlowRateAtLeast(percent int) bool
+
+type CountWindow struct { // the last N outcomes, running totals
+	mu                  sync.Mutex
+	failed, slow        []bool
+	next, size          int
+	failures, slowCalls int
+}
+
+func (w *CountWindow) Record(isFailure, isSlow bool) Snapshot
+
+type breakerState struct {
+	kind                   State        // Closed, Open or HalfOpen
+	window                 *CountWindow // Closed
+	openUntil              time.Time    // Open
+	permitsLeft, successes atomic.Int32 // HalfOpen
+}
+
+type Permit struct{ admittedIn *breakerState }
+
+type CircuitBreaker struct {
+	name      string
+	config    Config
+	clock     Clock
+	state     atomic.Pointer[breakerState] // swapped only by CompareAndSwap
+	mu        sync.Mutex                   // guards listeners
+	listeners []Listener
+}
+
+func Execute[T any](cb *CircuitBreaker, call func() (T, error)) (T, error)
+func ExecuteWithFallback[T any](cb *CircuitBreaker, call func() (T, error), fallback func(error) (T, error)) (T, error)
+func (cb *CircuitBreaker) TryAcquirePermission() (Permit, bool)
+func (cb *CircuitBreaker) OnSuccess(p Permit, elapsed time.Duration)
+func (cb *CircuitBreaker) OnError(p Permit, elapsed time.Duration, err error)
+func (cb *CircuitBreaker) State() State
+func (cb *CircuitBreaker) AddListener(l Listener)
+
+type Listener interface {
+	OnTransition(breaker string, from, to State)
+}
+
+type Registry struct {
+	mu       sync.Mutex
+	breakers map[string]*CircuitBreaker
+}
+
+func (r *Registry) ForDependency(name string) *CircuitBreaker`,
+
 "Configuration record and builder": `// Config is a value type: copy DefaultConfig, override fields, and NewCircuitBreaker validates it.
 type Config struct {
 	FailureRatePercent int              // trip when this share of recent calls failed
@@ -99,49 +202,6 @@ func (w *CountWindow) Record(isFailure, isSlow bool) Snapshot {
 	return Snapshot{Calls: w.size, Failures: w.failures, SlowCalls: w.slowCalls}
 }`,
 
-"States as immutable records": `type State int
-
-const (
-	Closed State = iota
-	Open
-	HalfOpen
-)
-
-func (s State) String() string { return [...]string{"CLOSED", "OPEN", "HALF_OPEN"}[s] }
-
-// breakerState is one period spent in one state. Go has no sealed types, so one struct is tagged by kind and only
-// that kind's fields are set. The breaker swaps whole pointers, so a state and its data change together.
-type breakerState struct {
-	kind        State
-	window      *CountWindow // Closed
-	openUntil   time.Time    // Open
-	permitsLeft atomic.Int32 // HalfOpen
-	successes   atomic.Int32 // HalfOpen
-}
-
-func newHalfOpen(permits int) *breakerState {
-	s := &breakerState{kind: HalfOpen}
-	s.permitsLeft.Store(int32(permits))
-	return s
-}
-
-func (s *breakerState) tryTakePermit() bool {
-	for {
-		n := s.permitsLeft.Load()
-		if n <= 0 {
-			return false
-		}
-		if s.permitsLeft.CompareAndSwap(n, n-1) { // one atomic step: never over-admits
-			return true
-		}
-	}
-}
-
-// Permit proves a call was admitted, and in which state; its outcome is recorded against that state.
-type Permit struct{ admittedIn *breakerState }
-
-var ErrCallNotPermitted = errors.New("circuit breaker is open")`,
-
 "CircuitBreaker": `type Clock interface{ Now() time.Time }
 
 type SystemClock struct{}
@@ -182,6 +242,12 @@ func Execute[T any](cb *CircuitBreaker, call func() (T, error)) (T, error) {
 		return zero, ErrCallNotPermitted
 	}
 	start := cb.clock.Now()
+	defer func() { // every admitted call reports, or a trial permit leaks
+		if r := recover(); r != nil {
+			cb.OnError(permit, cb.clock.Now().Sub(start), fmt.Errorf("panic: %v", r))
+			panic(r)
+		}
+	}()
 	result, err := call()
 	elapsed := cb.clock.Now().Sub(start)
 	if err != nil {
@@ -257,14 +323,17 @@ func (cb *CircuitBreaker) newOpen() *breakerState {
 
 // transition swaps from the exact pointer the decision was based on; a stale decision simply loses.
 func (cb *CircuitBreaker) transition(from, to *breakerState) {
-	if !cb.state.CompareAndSwap(from, to) {
-		return
+	if cb.state.CompareAndSwap(from, to) {
+		cb.notifyListeners(from.kind, to.kind)
 	}
+}
+
+func (cb *CircuitBreaker) notifyListeners(from, to State) {
 	cb.mu.Lock()
 	ls := slices.Clone(cb.listeners)
 	cb.mu.Unlock()
 	for _, l := range ls { // called outside the lock
-		notify(l, cb.name, from.kind, to.kind)
+		notify(l, cb.name, from, to)
 	}
 }
 
@@ -343,7 +412,7 @@ func (m *TransitionMetrics) Count(key string) int64 {
 }
 
 // QuoteAsync takes a permit up front, runs the call in a goroutine and always reports the outcome.
-func QuoteAsync(pricing *CircuitBreaker, clock Clock, client PricingClient, sku string) <-chan QuoteResult {
+func QuoteAsync(ctx context.Context, pricing *CircuitBreaker, clock Clock, client PricingClient, sku string) <-chan QuoteResult {
 	out := make(chan QuoteResult, 1)
 	permit, ok := pricing.TryAcquirePermission()
 	if !ok {
@@ -352,7 +421,7 @@ func QuoteAsync(pricing *CircuitBreaker, clock Clock, client PricingClient, sku 
 	}
 	start := clock.Now()
 	go func() {
-		q, err := client.Quote(sku)
+		q, err := client.Quote(ctx, sku) // ctx carries the deadline, so the call always returns
 		elapsed := clock.Now().Sub(start)
 		if err != nil {
 			pricing.OnError(permit, elapsed, err)
@@ -364,7 +433,7 @@ func QuoteAsync(pricing *CircuitBreaker, clock Clock, client PricingClient, sku 
 	return out
 }`,
 
-"Circuit breaker in one screen": `type Config struct {
+"Circuit breaker in one screen": `type Config struct { // Validate rejects bad values; DefaultConfig gives defaults
 	FailureRatePercent, SlowRatePercent, WindowSize, MinimumCalls, HalfOpenPermits int
 	SlowCallThreshold, OpenWait                                                   time.Duration
 	RecordAsFailure                                                               func(error) bool
@@ -377,19 +446,35 @@ type breakerState struct { // one value per period in a state; swapped whole
 	permitsLeft, successes atomic.Int32 // HalfOpen
 }
 
+type Permit struct{ admittedIn *breakerState } // outcomes go to the state that admitted the call
+
 type CircuitBreaker struct {
 	state atomic.Pointer[breakerState] // every transition is CompareAndSwap(from, to)
 }
 
 func Execute[T any](cb *CircuitBreaker, call func() (T, error)) (T, error)
 func ExecuteWithFallback[T any](cb *CircuitBreaker, call func() (T, error), fallback func(error) (T, error)) (T, error)
-func (cb *CircuitBreaker) TryAcquirePermission() (Permit, bool)
+func (cb *CircuitBreaker) TryAcquirePermission() (Permit, bool) // Open past its wait: CAS to HalfOpen, loop
 func (cb *CircuitBreaker) OnSuccess(p Permit, elapsed time.Duration)
 func (cb *CircuitBreaker) OnError(p Permit, elapsed time.Duration, err error)
 
 type Registry struct{ breakers map[string]*CircuitBreaker } // mutex-guarded; ForDependency(name)`,
 
-"Time-based window with atomic buckets": `type bucket struct {
+"Time-based window with atomic buckets": `// The window becomes an interface; CountWindow already satisfies it.
+type OutcomeWindow interface {
+	Record(isFailure, isSlow bool) Snapshot
+}
+
+// breakerState.window becomes an OutcomeWindow. Config gains WindowSeconds; 0 keeps the count window.
+func (cb *CircuitBreaker) newClosed() *breakerState {
+	var w OutcomeWindow = NewCountWindow(cb.config.WindowSize)
+	if cb.config.WindowSeconds > 0 {
+		w = NewTimeWindow(cb.config.WindowSeconds, cb.clock)
+	}
+	return &breakerState{kind: Closed, window: w}
+}
+
+type bucket struct {
 	second                int64
 	calls, failures, slow atomic.Int64
 }
@@ -404,7 +489,7 @@ func NewTimeWindow(seconds int, clock Clock) *TimeWindow {
 	return &TimeWindow{buckets: make([]atomic.Pointer[bucket], seconds), clock: clock}
 }
 
-func (w *TimeWindow) Record(isFailure, isSlow bool) {
+func (w *TimeWindow) Record(isFailure, isSlow bool) Snapshot {
 	now := w.clock.Now().Unix()
 	slot := &w.buckets[now%int64(len(w.buckets))]
 	b := slot.Load()
@@ -423,14 +508,14 @@ func (w *TimeWindow) Record(isFailure, isSlow bool) {
 	if isSlow {
 		b.slow.Add(1)
 	}
+	return w.snapshot(now)
 }
 
-func (w *TimeWindow) Snapshot() Snapshot {
-	now := w.clock.Now().Unix()
+func (w *TimeWindow) snapshot(now int64) Snapshot {
 	var s Snapshot
 	for i := range w.buckets {
 		b := w.buckets[i].Load()
-		if b != nil && now-b.second < int64(len(w.buckets)) {
+		if b != nil && now-b.second < int64(len(w.buckets)) { // skip buckets older than the window
 			s.Calls += int(b.calls.Load())
 			s.Failures += int(b.failures.Load())
 			s.SlowCalls += int(b.slow.Load())
@@ -459,47 +544,54 @@ payments.RecordAsFailure = serverTrouble
 payments.SlowCallThreshold = 800 * time.Millisecond // p99 is 300 ms; 800 ms means something is wrong
 payments.FailureRatePercent, payments.WindowSize, payments.MinimumCalls = 50, 50, 20`,
 
-"Racy transitions with separate fields": `// Broken: fields that must change together, updated one at a time.
-type racyBreaker struct {
-	state         atomic.Int32 // a State
-	openedAt      atomic.Pointer[time.Time]
-	halfOpenCalls atomic.Int32
-	window        *CountWindow
+"HalfOpen with a deadline": `// breakerState gains startedAt (HalfOpen only); Config gains MaxHalfOpenWait, for example twice the call timeout.
+func newHalfOpen(permits int, now time.Time) *breakerState {
+	s := &breakerState{kind: HalfOpen, startedAt: now}
+	s.permitsLeft.Store(int32(permits))
+	return s
 }
 
-func (b *racyBreaker) allow(now time.Time) bool {
-	if State(b.state.Load()) == Open && now.After(b.openedAt.Load().Add(openWait)) {
-		b.state.Store(int32(HalfOpen)) // 40 goroutines can all get here and each think it made the switch
-		b.halfOpenCalls.Store(0)       // ...and each resets the trial counter, admitting far too many trials
+// In TryAcquirePermission:
+case HalfOpen:
+	if s.tryTakePermit() {
+		return Permit{s}, true
 	}
-	return State(b.state.Load()) != Open
+	if cb.clock.Now().After(s.startedAt.Add(cb.config.MaxHalfOpenWait)) {
+		cb.transition(s, cb.newOpen()) // the trials went silent: wait again, then probe afresh
+	}
+	return Permit{}, false
+case Open:
+	if cb.clock.Now().Before(s.openUntil) {
+		return Permit{}, false
+	}
+	cb.transition(s, newHalfOpen(cb.config.HalfOpenPermits, cb.clock.Now()))`,
+
+"Operator overrides: forced and disabled states": `const (
+	Closed State = iota
+	Open
+	HalfOpen
+	ForcedOpen
+	Disabled
+)
+
+func (s State) String() string {
+	return [...]string{"CLOSED", "OPEN", "HALF_OPEN", "FORCED_OPEN", "DISABLED"}[s]
 }
 
-func (b *racyBreaker) onFailure(now time.Time) {
-	snap := b.window.Record(true, false)
-	if snap.FailureRateAtLeast(threshold) {
-		b.state.Store(int32(Open)) // two goroutines trip together: two "opened" events
-		b.openedAt.Store(&now)     // a reader can see Open with a nil or previous openedAt
-	}
-}`,
+// An operator command replaces whatever the breaker was doing.
+func (cb *CircuitBreaker) ForceOpen() { cb.override(&breakerState{kind: ForcedOpen}) }
+func (cb *CircuitBreaker) Disable()   { cb.override(&breakerState{kind: Disabled}) }
+func (cb *CircuitBreaker) Reset()     { cb.override(cb.newClosed()) }
 
-"Half-open gate: racy vs atomic": `// Racy: check-then-act. Ten goroutines read 1, all pass the check, all decrement: ten trial calls.
-if permitsLeft.Load() > 0 {
-	permitsLeft.Add(-1)
-	return true
+func (cb *CircuitBreaker) override(to *breakerState) {
+	from := cb.state.Swap(to)
+	cb.notifyListeners(from.kind, to.kind)
 }
-return false
 
-// Atomic: a compare-and-swap loop makes the read and the decrement one step, and the count never goes below zero.
-for {
-	n := permitsLeft.Load()
-	if n <= 0 {
-		return false
-	}
-	if permitsLeft.CompareAndSwap(n, n-1) {
-		return true
-	}
-}`,
+// Go switches are not checked for missing cases, so add these by hand (a linter such as exhaustive can enforce it):
+//   TryAcquirePermission:  case ForcedOpen: return Permit{}, false
+//                          case Disabled:   return Permit{s}, true // pass, never trip
+//   record:                case ForcedOpen, Disabled: // nothing to count, nothing to trip`,
 
 "Retry outside the breaker": `// Retry holds only immutable settings, so one value can be shared by every goroutine.
 type Retry struct {
@@ -603,14 +695,14 @@ func TestOpensAtThresholdThenRecoversThroughHalfOpen(t *testing.T) {
 	}
 }
 
-func TestFailedTrialCallReopens(t *testing.T) {
+func TestSlowTrialCallReopens(t *testing.T) {
 	cb, clock := testBreaker()
 	succeed(cb)
 	succeed(cb)
 	fail(cb)
 	fail(cb)
 	clock.Advance(10 * time.Second)
-	fail(cb)
+	Execute(cb, func() (string, error) { clock.Advance(2 * time.Second); return "late", nil })
 	if cb.State() != Open {
 		t.Fatalf("state = %v, want OPEN", cb.State())
 	}

@@ -25,7 +25,7 @@ Paths in the table are relative to `public/high-level-design/`. Also included: [
 |---|---|---|---|---|---|
 | Low-Level Design in a Hurry (based on [Hello Interview](https://www.hellointerview.com/learn/low-level-design/in-a-hurry/introduction)) | [`notes/in-a-hurry`](public/low-level-design/notes/in-a-hurry/) | 5 | 68 | 4 | 31 |
 | Concurrency for Low-Level Design (based on [Hello Interview](https://www.hellointerview.com/learn/low-level-design/concurrency/intro)) | [`notes/concurrency`](public/low-level-design/notes/concurrency/) | 4 | 62 | 6 | 27 |
-| Low-Level Design Problem Breakdowns: eighteen problems ordered by difficulty, from Connect Four to Inventory Management (several inspired by [Hello Interview](https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/rate-limiter)) | [`notes/problem-breakdowns`](public/low-level-design/notes/problem-breakdowns/) | 18 | 153 | 5 | 111 |
+| Low-Level Design Problem Breakdowns: eighteen problems ordered by difficulty, from Connect Four to Inventory Management (several inspired by [Hello Interview](https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/rate-limiter)) | [`notes/problem-breakdowns`](public/low-level-design/notes/problem-breakdowns/) | 18 | 149 | 5 | 120 |
 
 Paths in the table are relative to `public/low-level-design/`. Every code example is Java 21. The *Mastering Go* notes that used to live here are now in Books.
 
@@ -97,6 +97,8 @@ public/                        served as-is under /learn/
   low-level-design/
     index.html                 hub page linking LLD in a hurry and concurrency
     notes/<app>/               same layout as above
+    notes/problem-breakdowns/  one problem per file: chapters/<id>.js; data.js holds the book and chapterOrder,
+                               data-part2.js the shared helpers; deep/<id>.js and alt/<id>.js as elsewhere
   books/
     index.html                 book notes, then the library / PDF viewer
     notes/<book>/              same layout as above (mastering-go has data-part1..5.js and demos-part1..5.js)

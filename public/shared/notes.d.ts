@@ -8,7 +8,12 @@ interface NotesData {
   /** The dashboard's pillar cards; `cls` picks the card colour. */
   fourQuestions: { q: string; cls: "what" | "where" | "when" | "how"; text: string; answer: string }[];
   takeaways: string[];
-  /** In reading order; data-part*.js files append with `window.DATA.chapters.push(...)`. */
+  /**
+   * Chapter ids in reading order, for apps that keep one chapter per file in chapters/<id>.js. The loader sorts the
+   * chapters into this order and numbers them; every chapter must be listed.
+   */
+  chapterOrder?: string[];
+  /** In reading order; data-part*.js and chapters/*.js files append with `window.DATA.chapters.push(...)`. */
   chapters: Chapter[];
 }
 

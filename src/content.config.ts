@@ -87,6 +87,7 @@ const schema = z
     parts: z.record(z.string(), text),
     fourQuestions: z.array(z.strictObject({ q: text, cls: z.enum(["what", "where", "when", "how"]), text, answer: text })),
     takeaways: z.array(text),
+    chapterOrder: z.array(z.string()).optional(),
     chapters: z.array(chapter).min(1),
   })
   .superRefine((d, ctx) => {

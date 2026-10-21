@@ -1,27 +1,72 @@
 // Go versions of the Tic-Tac-Toe code blocks, matched to the Java blocks by title. Imports are omitted.
 window.ALT = window.ALT || {};
 ALT["tic-tac-toe"] = { go: {
-"Public API": `func NewGame(first, second Player, size int) (*Game, error) // size 3 for the classic game
+"Symbol, Player and GameState": `type Symbol int
+
+const (
+	Empty Symbol = iota // the zero value, so a fresh grid is all empty
+	X
+	O
+)
+
+type GameState int
+
+const (
+	InProgress GameState = iota
+	Won
+	Draw
+)
+
+// Player is a comparable value: two players are equal when name and symbol match.
+type Player struct {
+	Name   string
+	Symbol Symbol
+}
+
+// Cell is a coordinate, for move sources and bots.
+type Cell struct{ Row, Col int }`,
+
+"Final class design": `type Game struct { // the entry point; one mutex per game
+	mu            sync.Mutex
+	board         *Board      // created here, never handed out
+	tracker       *WinTracker
+	first, second Player
+	current       Player
+	state         GameState // InProgress, Won or Draw
+	winner        *Player   // set only when state == Won
+}
+
+func NewGame(first, second Player, size int) (*Game, error) // size 3 for the classic game
 func (g *Game) Play(p Player, row, col int) error              // error on an invalid move
 func (g *Game) State() GameState
 func (g *Game) Winner() (Player, bool)
 func (g *Game) CurrentPlayer() Player
 func (g *Game) Cell(row, col int) Symbol // Empty when free, for a renderer
-func (g *Game) Size() int`,
-
-"Board": `type Symbol int
-
-const (
-	Empty Symbol = iota
-	X
-	O
-)
-
-type Cell struct{ Row, Col int }
+func (g *Game) Size() int
 
 type Board struct {
 	n      int
-	grid   [][]Symbol
+	grid   [][]Symbol // Empty means free
+	filled int
+}
+
+func (b *Board) Place(row, col int, s Symbol) error // error if off the board or taken
+func (b *Board) Inside(row, col int) bool
+func (b *Board) Cell(row, col int) Symbol
+func (b *Board) IsFull() bool
+func (b *Board) Size() int
+
+type WinTracker struct {
+	n          int
+	rows, cols []int // X adds +1, O adds -1
+	diag, anti int   // main diagonal and anti-diagonal
+}
+
+func (t *WinTracker) Record(row, col int, s Symbol) bool // true if this move completed a line`,
+
+"Board": `type Board struct {
+	n      int
+	grid   [][]Symbol // Empty means free
 	filled int
 }
 
@@ -51,6 +96,19 @@ func (b *Board) Place(row, col int, s Symbol) error {
 	b.grid[row][col] = s
 	b.filled++
 	return nil
+}`,
+
+"Win check: the lines through the last move": `// completesLine is the "better" option: O(n) per move and no extra state.
+func (b *Board) completesLine(row, col int) bool {
+	s := b.grid[row][col]
+	r, c, d, a := true, true, row == col, row+col == b.n-1
+	for i := 0; i < b.n; i++ {
+		r = r && b.grid[row][i] == s
+		c = c && b.grid[i][col] == s
+		d = d && b.grid[i][i] == s
+		a = a && b.grid[i][b.n-1-i] == s
+	}
+	return r || c || d || a
 }`,
 
 "WinTracker": `// WinTracker checks for a win in O(1): X adds +1 to every line it touches, O adds -1,
@@ -90,21 +148,8 @@ func abs(v int) int {
 	return v
 }`,
 
-"Game": `type GameState int
-
-const (
-	InProgress GameState = iota
-	Won
-	Draw
-)
-
-type Player struct {
-	Name   string
-	Symbol Symbol
-}
-
-// Game is safe for concurrent use: every method that touches mutable state holds mu,
-// and board and tracker are created here and never handed out.
+"Game": `// Game is safe for concurrent use: every method that touches mutable state holds mu,
+// and board and tracker are created here and never handed out, so mu guards them too.
 type Game struct {
 	mu            sync.Mutex
 	board         *Board
@@ -201,18 +246,36 @@ func RunTurns(g *Game, sources map[Player]MoveSource) {
 	}
 }`,
 
-"Scanning the lines through the last move": `// completesLine is O(n) per move with no extra state.
-func (b *Board) completesLine(row, col int) bool {
-	s := b.grid[row][col]
-	r, c, d, a := true, true, row == col, row+col == b.n-1
-	for i := 0; i < b.n; i++ {
-		r = r && b.grid[row][i] == s
-		c = c && b.grid[i][col] == s
-		d = d && b.grid[i][i] == s
-		a = a && b.grid[i][b.n-1-i] == s
-	}
-	return r || c || d || a
-}`,
+"Tic-Tac-Toe in one screen": `type Player struct { // Symbol: Empty, X, O; GameState: InProgress, Won, Draw
+	Name   string
+	Symbol Symbol
+}
+
+type Board struct {
+	grid   [][]Symbol // Empty means free
+	filled int
+}
+
+func (b *Board) Place(r, c int, s Symbol) error // error if off the board or taken
+func (b *Board) IsFull() bool
+
+type WinTracker struct {
+	rows, cols []int // X adds +1, O adds -1
+	diag, anti int
+}
+
+func (t *WinTracker) Record(r, c int, s Symbol) bool // a line at +n or -n wins: O(1)
+
+type Game struct { // every method holds mu: one lock per game
+	mu      sync.Mutex
+	state   GameState
+	current Player
+	winner  *Player
+}
+
+func (g *Game) Play(p Player, r, c int) error // over? turn? place, win, draw, switch turn
+
+// Order inside Play: state check, turn check, place (bounds, taken), win, draw, switch.`,
 
 "Run check for K in a row": `type WinRule interface {
 	// Wins is called after s has been placed at (row, col); true if this move wins.
@@ -243,7 +306,8 @@ func (rc RunChecker) count(b *Board, row, col, dr, dc int, s Symbol) int {
 	return n
 }
 
-// In NewGame: var rule WinRule = RunChecker{K: k}; if k == size { rule = NewWinTracker(size) }`,
+// In NewGame: var rule WinRule = RunChecker{K: k}; if k == size { rule = NewWinTracker(size) }
+// Play calls rule.Wins(g.board, row, col, p.Symbol) where it called g.tracker.Record(row, col, p.Symbol).`,
 
 "Bot interface and grid helpers": `// MoveChooser picks a move from a private copy of the grid; it may scribble on the copy but must restore it.
 type MoveChooser interface {
@@ -397,10 +461,10 @@ func (g *Game) Undo() bool {
 	}
 	last := g.history[len(g.history)-1]
 	g.history = g.history[:len(g.history)-1]
-	g.board.clear(last.Row, last.Col) // empties the cell, decrements filled
+	g.board.clear(last.Row, last.Col) // empties the cell and decrements filled
 	g.tracker.Unrecord(last.Row, last.Col, last.Player.Symbol)
 	g.current = last.Player
-	g.state, g.winner = InProgress, nil // the position before any move had no winner
+	g.state, g.winner = InProgress, nil // the position before the last move had no winner
 	return true
 }
 
@@ -421,6 +485,7 @@ func (t *WinTracker) Unrecord(row, col int, s Symbol) {
 }`,
 
 "A registry of games": `// GameManager is safe for concurrent use: mu guards the map, and each Game guards its own state.
+// Create one at startup and pass it to the handlers; it is not a global.
 type GameManager struct {
 	mu    sync.RWMutex
 	games map[string]*Game
@@ -445,14 +510,14 @@ func (m *GameManager) Play(id string, p Player, row, col int) error {
 	if err != nil {
 		return err
 	}
-	return g.Play(p, row, col) // the game's own mutex serializes moves within it
+	return g.Play(p, row, col) // the map lock is released; the game's own mutex serializes moves within it
 }
 
 // EvictIfOver removes a finished game; a game still in progress is kept.
 func (m *GameManager) EvictIfOver(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if g, ok := m.games[id]; ok && g.State() != InProgress {
+	if g, ok := m.games[id]; ok && g.State() != InProgress { // lock order: map, then game
 		delete(m.games, id)
 	}
 }
@@ -467,32 +532,63 @@ func (m *GameManager) find(id string) (*Game, error) {
 	return g, nil
 }`,
 
-"Tic-Tac-Toe in one screen": `type Board struct {
-	grid   [][]Symbol
-	filled int
+"Scoreboard as a game listener": `// GameListener hears about a game once, on the move that ends it.
+type GameListener interface {
+	OnGameOver(result GameState, winner *Player)
 }
 
-func (b *Board) Place(r, c int, s Symbol) error // error if off the board or taken
-func (b *Board) IsFull() bool
-
-type WinTracker struct {
-	rows, cols []int // X adds +1, O adds -1
-	diag, anti int
+// Game gains a field: listeners []GameListener, guarded by mu.
+func (g *Game) AddListener(l GameListener) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.listeners = append(g.listeners, l)
 }
 
-func (t *WinTracker) Record(r, c int, s Symbol) bool // a line at +n or -n wins: O(1)
-
-type Game struct { // every method holds mu: one lock per game
-	mu      sync.Mutex
-	state   GameState
-	current Player
-	winner  *Player
+func (g *Game) Play(p Player, row, col int) error {
+	g.mu.Lock()
+	err := g.applyMove(p, row, col) // the old body of Play; errors on an invalid move
+	result, winner := g.state, g.winner
+	listeners := append([]GameListener(nil), g.listeners...) // a copy, so they can be called unlocked
+	g.mu.Unlock()
+	if err != nil {
+		return err // later moves fail here, so listeners hear only the ending move
+	}
+	if result != InProgress {
+		for _, l := range listeners { // outside the lock: a slow listener can't stall the game
+			l.OnGameOver(result, winner)
+		}
+	}
+	return nil
 }
 
-func (g *Game) Play(p Player, r, c int) error // over? turn? place, win, draw, switch turn
+// Scoreboard is shared by every game and called from many goroutines, so mu guards both fields.
+type Scoreboard struct {
+	mu    sync.Mutex
+	wins  map[string]int
+	draws int
+}
 
-type GameManager struct {
-	mu    sync.RWMutex
-	games map[string]*Game // many games, a short map lock, no lock held during a move
+func NewScoreboard() *Scoreboard { return &Scoreboard{wins: map[string]int{}} }
+
+func (s *Scoreboard) OnGameOver(result GameState, winner *Player) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if result == Draw {
+		s.draws++
+	} else if winner != nil {
+		s.wins[winner.Name]++ // read-modify-write under the lock, so no update is lost
+	}
+}
+
+func (s *Scoreboard) WinsFor(name string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.wins[name]
+}
+
+func (s *Scoreboard) Draws() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.draws
 }`
 } };
