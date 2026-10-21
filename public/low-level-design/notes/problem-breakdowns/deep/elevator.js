@@ -1,114 +1,55 @@
 // Deep dives: Elevator System (LLD practice set). Format: DeepDive in public/shared/notes.d.ts.
 window.DEEP = window.DEEP || {};
 DEEP["elevator"] = {
-  hook: `<p>The basic design moves cars with SCAN and dispatches by cost. Follow-ups push on modelling (doors and maintenance as states), dispatch quality, physical limits and new interaction models like destination dispatch.</p>`,
+  hook: `<p>The basic design moves cars with SCAN over two sorted sets, models direction as states and dispatches by cost. Follow-ups push on modelling (doors and maintenance as states), dispatch quality, physical limits and new interaction models like destination dispatch.</p>`,
   sections: [
     {
-      id: "direction-aware-stops",
-      title: "Direction-aware stops: don't pick up people going the other way",
-      kicker: "Refinement: hall call direction",
+      id: "two-sets",
+      title: "One set of floors, a set of requests, or two sorted sets",
+      kicker: "Design choice: storing stops",
       blocks: [
-        { type: "problem", html: `<p>The basic design stores stops as plain floor numbers. A car at floor 5 going up with stops {7, 8} receives a DOWN hall call from floor 7. Floor 7 is already in the set, so the car stops there on its way up, and the person who wanted to go down either boards a car heading the wrong way or watches it leave. The set lost the one fact that mattered: which way they want to go.</p>` },
-        { type: "idea", html: `<p>Keep the direction, and keep the sorted order SCAN depends on: replace the one <code>TreeSet</code> with <strong>two</strong>. <code>up</code> holds floors to stop at while moving up (UP hall calls, and destinations above the car); <code>down</code> holds floors to stop at while moving down. Moving up, the next stop is <code>up.ceiling(floor)</code>; moving down, <code>down.floor(floor)</code>, both O(log n). When nothing is left ahead in <code>up</code>, the car still travels to the highest DOWN call above it (<code>down.last()</code>), turns there and serves it on the way back.</p>` },
-        { type: "code", lang: "java", title: "Direction-aware stops in two TreeSets", code: `enum RequestType { PICKUP_UP, PICKUP_DOWN, DESTINATION }
-
-class Elevator {
-    private static final int MIN_FLOOR = 0, MAX_FLOOR = 9;
-    private int floor = 0;
-    private Direction dir = Direction.IDLE;
-    // Floors to stop at while moving up, and while moving down. Sorted, so SCAN's
-    // "next stop ahead" is ceiling/floor in O(log n). Guarded by this.
-    private final TreeSet<Integer> up = new TreeSet<>(), down = new TreeSet<>();
-
-    synchronized boolean addRequest(int f, RequestType type) {
-        if (f < MIN_FLOOR || f > MAX_FLOOR) return false;               // invalid floor
-        switch (type) {
-            case PICKUP_UP   -> up.add(f);
-            case PICKUP_DOWN -> down.add(f);
-            case DESTINATION -> { if (f != floor) (f > floor ? up : down).add(f); }   // on the sweep that reaches it
-        }
-        return true;
-    }
-
-    synchronized void step() {
-        if (up.isEmpty() && down.isEmpty()) { dir = Direction.IDLE; return; }
-        if (dir == Direction.IDLE) dir = directionToNearest();
-        if ((dir == Direction.UP ? up : down).remove(floor)) return;     // doors open; only same-direction stops
-        Integer target = nextTarget();
-        if (target == null) { dir = dir == Direction.UP ? Direction.DOWN : Direction.UP; return; }
-        floor += Integer.signum(target - floor);
-    }
-
-    // SCAN (LOOK): the next stop ahead in this direction; if none, the farthest opposite-direction
-    // call ahead (go there, then turn); if none, null means reverse.
-    private Integer nextTarget() {
-        if (dir == Direction.UP) {
-            Integer next = up.ceiling(floor);
-            if (next != null) return next;
-            return !down.isEmpty() && down.last() > floor ? down.last() : null;
-        }
-        Integer next = down.floor(floor);
-        if (next != null) return next;
-        return !up.isEmpty() && up.first() < floor ? up.first() : null;
-    }
-
-    private Direction directionToNearest() {              // deterministic: nearest stop, ties go up
-        int best = Integer.MAX_VALUE;
-        Direction d = Direction.UP;
-        for (TreeSet<Integer> s : List.of(up, down)) {
-            Integer above = s.ceiling(floor), below = s.floor(floor);
-            if (above != null && above - floor < best) { best = above - floor; d = Direction.UP; }
-            if (below != null && floor - below < best) { best = floor - below; d = Direction.DOWN; }
-        }
-        return d;
-    }
-}` },
+        { type: "compare", items: [
+          { title: "One TreeSet of floors", tone: "bad", html: "<p>Sorted, so SCAN is easy, but it forgets direction: a car going up with a stop at 7 also stops for someone at 7 who pressed DOWN, and they board a car heading the wrong way.</p>" },
+          { title: "A HashSet of (floor, type)", tone: "warn", html: "<p>Remembers direction, but forgets order: every step becomes a linear scan for \"anything ahead?\" and \"which is nearest?\".</p>" },
+          { title: "Two TreeSets, down reversed", tone: "ok", html: "<p>Remembers direction <em>and</em> order. <code>ceiling(floor)</code> is the next stop ahead in either set in O(log n); <code>first()</code> is the far end for turning around.</p>" }
+        ] },
         { type: "keypoints", items: [
-          "<strong>Stopping</strong> is direction-aware; <strong>travelling</strong> is not. <code>nextTarget</code> falls back to the farthest opposite-direction call ahead, or a DOWN call above the car would never be reached.",
-          "<strong>Why two TreeSets, not a HashSet of (floor, type):</strong> a hash set remembers direction but forgets order, so every tick becomes a linear scan for \"anything ahead?\" and \"nearest?\". Two sorted sets answer both with <code>ceiling</code>, <code>floor</code>, <code>first</code> and <code>last</code> in O(log n), and still ignore duplicate presses.",
+          "<strong>Stopping</strong> is direction-aware; <strong>travelling</strong> is not. When no up-stop is ahead, <code>MovingUpState</code> still travels to the highest DOWN call above it (<code>down.first()</code>), turns there and serves it on the way down.",
+          "<strong>Cabin presses</strong> have no direction of their own: a floor above the car joins <code>up</code>, a floor below joins <code>down</code>.",
           "With a small, fixed number of floors, two <code>boolean[]</code> arrays scanned in O(F) are also fine; say so, then use <code>TreeSet</code> as the general answer.",
-          "Boundary floors need no special case: at the top floor nothing is ahead, so the car reverses naturally.",
+          "Boundary floors need no special case: at the top floor nothing is ahead, so the car turns naturally.",
           "Dispatch should also be honest about direction: prefer cars moving toward the caller in the caller's direction and whose remaining stops reach at least that far, then idle cars, then any car."
         ] },
-        { type: "callout", tone: "interview", html: `<p>If time is short, implement floors-only first and say: "This stops for people going the wrong way; storing (floor, type) fixes it." Naming the flaw and its fix is most of the credit.</p>` }
+        { type: "callout", tone: "interview", html: "<p>If time is short, implement one set of floors first and say: \"This stops for people going the wrong way; splitting it into an up set and a reversed down set fixes it.\" Naming the flaw and its fix is most of the credit.</p>" }
       ]
     },
     {
       id: "state-machine",
-      title: "The cabin as a State machine",
+      title: "Doors and maintenance are more states",
       kicker: "Follow-up: modelling",
       blocks: [
-        { type: "text", html: `<p>One <code>direction</code> field can't express "doors open", "under maintenance" or "emergency stop". Each of those changes what <code>step()</code> and button presses mean, which is the State pattern's job.</p>` },
-        { type: "code", lang: "java", title: "States decide what a tick means", code: `interface CabinState { CabinState step(Elevator e); }
-
-class Moving implements CabinState {
-    public CabinState step(Elevator e) {
-        if (e.atNextStop()) { e.removeCurrentStop(); return new DoorsOpen(3); }   // open for 3 ticks
-        e.moveOneFloor();
-        return this;
-    }
+        { type: "text", html: `<p>The direction states already decide each step. "Doors open", "under maintenance" and "emergency stop" each change what a step means too, so they are more classes behind the same <code>ElevatorState</code> interface, not new flags on <code>Elevator</code>.</p>` },
+        { type: "code", lang: "java", title: "Doors and maintenance as ElevatorStates", code: `// More states, same interface: each decides what one tick means.
+final class DoorsOpenState implements ElevatorState {
+    private final ElevatorState resume;                  // the direction to carry on in
+    private int ticksLeft;                               // touched only inside step(), under the elevator's lock
+    DoorsOpenState(ElevatorState resume, int ticks) { this.resume = resume; this.ticksLeft = ticks; }
+    public Direction direction() { return resume.direction(); }
+    public ElevatorState move(Elevator e) { return --ticksLeft > 0 ? this : resume; }
 }
 
-class DoorsOpen implements CabinState {
-    private int ticksLeft;
-    DoorsOpen(int ticks) { this.ticksLeft = ticks; }
-    public CabinState step(Elevator e) {
-        if (--ticksLeft > 0) return this;
-        return e.hasStops() ? new Moving() : new Idle();
-    }
+final class MaintenanceState implements ElevatorState {
+    public Direction direction() { return Direction.IDLE; }
+    public ElevatorState move(Elevator e) { return this; }   // ignores stops until an engineer resets it
 }
 
-class Idle implements CabinState {
-    public CabinState step(Elevator e) { return e.hasStops() ? new Moving() : this; }
-}
-
-class Maintenance implements CabinState {
-    public CabinState step(Elevator e) { return this; }      // ignores stops until reset
-}
-
-// Elevator: synchronized void step() { state = state.step(this); }
-// The controller skips elevators in Maintenance when dispatching.` },
-        { type: "callout", tone: "tip", html: `<p>Direction stays as data inside <code>Elevator</code>; the state decides <em>whether</em> it moves this tick. Emergency stop is another state that clears stops and parks at the nearest floor.</p>` }
+// In MovingUpState (and MovingDownState), a stop now holds the doors open for three ticks:
+//   if (next == e.floor) { e.up.remove(next); return new DoorsOpenState(this, 3); }
+// In Elevator:
+//   synchronized void enterMaintenance() { up.clear(); down.clear(); state = new MaintenanceState(); }
+//   synchronized void reset()            { state = new IdleState(); }
+// The dispatcher gives a car in maintenance an infinite cost, so it never gets hall calls.` },
+        { type: "callout", tone: "tip", html: `<p><code>DoorsOpenState</code> remembers which direction state to resume, so the car carries on its sweep when the doors close. Emergency stop is another state that clears stops and parks at the nearest floor.</p>` }
       ]
     },
     {
@@ -176,7 +117,8 @@ class DestinationDispatcher {
     }
   ],
   takeaways: [
-    "Doors, maintenance and emergencies are states; each decides what a tick means.",
+    "Two TreeSets, the down set reversed, keep stops both sorted and direction-aware; ceiling(floor) is the next stop either way.",
+    "Direction, doors, maintenance and emergencies are all ElevatorStates; each decides what a step means.",
     "Dispatch is a strategy; a better cost counts stops along the path and ages waiting requests.",
     "Weight limits, express cars and zones change which cars are eligible for a call.",
     "Destination dispatch changes the request type and groups passengers to reduce stops."

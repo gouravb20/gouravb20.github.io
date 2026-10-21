@@ -1259,6 +1259,7 @@ final class MeetingScheduler {
   {
     id: `ride-sharing`, part: 3, number: 0, difficulty: `hard`,
     title: `Ride Sharing: pricing and matching strategies, a ride state machine, one driver per ride`,
+    source: { title: `awesome-low-level-design: Designing a Ride-Sharing Service`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/ride-sharing-service.md` },
     overview: `An Uber or Ola style cab booking core: a rider gets a fare estimate and requests a ride, the system offers it to nearby drivers one at a time until someone accepts, and the ride moves from request to drop-off. It is a flagship machine-coding round because it tests three things at once: <strong>Strategy</strong> for the rules that keep changing (pricing with surge, driver matching), an <strong>explicit state machine</strong> for a lifecycle where an illegal step costs money, and <strong>concurrency</strong> on a scarce shared resource: two riders must never get the same driver, and one ride must never get two.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [
@@ -1275,19 +1276,26 @@ final class MeetingScheduler {
   5. Pricing is pluggable: base + per km + per minute by ride type, a surge
      multiplier from demand and supply, or a flat rate.
   6. Matching is pluggable: nearest, highest rated, or least recently assigned.
-  7. The final fare is computed from the actual trip; the rider is charged once.
+  7. The final fare is computed from the actual trip; the rider is charged once
+     through a payment gateway, and each ride records a Payment whose status is
+     PENDING, SUCCEEDED or FAILED.
   8. Riders rate the driver after a completed ride; riders and drivers are
      notified of every status change.
-  9. Concurrency: a driver never holds two rides, a ride never has two drivers,
-     and a retried request never creates a second ride.
+  9. Riders see the assigned driver's live location and ETA until drop-off.
+ 10. A city can instead broadcast requests: nearby drivers see open requests and
+     choose one; the first to accept gets the ride.
+ 11. Concurrency: a driver never holds two rides, a ride never has two drivers,
+     and a retried request never creates a second ride or a second charge.
 
 Out of scope
-  - Maps and routing (an estimator interface), real payments, driver onboarding,
-    pooled rides, scheduled rides, per-city regulations.` }
+  - Maps and routing (an estimator interface), card processing itself (a gateway
+    interface), driver onboarding, pooled rides, scheduled rides, regulations.` }
       ] },
       { id: `clarifying`, title: `Questions that change the design`, kicker: `Clarifying`, blocks: [
         { type: `table`, headers: [`Ask`, `Assume`, `Decides`], rows: [
-          [`Broadcast a request to many drivers, or offer one at a time?`, `One at a time, with a timeout`, `An atomic claim on the driver per offer`],
+          [`Broadcast a request to many drivers, or offer one at a time?`, `One at a time by default; broadcast as a per-city option`, `An atomic claim on the driver per offer; in broadcast mode, the first claim on the ride wins (Deep Dives)`],
+          [`Does the rider track the car live?`, `Yes: the assigned driver's location and ETA until drop-off`, `Forward assigned drivers' pings to the rider, throttled (Deep Dives)`],
+          [`What if the card is declined?`, `The ride still completes; the payment is FAILED and retried`, `A Payment with its own status (Deep Dives)`],
           [`How is a driver found?`, `Available drivers of the ride type within a few km, ranked by a policy`, `A spatial index plus a MatchingStrategy`],
           [`How is the price decided?`, `A rate card per ride type, times surge; some routes are flat`, `PricingStrategy; money in paise as long`],
           [`Is the estimate the final price?`, `No: recomputed from the actual trip, with the surge locked at request time`, `The same strategy called twice`],
@@ -1310,13 +1318,16 @@ Out of scope
           [`Ride`, `The lifecycle: status, assigned driver, candidates left to try, estimate and final fare, under its own lock`],
           [`PricingStrategy`, `MeteredPricing, FlatRatePricing; returns a FareBreakdown`],
           [`MatchingStrategy`, `NearestDriver, HighestRated, LeastRecentlyAssigned`],
-          [`RideListener, PaymentGateway`, `Observer for notifications; charging is an external port`]
+          [`RideListener, PaymentGateway`, `Observer for notifications; charging is an external port`],
+          [`Payment, PaymentService`, `One payment per ride with status PENDING, SUCCEEDED or FAILED; retries (Deep Dives)`],
+          [`RideTracker`, `Forwards an assigned driver's pings and ETA to the rider (Deep Dives)`]
         ] },
         { type: `keypoints`, items: [
           `<strong>Two strategy interfaces</strong>, because pricing and matching vary independently, differ by city and are A/B-tested. Shipping a new rule is a new class; <code>RideService</code> does not change.`,
           `<strong>Ride status is an enum plus a transition table.</strong> Every change goes through one <code>moveTo</code> method under the ride's lock, so an illegal step is rejected in exactly one place.`,
           `<strong>Driver state is shared, ride state is not.</strong> Many rides compete for the same nearby driver, so the driver's status changes only by compare-and-set (AVAILABLE &rarr; OFFERED). A ride is touched by its own rider, its driver and its timer, so a plain lock per ride is enough.`,
-          `<strong>Dispatch is event driven.</strong> An offer schedules a timeout; accept, decline and timeout are events that each take the ride's lock. No thread sits blocked waiting for a driver to tap.`
+          `<strong>Dispatch is event driven.</strong> An offer schedules a timeout; accept, decline and timeout are events that each take the ride's lock. No thread sits blocked waiting for a driver to tap.`,
+          `<strong>RideService is not a Singleton.</strong> Many write-ups make it one. Create one instance at startup and pass it to the controllers that need it: tests can build their own with fake strategies and a fake clock, and nothing hides a global. If a global accessor is truly required, use a lock-based lazy singleton.`
         ] },
         { type: `code`, lang: `java`, title: `Public API`, code: `// Riders
 FareBreakdown estimate(Location pickup, Location drop, RideType type);
@@ -1334,6 +1345,12 @@ void decline(String rideId, String driverId);
 void arrived(String rideId, String driverId);
 void start(String rideId, String driverId);
 void complete(String rideId, String driverId, TripMetrics actual);
+
+// Broadcast mode, live tracking and payments (Deep Dives)
+List<Ride> openRequestsNear(String driverId);
+void claim(String rideId, String driverId);           // first driver to claim wins
+void addTrackingListener(TrackingListener listener);  // live location and ETA for riders
+Payment payment(String rideId);
 
 void addListener(RideListener listener);` }
       ] },
@@ -1789,7 +1806,10 @@ final class RideService {
       { term: `Grid cell index`, def: `Drivers bucketed by a cell computed from latitude and longitude; a search scans only nearby cells.`, why: `Finding candidates costs a few cells, not every driver in the city.` },
       { term: `Idempotent request`, def: `A client-generated request id, stored with <code>putIfAbsent</code>, maps retries to the same ride.`, why: `A network retry never books two cabs.` },
       { term: `Estimate vs final fare`, def: `The estimate prices the routed trip; the final fare prices the actual trip with the surge locked at request time.`, why: `Riders keep the surge they agreed to; detours and jams are still paid for.` },
-      { term: `Observer for notifications`, def: `Listeners receive a <code>RideEvent</code> for every status change, after the ride's lock is released.`, why: `Push, SMS and receipts plug in without coupling to dispatch, and can't slow it down.` }
+      { term: `Observer for notifications`, def: `Listeners receive a <code>RideEvent</code> for every status change, after the ride's lock is released.`, why: `Push, SMS and receipts plug in without coupling to dispatch, and can't slow it down.` },
+      { term: `Broadcast dispatch`, def: `Nearby drivers see open requests and choose; <code>Ride.claim</code> under the ride's lock lets the first valid claim win.`, why: `The race flips from rides competing for a driver to drivers competing for a ride, and both sides stay atomic.` },
+      { term: `Live tracking`, def: `A <code>RideTracker</code> forwards an assigned driver's pings and ETA to the rider, throttled per ride with a compare-and-set.`, why: `Riders see the car approach without any lock on the hot ping path.` },
+      { term: `Payment lifecycle`, def: `One <code>Payment</code> per ride, PENDING then SUCCEEDED or FAILED, retried with the ride id as the idempotency key.`, why: `A declined card is tracked and retried without un-completing the ride or charging twice.` }
     ],
     interview: [
       { q: `How do you guarantee two riders never get the same driver?`, a: `Taking a driver is a compare-and-set on the driver's status from AVAILABLE to OFFERED. Two dispatch threads can both see the driver available, but only one CAS succeeds; the loser moves on to its next candidate. A per-driver lock works too. What does not work is checking the status and then setting it in two steps, because both threads can pass the check. The ride side is protected separately: a ride holds at most one driver because offerNext, accept and withdrawOffer all run under the ride's lock and check its status first.`, diff: `medium` },
@@ -1798,7 +1818,10 @@ final class RideService {
       { q: `How do you find nearby drivers without scanning every driver?`, a: `Bucket drivers into grid cells computed from latitude and longitude (about 1 km cells), kept in a concurrent map from cell to a concurrent set of drivers. A search computes the pickup's cell and scans the rings of cells that cover the radius, then filters by exact distance, status and ride type. A ping that stays in the same cell only updates the driver's volatile location; a cell change moves the driver between two sets. Geohash or hexagonal grids are refinements of the same idea.`, diff: `medium` },
       { q: `How do you make a ride request safe to retry?`, a: `The client generates a request id and resends it on retry. The service keys rides by riderId plus requestId and inserts with putIfAbsent, so two racing copies resolve to one ride and only the winner dispatches. Entries expire after a while so the map doesn't grow forever. Payments follow the same idea: the gateway is called with the ride id as the idempotency key.`, diff: `medium` },
       { q: `How does the final fare differ from the estimate?`, a: `The estimate prices the routed distance and time with the current surge. The final fare prices the actual distance and time from the trip, but with the surge multiplier locked at request time, because the rider agreed to it. A common variant is an upfront price: charge the estimate unless the metered fare differs by more than a tolerance, say 15 percent, which signals a detour or a changed drop. Money stays in long paise throughout and is rounded once per line item.`, diff: `medium` },
-      { q: `What changes when this runs across many servers?`, a: `The design stays, the mechanisms move. Location pings flow through a stream such as Kafka into a geo-sharded location service, so each shard indexes its own cells. The driver claim becomes a conditional write in a shared store, such as an update guarded by status = AVAILABLE or a key set only if absent, with a TTL. Offer timeouts need durable timers so a crash doesn't strand an offer. Events go to a topic that notification services consume. In an LLD round, name these in a minute rather than designing them.`, diff: `hard` }
+      { q: `What changes when this runs across many servers?`, a: `The design stays, the mechanisms move. Location pings flow through a stream such as Kafka into a geo-sharded location service, so each shard indexes its own cells. The driver claim becomes a conditional write in a shared store, such as an update guarded by status = AVAILABLE or a key set only if absent, with a TTL. Offer timeouts need durable timers so a crash doesn't strand an offer. Events go to a topic that notification services consume. In an LLD round, name these in a minute rather than designing them.`, diff: `hard` },
+      { q: `Drivers can see open requests and pick one. Five drivers tap Accept on the same ride at once: what happens?`, a: `Each tap calls Ride.claim, which is synchronized on the ride. The first thread in finds the ride REQUESTED, claims the driver by compare-and-set and moves the ride to ACCEPTED; the other four find it no longer REQUESTED and get "no longer available", which the app shows as "taken". The driver CAS covers the other side: a driver who taps two rides at the same moment can win only one. Only one lock is ever held, so there is no deadlock.`, diff: `medium` },
+      { q: `How do you show the rider the driver's live location?`, a: `Drivers already ping every few seconds for matching. A RideTracker keeps a concurrent map from driver id to the ride they are driving, filled on accept and cleared on complete or cancel. Each ping does one lookup; if the driver is on a ride, it computes an ETA to the pickup (or to the drop once the trip has started) and pushes an update to the rider. Updates are throttled per ride with a compare-and-set on the last-sent time, so the hot path takes no lock and only one of two simultaneous pings is forwarded.`, diff: `medium` },
+      { q: `Should RideService be a Singleton?`, a: `Many solutions make it one, but I wouldn't. A Singleton hides a global dependency, makes tests share state, and stops a test from building a service with fake strategies and a fake clock. One instance created at startup and passed to the controllers gives the same "only one" guarantee. If a global accessor is really required, a lock-based lazy singleton keeps creation thread-safe, and the service's own state is already thread-safe.`, diff: `easy` }
     ],
     cheatsheet: [
       { title: `Ride sharing in one screen`, type: `code`, lang: `java`, body: `interface PricingStrategy  { FareBreakdown price(RideType t, TripMetrics trip, double surge); }
@@ -2281,9 +2304,9 @@ final class CircuitBreakerRegistry { ConcurrentHashMap<String, CircuitBreaker> b
 // Order every problem by difficulty (easy, medium, hard) and number them in that order.
 const ORDER = [
   `connect-four`, `tic-tac-toe`, `snake-and-ladders`, `vending-machine`, `parking-lot`,
-  `lru-cache`, `file-system`, `elevator`, `atm`, `splitwise`, `circuit-breaker`, `logging-service`,
+  `lru-cache`, `file-system`, `atm`, `splitwise`, `circuit-breaker`, `logging-service`,
   `meeting-scheduler`, `movie-ticket-booking`, `pub-sub`,
-  `rate-limiter`, `ride-sharing`, `inventory-management`
+  `rate-limiter`, `elevator`, `ride-sharing`, `inventory-management`
 ];
 const rank = (/** @type {string} */ id) => { const i = ORDER.indexOf(id); return i < 0 ? ORDER.length : i; };
 window.DATA.chapters.sort((a, b) => rank(a.id) - rank(b.id));

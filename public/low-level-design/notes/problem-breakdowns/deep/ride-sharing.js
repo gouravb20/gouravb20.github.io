@@ -260,6 +260,168 @@ final class GracePeriodPolicy implements CancellationPolicy {
       ]
     },
     {
+      id: "broadcast-requests",
+      title: "Drivers see open requests: broadcast, first accept wins",
+      kicker: "Deep dive: a second dispatch mode",
+      blocks: [
+        { type: "text", html: `<p>Offering a ride to one driver at a time is how Uber-style dispatch usually works. Many prompts describe the other model instead: <strong>drivers see the ride requests near them and choose</strong> which one to accept (common for autos, bikes and quieter markets). It changes where the race is. With sequential offers, rides race for a driver. With broadcast, <em>drivers race for a ride</em>: several of them can tap Accept on the same request within milliseconds, and exactly one must win.</p>` },
+        { type: "code", lang: "java", title: "Broadcast mode: open requests and the first claim wins", code: `// In Ride: the first driver to tap claims the ride, if it is still searching and they are still free.
+synchronized RideEvent claim(Driver d, long nowMillis) {
+    if (status != RideStatus.REQUESTED) return null;     // another driver won, or the rider cancelled
+    if (!d.tryClaim()) return null;                      // this driver is busy with another ride
+    driver = d;
+    moveTo(RideStatus.OFFERED);                          // the transition table stays the one rulebook
+    d.startTrip(nowMillis);                              // OFFERED -> ON_TRIP
+    return moveTo(RideStatus.ACCEPTED);
+}
+
+// In RideService
+private final Map<String, Ride> open = new ConcurrentHashMap<>();   // broadcast rides still searching
+
+/** What a driver's app lists: open rides of their type within the radius, nearest first. */
+List<Ride> openRequestsNear(String driverId) {
+    Driver d = driver(driverId);
+    Location at = d.location();                          // read once, so the sort sees one stable point
+    return open.values().stream()
+        .filter(r -> r.type == d.vehicle.type() && r.pickup.distanceKm(at) <= SEARCH_RADIUS_KM)
+        .sorted(Comparator.comparingDouble(r -> r.pickup.distanceKm(at)))
+        .toList();
+}
+
+void claim(String rideId, String driverId) {
+    RideEvent e = ride(rideId).claim(driver(driverId), clock.millis());
+    if (e == null) throw new IllegalStateException("Ride " + rideId + " is no longer available");   // app shows "taken"
+    open.remove(rideId);
+    publish(e);
+}` },
+        { type: "keypoints", items: [
+          "<strong>Two guards, one per side of the race.</strong> The ride's lock makes \"still REQUESTED? then take it\" one step, so of five drivers tapping at once, one wins and four get \"no longer available\". The driver's compare-and-set stops one driver from winning two rides tapped at the same moment.",
+          "<strong>No deadlock.</strong> The ride's lock is the only lock held; the driver claim is a non-blocking CAS, exactly as in sequential mode.",
+          "<strong>The listing is a snapshot.</strong> A ride shown in the app can be gone by the time the driver taps; the claim re-checks under the lock, which is why the failure path is a normal result, not an error page.",
+          "<code>requestRide</code> in broadcast mode adds the ride to <code>open</code> and notifies nearby drivers instead of calling <code>offerNext</code>; <code>cancel</code> removes it. A city picks one mode in configuration, a natural <strong>Strategy</strong> (<code>DispatchMode</code>)."
+        ] },
+        { type: "compare", items: [
+          { title: "Sequential offers", tone: "info", html: `<p>The system picks the best driver; rides race for drivers. Better matches and fairer earnings, but a slow driver costs the rider 15 seconds before the next offer.</p>` },
+          { title: "Broadcast", tone: "info", html: `<p>Drivers pick; drivers race for rides. Fast acceptance and driver choice, but the nearest driver isn't guaranteed and drivers cherry-pick long trips.</p>` }
+        ] },
+        { type: "callout", tone: "tip", html: `<p>Scanning every open ride in the city per listing is fine for an interview. At scale, index open rides by the same grid <code>Cell</code> used for drivers and scan only the cells around the driver.</p>` }
+      ]
+    },
+    {
+      id: "live-tracking",
+      title: "Real-time tracking of an ongoing ride",
+      kicker: "Deep dive: the rider's map",
+      blocks: [
+        { type: "text", html: `<p>Once a driver accepts, the rider watches the car approach, then watches the trip. The data already arrives: drivers ping their location every few seconds, and <code>updateLocation</code> feeds the matching index. Tracking forwards the pings of <em>assigned</em> drivers to their riders, with an ETA, and drops everything else.</p>` },
+        { type: "code", lang: "java", title: "Live tracking: forward the assigned driver's pings to the rider", code: `record LocationUpdate(String rideId, String riderId, Location driverAt, double etaMinutes) {}
+interface TrackingListener { void onLocation(LocationUpdate u); }   // e.g. pushes to the rider's app over a WebSocket
+
+/** Forwards an assigned driver's GPS pings to the rider, at most one update every two seconds per ride. */
+final class RideTracker {
+    private static final long MIN_INTERVAL_MS = 2_000;
+    private record Tracked(Ride ride, AtomicLong lastSentAt) {}
+
+    private final Map<String, Tracked> byDriver = new ConcurrentHashMap<>();   // driver id -> the ride they drive
+    private final List<TrackingListener> listeners = new CopyOnWriteArrayList<>();
+    private final RouteEstimator routes;
+    private final Clock clock;
+
+    RideTracker(RouteEstimator routes, Clock clock) { this.routes = routes; this.clock = clock; }
+
+    void addListener(TrackingListener l) { listeners.add(l); }
+    void start(Ride r, String driverId)  { byDriver.put(driverId, new Tracked(r, new AtomicLong())); }   // on ACCEPTED
+    void stop(String driverId)           { byDriver.remove(driverId); }                                  // on COMPLETED or CANCELLED
+
+    /** Called from updateLocation on every ping; takes no lock. */
+    void onPing(String driverId, Location at) {
+        Tracked t = byDriver.get(driverId);
+        if (t == null) return;                                   // not on a ride: nothing to track
+        long now = clock.millis(), prev = t.lastSentAt().get();
+        if (now - prev < MIN_INTERVAL_MS || !t.lastSentAt().compareAndSet(prev, now)) return;   // throttled, or another ping won
+        Ride r = t.ride();
+        Location target = r.status() == RideStatus.IN_PROGRESS ? r.drop : r.pickup;   // to the pickup, then to the drop
+        LocationUpdate u = new LocationUpdate(r.id, r.riderId, at, routes.estimate(at, target).minutes());
+        for (TrackingListener l : listeners) l.onLocation(u);
+    }
+}
+
+// Wiring in RideService:
+//   updateLocation: index.update(d, at); tracker.onPing(driverId, at);
+//   accept or claim: tracker.start(ride, driverId);    complete or cancel: tracker.stop(driverId);` },
+        { type: "keypoints", items: [
+          "<strong>Pings never block.</strong> Thousands arrive per second; <code>onPing</code> does a map lookup and a compare-and-set, and holds no lock, so tracking can't slow matching or dispatch.",
+          "<strong>Throttle per ride with a CAS.</strong> Two pings for the same ride in one interval both read the same <code>lastSentAt</code>; only one compare-and-set succeeds, so the rider gets one update, not two.",
+          "<strong>Throttle state lives with the tracking entry.</strong> <code>stop</code> removes both at once, so a late ping can't leave a stray timestamp behind.",
+          "<strong>Pickup first, then drop.</strong> Before the trip the ETA is to the pickup; once the ride is IN_PROGRESS it is to the drop. The ride's status is read through its synchronized getter."
+        ] },
+        { type: "callout", tone: "insight", html: `<p>Tracking is an Observer of location, just as notifications are an Observer of status. Keeping them separate matters: status events are rare and must all be delivered; location events are frequent and only the latest one matters, so dropping some is correct.</p>` }
+      ]
+    },
+    {
+      id: "payments",
+      title: "Payments: one Payment per ride, and what happens when a charge fails",
+      kicker: "Deep dive: money",
+      blocks: [
+        { type: "text", html: `<p>The core design calls a <code>PaymentGateway</code> with the ride id as the idempotency key. Interviewers often ask for the next layer: a <strong>Payment</strong> record with a status, so the system knows what was charged, what failed and what to retry. The key decision is that a payment has its <strong>own lifecycle</strong>: a declined card does not un-complete the ride.</p>` },
+        { type: "code", lang: "java", title: "Payment with a status, charged once per ride", code: `enum PaymentStatus { PENDING, SUCCEEDED, FAILED }
+final class PaymentDeclinedException extends RuntimeException {}
+
+final class Payment {
+    final String rideId, riderId;
+    final long amount;                                       // paise
+    private PaymentStatus status = PaymentStatus.PENDING;    // guarded by this
+    private int attempts;                                    // guarded by this
+
+    Payment(String rideId, String riderId, long amount) { this.rideId = rideId; this.riderId = riderId; this.amount = amount; }
+
+    synchronized PaymentStatus status() { return status; }
+
+    /** One attempt at a time; a success is final. Holding this lock during the call only delays retries of this ride. */
+    synchronized PaymentStatus attempt(PaymentGateway gateway) {
+        if (status == PaymentStatus.SUCCEEDED) return status;
+        attempts++;
+        try {
+            gateway.charge(rideId, riderId, amount);         // ride id = idempotency key: a retry can't charge twice
+            status = PaymentStatus.SUCCEEDED;
+        } catch (PaymentDeclinedException e) {
+            status = PaymentStatus.FAILED;                   // the ride stays COMPLETED; the debt is retried later
+        }                                                    // a timeout propagates and leaves it PENDING: retry is safe
+        return status;
+    }
+}
+
+final class PaymentService {
+    private final Map<String, Payment> byRide = new ConcurrentHashMap<>();
+    private final PaymentGateway gateway;
+
+    PaymentService(PaymentGateway gateway) { this.gateway = gateway; }
+
+    /** Exactly one Payment per ride, however many times this is called. */
+    Payment charge(Ride r, long amount) {
+        Payment p = byRide.computeIfAbsent(r.id, id -> new Payment(id, r.riderId, amount));
+        p.attempt(gateway);
+        return p;
+    }
+
+    PaymentStatus retry(String rideId) { return byRide.get(rideId).attempt(gateway); }   // for a retry job
+
+    List<Payment> failed() {
+        return byRide.values().stream().filter(p -> p.status() == PaymentStatus.FAILED).toList();
+    }
+}
+
+// In RideService.complete, replace the direct gateway call with: paymentService.charge(r, fare.total());` },
+        { type: "table", headers: ["Situation", "What happens"], rows: [
+          ["Card charged", "Payment SUCCEEDED; a receipt event goes to the rider"],
+          ["Card declined", "Payment FAILED; the ride stays COMPLETED; the rider is asked to pay or add a card before the next ride; a job retries"],
+          ["Gateway times out", "Outcome unknown, so the payment stays PENDING; the retry uses the same idempotency key, so the gateway returns the first result instead of charging again"],
+          ["complete() retried", "The ride rejects COMPLETED &rarr; COMPLETED before charging; even if it didn't, <code>computeIfAbsent</code> returns the same Payment"],
+          ["Cash ride", "A <code>PaymentMethod</code> strategy: cash marks the payment SUCCEEDED when the driver confirms collection"]
+        ] },
+        { type: "callout", tone: "warning", html: `<p>Never decide "charge or not" from a flag outside a lock. Two threads finishing the same ride would both see "not charged". Here the decision is made inside <code>Payment.attempt</code> under the payment's lock, and the gateway's idempotency key protects the call itself.</p>` }
+      ]
+    },
+    {
       id: "at-scale",
       title: "What changes at scale",
       kicker: "Staff-level: beyond one process",
@@ -284,6 +446,9 @@ final class GracePeriodPolicy implements CancellationPolicy {
     "Every ride status change goes through one moveTo that checks an explicit transition table, under the ride's lock.",
     "A driver is claimed with compare-and-set; offers time out on a scheduler and every handler re-checks the state before acting.",
     "Requests, completion, payment and rating are each idempotent, so retries are safe.",
+    "Broadcast mode flips the race: drivers race for a ride, and the ride's lock lets exactly one claim win.",
+    "Live tracking forwards only assigned drivers' pings, throttled per ride with a compare-and-set and no locks.",
+    "A Payment has its own status; a declined card leaves the ride COMPLETED and the debt is retried with the same idempotency key.",
     "At scale the mechanisms move (geo-sharding, conditional writes, durable timers) but the shape stays."
   ]
 };

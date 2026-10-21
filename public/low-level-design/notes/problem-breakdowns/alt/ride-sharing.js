@@ -18,6 +18,12 @@ func (s *RideService) Arrived(rideID, driverID string) error
 func (s *RideService) Start(rideID, driverID string) error
 func (s *RideService) Complete(rideID, driverID string, actual TripMetrics) error
 
+// Broadcast mode, live tracking and payments (Deep Dives)
+func (s *RideService) OpenRequestsNear(driverID string) ([]*Ride, error)
+func (s *RideService) Claim(rideID, driverID string) error // first driver to claim wins
+func (s *RideService) AddTrackingListener(l TrackingListener) // live location and ETA for riders
+func (s *RideService) Payment(rideID string) (*Payment, bool)
+
 func (s *RideService) AddListener(l RideListener)`,
 
 "Value types and the transition table": `type Location struct{ Lat, Lng float64 }
@@ -915,5 +921,192 @@ type Ride struct {
 func (r *Ride) offerNext() (RideEvent, bool)                          // claim next free candidate, Offered
 func (r *Ride) accept(driverID string, now int64) (RideEvent, error)
 func (r *Ride) withdrawOffer(driverID string) bool                    // decline or timeout; false if stale
-func (s RideStatus) CanMoveTo(to RideStatus) bool                     // explicit table`
+func (s RideStatus) CanMoveTo(to RideStatus) bool                     // explicit table`,
+
+"Broadcast mode: open requests and the first claim wins": `// On Ride: the first driver to tap claims the ride, if it is still searching and they are still free.
+func (r *Ride) claim(d *Driver, nowMillis int64) (RideEvent, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.status != Requested { // another driver won, or the rider cancelled
+		return RideEvent{}, false
+	}
+	if !d.TryClaim() { // this driver is busy with another ride
+		return RideEvent{}, false
+	}
+	r.driver = d
+	r.moveTo(Offered) // the transition table stays the one rulebook
+	d.StartTrip(nowMillis)
+	e, _ := r.moveTo(Accepted)
+	return e, true
+}
+
+// On RideService: open is a sync.Map of broadcast rides still searching (ride id -> *Ride).
+
+// OpenRequestsNear is what a driver's app lists: open rides of their type within the radius, nearest first.
+func (s *RideService) OpenRequestsNear(driverID string) ([]*Ride, error) {
+	d, err := s.driver(driverID)
+	if err != nil {
+		return nil, err
+	}
+	at := d.Location() // read once, so the sort sees one stable point
+	var out []*Ride
+	s.open.Range(func(_, v any) bool {
+		if r := v.(*Ride); r.Type == d.Vehicle.Type && r.Pickup.DistanceKm(at) <= searchRadiusKm {
+			out = append(out, r)
+		}
+		return true
+	})
+	slices.SortFunc(out, func(a, b *Ride) int { return cmp.Compare(a.Pickup.DistanceKm(at), b.Pickup.DistanceKm(at)) })
+	return out, nil
+}
+
+func (s *RideService) Claim(rideID, driverID string) error {
+	r, err := s.ride(rideID)
+	if err != nil {
+		return err
+	}
+	d, err := s.driver(driverID)
+	if err != nil {
+		return err
+	}
+	e, ok := r.claim(d, s.now().UnixMilli())
+	if !ok {
+		return fmt.Errorf("ride %s is no longer available", rideID) // the app shows "taken"
+	}
+	s.open.Delete(rideID)
+	s.publish(e)
+	return nil
+}`,
+
+"Live tracking: forward the assigned driver's pings to the rider": `type LocationUpdate struct {
+	RideID, RiderID string
+	DriverAt        Location
+	ETAMinutes      float64
+}
+
+type TrackingListener interface{ OnLocation(u LocationUpdate) } // e.g. pushes to the rider's app over a WebSocket
+
+const minTrackingInterval = 2 * time.Second
+
+type tracked struct {
+	ride       *Ride
+	lastSentAt atomic.Int64 // unix millis of the last update sent for this ride
+}
+
+// RideTracker forwards an assigned driver's pings to the rider, at most one update every two seconds per ride.
+type RideTracker struct {
+	byDriver  sync.Map // driver id -> *tracked
+	mu        sync.RWMutex
+	listeners []TrackingListener // guarded by mu
+	routes    RouteEstimator
+	now       func() time.Time
+}
+
+func (t *RideTracker) AddListener(l TrackingListener) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.listeners = append(t.listeners, l)
+}
+
+func (t *RideTracker) Start(r *Ride, driverID string) { t.byDriver.Store(driverID, &tracked{ride: r}) } // on Accepted
+func (t *RideTracker) Stop(driverID string)           { t.byDriver.Delete(driverID) }                 // on Completed or Cancelled
+
+// OnPing is called from UpdateLocation on every ping; the hot path takes no lock.
+func (t *RideTracker) OnPing(driverID string, at Location) {
+	v, ok := t.byDriver.Load(driverID)
+	if !ok {
+		return // not on a ride: nothing to track
+	}
+	tr := v.(*tracked)
+	now, prev := t.now().UnixMilli(), tr.lastSentAt.Load()
+	if now-prev < minTrackingInterval.Milliseconds() || !tr.lastSentAt.CompareAndSwap(prev, now) {
+		return // throttled, or another ping won
+	}
+	target := tr.ride.Pickup // to the pickup, then to the drop
+	if tr.ride.Status() == InProgress {
+		target = tr.ride.Drop
+	}
+	u := LocationUpdate{tr.ride.ID, tr.ride.RiderID, at, t.routes.Estimate(at, target).Minutes}
+	t.mu.RLock()
+	ls := slices.Clone(t.listeners)
+	t.mu.RUnlock()
+	for _, l := range ls {
+		l.OnLocation(u)
+	}
+}
+
+// Wiring in RideService:
+//   UpdateLocation: s.index.Update(d, at); s.tracker.OnPing(driverID, at)
+//   Accept or Claim: s.tracker.Start(r, driverID)    Complete or Cancel: s.tracker.Stop(driverID)`,
+
+"Payment with a status, charged once per ride": `type PaymentStatus int
+
+const (
+	PaymentPending PaymentStatus = iota
+	PaymentSucceeded
+	PaymentFailed
+)
+
+var ErrDeclined = errors.New("payment declined")
+
+type Payment struct {
+	RideID, RiderID string
+	Amount          int64 // paise
+
+	mu       sync.Mutex // guards status and attempts
+	status   PaymentStatus
+	attempts int
+}
+
+func (p *Payment) Status() PaymentStatus {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.status
+}
+
+// Attempt runs one attempt at a time; a success is final. Holding the lock during the call only delays retries of this ride.
+func (p *Payment) Attempt(g PaymentGateway) (PaymentStatus, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.status == PaymentSucceeded {
+		return p.status, nil
+	}
+	p.attempts++
+	err := g.Charge(p.RideID, p.RiderID, p.Amount) // ride id = idempotency key: a retry can't charge twice
+	switch {
+	case err == nil:
+		p.status = PaymentSucceeded
+	case errors.Is(err, ErrDeclined):
+		p.status = PaymentFailed // the ride stays Completed; the debt is retried later
+	default:
+		return p.status, err // a timeout leaves it Pending: retrying is safe
+	}
+	return p.status, nil
+}
+
+type PaymentService struct {
+	byRide  sync.Map // ride id -> *Payment
+	gateway PaymentGateway
+}
+
+// Charge keeps exactly one Payment per ride, however many times it is called.
+func (s *PaymentService) Charge(r *Ride, amount int64) (*Payment, error) {
+	v, _ := s.byRide.LoadOrStore(r.ID, &Payment{RideID: r.ID, RiderID: r.RiderID, Amount: amount})
+	p := v.(*Payment)
+	_, err := p.Attempt(s.gateway)
+	return p, err
+}
+
+func (s *PaymentService) Failed() []*Payment {
+	var out []*Payment
+	s.byRide.Range(func(_, v any) bool {
+		if p := v.(*Payment); p.Status() == PaymentFailed {
+			out = append(out, p)
+		}
+		return true
+	})
+	return out
+}
+
+// In RideService.Complete, replace the direct gateway call with: s.paymentService.Charge(r, fare.Total)`
 } };
