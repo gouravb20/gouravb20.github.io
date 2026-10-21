@@ -1,155 +1,185 @@
-// Deep dives: ATM Machine (LLD). Format: DeepDive in public/shared/notes.d.ts.
+// Deep dives: ATM (LLD practice set). Format: DeepDive in public/shared/notes.d.ts.
 window.DEEP = window.DEEP || {};
 DEEP["atm"] = {
-  hook: `<p>The happy path of an ATM is four states and a loop over note values. What interviewers probe is everything around it: a dispense chain that says "cannot dispense" for Rs 600 while holding plenty of Rs 200 notes, a customer debited for cash that jammed inside the machine, a retried network call that debits twice, and two ATMs draining one account at the same instant.</p><p>Each section below takes one of those failures and shows the design choice that prevents it.</p>`,
+  hook: `<p>Once the session, the cash chain and the withdrawal work, interviewers add twists to see whether the design bends without breaking: a new operation, a different note mix, a bank that stops answering, two machines draining one account, a customer who walks away. You rarely implement them in full; you show which class changes and why the rest doesn't. Mid-level candidates may get one or two of these, senior and staff candidates several, in more depth.</p>`,
   sections: [
     {
-      id: "state-vs-switch",
-      title: "State classes or an enum and a switch?",
-      kicker: "Pattern choice",
+      id: "deposits",
+      title: "\"How would you add cash deposits?\"",
+      kicker: "Follow-up: a new operation",
       blocks: [
-        { type: "text", html: `<p>Both designs encode the same twenty decisions (five actions, four states). The difference is where the decisions and the per-state data live. Here is the enum version of two of the five methods.</p>` },
-        { type: "code", lang: "java", title: "Same rules as an enum switch", code: `enum Status { IDLE, CARD_INSERTED, AUTHENTICATED, OUT_OF_SERVICE }
-
-final class SwitchAtm {
-    private Status status = Status.IDLE;
-    private Card card;               // meaningful only in CARD_INSERTED and AUTHENTICATED
-    private int wrongPins;           // meaningful only in CARD_INSERTED
-
-    synchronized PinResult enterPin(String pin) {
-        switch (status) {
-            case CARD_INSERTED -> { /* verify, count, maybe retain */ return PinResult.OK; }
-            default -> throw new IllegalStateException("Cannot enter a PIN while " + status);
-        }
-    }
-
-    synchronized void ejectCard() {
-        switch (status) {
-            case CARD_INSERTED, AUTHENTICATED -> {
-                card = null; wrongPins = 0; status = Status.IDLE;   // forget one reset and the next customer inherits it
-            }
-            default -> throw new IllegalStateException("No card to eject");
-        }
-    }
-    // ... and the same switch again in insertCard, balance and withdraw
-}` },
-        { type: "compare", items: [
-          { title: "Enum and switch", tone: "warn", html: `<p>One method per action, each with a switch over every state. Per-state data (<code>card</code>, <code>wrongPins</code>) lives in fields that exist in every state and must be cleared on every exit path. Adding a Dispensing state means editing all five switches.</p>` },
-          { title: "State records", tone: "ok", html: `<p>One record per state, holding only its own data. Leaving a state discards its data automatically, so there is nothing to reset. A new state is a new record plus the transitions into it; the default methods reject everything else.</p>` }
+        { type: "text", html: `<p>A deposit is one more customer action that only makes sense once the customer is authenticated. That is exactly what the State pattern is for: add a default that rejects, override it in one state, and the other states need no edits. The money side needs one new bank call and one new piece of hardware.</p>` },
+        { type: "table", headers: ["Class", "Change"], rows: [
+          ["AtmState", "One more default method, <code>deposit</code>, that rejects"],
+          ["Authenticated", "Overrides <code>deposit</code> and hands it to the Atm"],
+          ["Idle, CardInserted, OutOfService", "Nothing: the default already rejects"],
+          ["BankService", "<code>credit(card, amount, key)</code>, idempotent by key like a debit"],
+          ["CashHardware", "<code>acceptNotes()</code>: the note acceptor counts and checks the notes"],
+          ["Atm", "<code>deposit()</code>, <code>runDeposit</code>, and a deposit bin for unverified notes"],
+          ["CashDispenser, Cassette", "Nothing, unless the machine recycles deposited notes into its cassettes"]
         ] },
-        { type: "callout", tone: "interview", html: `<p>Say when you would pick each. Two or three states with no per-state data: an enum is shorter and clearer. Here the session carries data that must not leak between customers, and the state list is known to grow (Dispensing, DepositAccepted, PinChange), which is the force that justifies the pattern.</p>` },
-        { type: "callout", tone: "tip", html: `<p>Making states immutable records has a concurrency bonus: a state object never changes after it is built, so it needs no lock of its own. The only mutable thing is the ATM's reference to the current state, and that only changes inside the ATM's synchronized methods.</p>` }
+        { type: "code", lang: "java", title: "Deposits: one more action, one more bank call", code: `// AtmState: one more default, so Idle, CardInserted and OutOfService reject deposits without edits.
+default Transaction deposit(Atm atm) { throw reject("deposit"); }
+
+// Authenticated: the only state that allows it.
+public Transaction deposit(Atm atm) { return atm.runDeposit(card); }
+
+// BankService: a credit is idempotent by key, exactly like a debit.
+void credit(String cardNumber, long amount, String idempotencyKey);
+
+// CashHardware: counts and checks the notes; fakes and foreign notes go back to the customer.
+Map<Long, Integer> acceptNotes() throws AcceptorException;
+
+// Atm: the same monitor as every other action.
+private final Map<Long, Integer> depositBin = new HashMap<>();   // guarded by this; emptied by an operator
+
+synchronized Transaction deposit() { return state.deposit(this); }
+
+Transaction runDeposit(Card card) {
+    String txnId = UUID.randomUUID().toString();
+    Map<Long, Integer> notes;
+    try {
+        notes = hardware.acceptNotes();
+    } catch (AcceptorException e) {
+        return recordTxn(txnId, card, 0, TxnStatus.DECLINED, "Note acceptor fault");
+    }
+    long amount = 0;
+    for (Map.Entry<Long, Integer> e : notes.entrySet()) amount += e.getKey() * e.getValue();
+    if (amount == 0) return recordTxn(txnId, card, 0, TxnStatus.DECLINED, "No valid notes");
+    notes.forEach((note, n) -> depositBin.merge(note, n, Integer::sum));   // not the cassettes: unverified notes
+    bank.credit(card.number(), amount, txnId);           // the amount comes from the counted notes, never the keypad
+    return recordTxn(txnId, card, amount, TxnStatus.COMPLETED, "Deposited");
+}` },
+        { type: "keypoints", items: [
+          "<strong>The amount is counted, never typed.</strong> The customer's claim about how much they put in is input you can't trust; the acceptor's count is the amount credited.",
+          "<strong>The failure direction flips.</strong> In a withdrawal an unknown bank outcome is fixed by a reversal. In a deposit the machine already holds the customer's money, so an unknown outcome is fixed by retrying the credit with the same key until it lands.",
+          "<strong>Real machines escrow the notes</strong> and show the count for the customer to confirm or cancel. That is one more state, <code>DepositEscrow(card, notes)</code>, whose confirm credits the bank and whose cancel hands the notes back."
+        ] }
       ]
     },
     {
-      id: "cash-chain",
-      title: "An inventory-aware chain, and why greedy fails",
-      kicker: "Chain of Responsibility",
+      id: "note-mix",
+      title: "\"Can you pay with the fewest notes, or let the customer choose the mix?\"",
+      kicker: "Follow-up: a planning strategy",
       blocks: [
-        { type: "problem", html: `<p>The simple chain from the In a Hurry notes hands the amount to the largest-note handler, which takes as many notes as fit and passes the remainder on. Once cassettes have real counts, that greedy rule declines amounts the machine could pay.</p>` },
-        { type: "code", lang: "java", title: "Greedy chain that fails on 600", code: `final class GreedyLink {
-    final long note;
-    final GreedyLink next;
-    int count;
+        { type: "text", html: `<p>The backing-off chain finds a mix, largest notes first. Is that ever more notes than necessary? For Rs 2000, 500, 200 and 100 we checked 126,000 combinations of cassette counts and amounts against an exact fewest-notes search, and the two always used the same number of notes. With other denominations they can differ: with Rs 400, 300 and 100 notes, Rs 600 from the chain is 400 + 100 + 100, while the fewest is 300 + 300. Customers asking for "no Rs 2000 notes, please" is a more common reason to change the rule.</p>` },
+        { type: "text", html: `<p>So planning becomes a <strong>Strategy</strong>. The cassettes keep owning the counts; a planner only reads them and returns a plan. <code>CashDispenser.plan</code> delegates to it, and <code>take</code>, <code>load</code> and <code>total</code> don't change. The existing chain becomes one planner among several.</p>` },
+        { type: "code", lang: "java", title: "NotePlanner: fewest notes by dynamic programming", code: `/** How to turn an amount into notes. The cassettes own the counts; a planner only reads them. */
+interface NotePlanner {
+    Optional<Map<Long, Integer>> plan(long amount, SortedMap<Long, Integer> available);   // note -> count
+}
 
-    GreedyLink(long note, int count, GreedyLink next) { this.note = note; this.count = count; this.next = next; }
+// CashDispenser: plan delegates; counts() copies note -> count from the chain. take, load and total don't change.
+Optional<Map<Long, Integer>> plan(long amount) { return planner.plan(amount, counts()); }
 
-    boolean plan(long amount, Map<Long, Integer> plan) {
-        int use = (int) Math.min(count, amount / note);      // take as many as fit, never fewer
-        if (use > 0) plan.put(note, use);
-        long rest = amount - use * note;
-        return rest == 0 || (next != null && next.plan(rest, plan));
+/** Fewest notes for any set of denominations, by bounded change-making. */
+final class FewestNotes implements NotePlanner {
+    public Optional<Map<Long, Integer>> plan(long amount, SortedMap<Long, Integer> available) {
+        long unit = 100 * Atm.RS;                            // every note and amount is a multiple of Rs 100
+        if (amount % unit != 0) return Optional.empty();
+        int target = (int) (amount / unit), none = Integer.MAX_VALUE;
+        List<Long> notes = List.copyOf(available.keySet());
+        int[] best = new int[target + 1];                    // fewest notes for each sub-amount so far
+        int[][] take = new int[notes.size()][target + 1];    // notes of type i used for that sub-amount
+        Arrays.fill(best, none);
+        best[0] = 0;
+        for (int i = 0; i < notes.size(); i++) {
+            int value = (int) (notes.get(i) / unit), count = available.get(notes.get(i));
+            for (int a = target; a > 0; a--)                 // downwards: lower cells still hold the previous row
+                for (int k = 1; k <= count && k * value <= a; k++) {
+                    int prev = best[a - k * value];
+                    if (prev != none && prev + k < best[a]) { best[a] = prev + k; take[i][a] = k; }
+                }
+        }
+        if (best[target] == none) return Optional.empty();
+        Map<Long, Integer> plan = new TreeMap<>(Comparator.reverseOrder());
+        for (int i = notes.size() - 1, a = target; i >= 0; i--) {
+            int k = take[i][a];
+            if (k > 0) plan.put(notes.get(i), k);
+            a -= k * (int) (notes.get(i) / unit);
+        }
+        return Optional.of(plan);
     }
 }
-// Cassettes: Rs 500 x 10, Rs 200 x 10, no Rs 100. plan(600) takes one 500, leaves 100 and fails,
-// although 200 + 200 + 200 works. It also leaves a half-filled plan behind on failure.` },
-        { type: "table", title: "Greedy vs the backtracking chain", headers: ["Amount", "Notes loaded", "Greedy", "Backtracking chain"], rows: [
-          ["Rs 600", "500 x 10, 200 x 10", "500, then Rs 100 left: fails", "200 x 3"],
-          ["Rs 800", "500 x 1, 200 x 10", "500 + 200, then Rs 100 left: fails", "200 x 4"],
-          ["Rs 2600", "2000 x 1, 500 x 1, 200 x 5", "2000 + 500, then Rs 100 left: fails", "2000 + 200 x 3"],
-          ["Rs 1100", "500 x 4, 200 x 5", "500 x 2, then Rs 100 left: fails", "500 + 200 x 3"],
-          ["Rs 300", "500 x 4, 200 x 5", "200, then Rs 100 left: fails", "Fails too: correctly declined before the bank call"]
-        ] },
-        { type: "text", html: `<p>The fix in the solution keeps the chain's shape: each link still owns one denomination and passes the remainder on, but it tries the most notes first and backs off one at a time when the rest of the chain reports failure. Only the successful path writes to the plan, so a failed search leaves nothing behind. Because the greedy choice is tried first, the usual case costs one pass; the search is bounded by four links and the Rs 10,000 cap, so even an impossible amount costs well under a millisecond.</p>` },
-        { type: "code", lang: "java", title: "Fewest notes by dynamic programming", code: `/**
- * Fewest notes that make amount using at most counts[i] notes of value notes[i]; empty if impossible.
- * Amounts are in units of Rs 100, so a Rs 10,000 cap means a table of 101 cells.
- */
-static Optional<int[]> fewestNotes(int amount, int[] notes, int[] counts) {
-    int n = notes.length, none = Integer.MAX_VALUE;
-    int[] best = new int[amount + 1];                 // fewest notes for each sub-amount so far
-    int[][] take = new int[n][amount + 1];            // notes of type i chosen at that step
-    Arrays.fill(best, none);
-    best[0] = 0;
-    for (int i = 0; i < n; i++)
-        for (int a = amount; a > 0; a--)              // downwards: lower cells still hold the previous row
-            for (int k = 1; k <= counts[i] && k * notes[i] <= a; k++) {
-                int prev = best[a - k * notes[i]];
-                if (prev != none && prev + k < best[a]) { best[a] = prev + k; take[i][a] = k; }
-            }
-    if (best[amount] == none) return Optional.empty();
-    int[] out = new int[n];
-    for (int i = n - 1, a = amount; i >= 0; i--) { out[i] = take[i][a]; a -= out[i] * notes[i]; }
-    return Optional.of(out);
+
+/** "No Rs 2000 notes, please": hide some notes, then ask any other planner (a Decorator). */
+record Without(Set<Long> excluded, NotePlanner inner) implements NotePlanner {
+    public Optional<Map<Long, Integer>> plan(long amount, SortedMap<Long, Integer> available) {
+        SortedMap<Long, Integer> view = new TreeMap<>(available);
+        view.keySet().removeAll(excluded);
+        return inner.plan(amount, view);
+    }
 }` },
-        { type: "callout", tone: "insight", html: `<p>Backtracking finds <em>a</em> valid mix, largest notes first; dynamic programming finds the mix with the <em>fewest</em> notes. For Indian denominations the two usually agree. If the business wants something else, such as a few smaller notes so customers get change, or spending the fullest cassette first, that choice is a planning <strong>Strategy</strong> behind <code>CashDispenser.plan</code>. Add it only when that requirement exists.</p>` },
+        { type: "keypoints", items: [
+          "The table has one cell per Rs 100 up to the amount, so a Rs 10,000 cap means 101 cells per note: tiny.",
+          "A customer's preference reaches the planner through <code>Authenticated.withdraw</code>, for example as an optional set of excluded notes; the Atm wraps the default planner in <code>Without</code> for that one call.",
+          "Other business rules (spend the fullest cassette first, include a few small notes for change) are more planners. Add them only when the requirement exists."
+        ] },
         { type: "quiz", q: "Cassettes hold Rs 500 x 4 and Rs 200 x 5, nothing else. A customer asks for Rs 1,100. What should the dispenser do?", options: [
           "Decline: Rs 1,100 is not a multiple of Rs 500",
           "Dispense 500 + 500 and show Rs 100 as owed",
           "Dispense 500 + 200 + 200 + 200",
           "Debit the account first, then search for a mix"
-        ], answer: 2, explain: `<p>Greedy takes two 500s and is stuck with Rs 100. The backtracking chain backs off to one 500, and the 200 cassette makes the remaining Rs 600 with three notes. The plan is found before the bank is called, so a decline would never have debited anyone.</p>` }
+        ], answer: 2, explain: `<p>Greedy takes two 500s and is stuck with Rs 100. The backing-off chain drops to one 500, and the 200 cassette makes the remaining Rs 600 with three notes; the fewest-notes planner finds the same four notes. Either way the plan exists before the bank is called, so a decline would never have debited anyone.</p>` }
       ]
     },
     {
-      id: "all-or-nothing",
-      title: "All-or-nothing withdrawal and rollback",
-      kicker: "Failure handling",
+      id: "bank-timeout",
+      title: "\"The bank call times out in the middle of a debit. What does the ATM do?\"",
+      kicker: "Follow-up: unknown outcomes",
       blocks: [
-        { type: "text", html: `<p>A withdrawal changes two things that cannot share a database transaction: the bank's ledger and the notes in the machine. So the design orders the steps so that every failure has a cheap, safe fix.</p>` },
-        { type: "table", headers: ["Step", "Can fail because", "State if it fails", "Fix"], rows: [
-          ["1. Validate amount", "Not a multiple of Rs 100, above the cap", "Nothing changed", "Decline"],
-          ["2. Plan notes", "Loaded notes cannot make the amount", "Nothing changed", "Decline, suggest amounts that work"],
-          ["3. Debit at the bank", "Insufficient funds, daily limit, timeout", "Not debited, or unknown on a timeout", "Decline; on a timeout retry with the same key, then reverse"],
-          ["4. Take notes and dispense", "Jam, sensor fault", "Debited, no cash given", "Reverse the debit, return the card, go OutOfService"],
-          ["5. Customer leaves the cash", "Walks away", "Debited, cash presented", "Retract after a timeout and reverse (a common follow-up)"]
-        ] },
-        { type: "compare", items: [
-          { title: "Dispense, then debit", tone: "bad", html: `<p>If the debit is declined or times out after the notes are out, the bank has paid cash it cannot recover. There is no compensating action for handed-out money.</p>` },
-          { title: "Debit, then dispense, reverse on fault", tone: "ok", html: `<p>The worst case is a debit that is undone moments later. The bank can always credit an account; the reversal is idempotent by key, so sending it twice is harmless.</p>` },
-          { title: "Plan before the debit", tone: "info", html: `<p>Declining before the bank call means a customer is never debited for an amount the machine could not pay, and the common "notes unavailable" case never needs a reversal.</p>` }
-        ] },
-        { type: "code", lang: "java", title: "Retry with the same key, then reverse", code: `record PendingReversal(String card, String key) {}
-private final Queue<PendingReversal> pendingReversals = new ConcurrentLinkedQueue<>();   // drained by a background job
+        { type: "text", html: `<p>A timeout is the worst answer: the bank may or may not have debited. Dispensing is unsafe (maybe no debit) and simply giving up is unsafe too (maybe a debit with no cash). The idempotency key already on every debit is what makes this solvable. Only <code>Atm</code> changes: the debit goes through a retry helper, and a background job sends reversals until the bank confirms them.</p>` },
+        { type: "code", lang: "java", title: "Retry with the same key, then queue a reversal", code: `class BankTimeoutException extends RuntimeException {}    // the bank's outcome is unknown
 
-/** Up to three tries with the same key, so the bank applies the debit at most once. */
-Optional<DebitResult> debitWithRetry(String card, long amount, String key) {
+record PendingReversal(String cardNumber, String key) {}
+
+// Atm: added to under the Atm monitor, drained by a background thread without it, so a concurrent queue.
+private final Queue<PendingReversal> pendingReversals = new ConcurrentLinkedQueue<>();
+
+/** Up to three tries with one key: however many arrive, the bank applies the debit at most once. */
+Optional<DebitResult> debitWithRetry(String cardNumber, long amount, String key) {
     for (int attempt = 1; attempt <= 3; attempt++) {
         try {
-            return Optional.of(bank.debit(card, amount, key));
+            return Optional.of(bank.debit(cardNumber, amount, key));
         } catch (BankTimeoutException e) {
-            // Outcome unknown; the same key makes a retry safe (back off briefly in real code).
+            // Unknown outcome. The same key makes the retry safe; real code backs off between tries.
         }
     }
-    pendingReversals.add(new PendingReversal(card, key));   // retried until the bank confirms
-    return Optional.empty();                                 // tell the customer to try later; dispense nothing
+    pendingReversals.add(new PendingReversal(cardNumber, key));   // undo whatever may have happened
+    return Optional.empty();
+}
+
+// In runWithdrawal the debit becomes:
+//   Optional<DebitResult> debit = debitWithRetry(card.number(), amount, txnId);
+//   if (debit.isEmpty()) return recordTxn(txnId, card, amount, TxnStatus.DECLINED, "Bank unavailable, reversal queued");
+
+/** One background thread runs this every few seconds: each reversal is sent until the bank answers. */
+void drainReversals() {
+    for (PendingReversal r; (r = pendingReversals.peek()) != null; ) {
+        try {
+            bank.reverse(r.cardNumber(), r.key());
+            pendingReversals.poll();                         // only this thread removes, so peek then poll is safe
+        } catch (BankTimeoutException e) {
+            return;                                          // try again on the next run
+        }
+    }
 }` },
-        { type: "callout", tone: "warning", title: "A reversal is a new entry, not an undo", html: `<p>Banks never delete a ledger row. A reversal appends a credit that references the original debit's key, which is why it can be idempotent: the bank checks whether that key was already reversed. If the reversal arrives before a delayed debit, the bank stores a tombstone under the key so the late debit is refused rather than applied.</p>` },
+        { type: "callout", tone: "warning", title: "A reversal is a new ledger entry, not an undo", html: `<p>Banks never delete a ledger row. A reversal appends a credit that references the original debit's key, which is why it can be idempotent: the bank checks whether that key was already reversed. If the reversal arrives before a delayed debit, the bank stores a tombstone under the key so the late debit is refused rather than applied. That is the <code>CANCELLED</code> value of <code>DebitResult</code>.</p>` },
         { type: "keypoints", items: [
-          "Notes are removed from the cassette counts before dispensing. After a jam they sit in the reject bin, not the cassette, so the code does not add them back; an engineer counts the bin.",
-          "The journal records REVERSED with the transaction id, so reconciliation can match the reject-bin count against reversed transactions and the bank's ledger.",
-          "Every step before the debit only reads, and every step after it has a compensating action. That property, not a distributed transaction, is what makes the withdrawal all or nothing."
+          "Nothing is dispensed after a failed retry: an unknown outcome is always resolved towards \"no debit\".",
+          "The journal records the transaction with its key, so reconciliation can match it against the bank's ledger if a reversal is still queued when the machine restarts. In production the queue is persisted.",
+          "<code>BankService</code>'s signature doesn't change; only the network client underneath it learns to throw on a timeout."
         ] }
       ]
     },
     {
-      id: "concurrency",
-      title: "Concurrency at the ATM and at the bank",
-      kicker: "Thread safety",
+      id: "two-atms",
+      title: "\"Two ATMs withdraw from one account at the same moment. What stops an overdraft?\"",
+      kicker: "Follow-up: concurrency at the bank",
       blocks: [
-        { type: "text", html: `<p>There are two separate races with two separate guards. Mixing them up is the most common mistake: an ATM lock cannot stop two ATMs from overdrawing one account.</p>` },
+        { type: "text", html: `<p>Not the ATM's lock: it only protects one machine. Mixing up the two kinds of shared state is the most common mistake in this problem. Only the bank changes, and only its implementation: the interface already promises an atomic, idempotent debit.</p>` },
         { type: "table", headers: ["Shared state", "Touched by", "Guard", "Why it is safe"], rows: [
-          ["Session state, cassette counts, journal", "The customer's actions, operator refills, timers", "The Atm monitor (synchronized methods)", "Each action is one critical section; a refill can't land between plan and take"],
+          ["Session state, cassette counts, journal", "This machine's customer, operator and timers", "The Atm monitor", "Each action is one critical section; a refill can't land between plan and take"],
           ["State objects", "Read under the Atm monitor", "Immutable records", "Nothing changes after construction"],
           ["Balance, daily total, idempotency records", "Every ATM, app and branch", "A per-account lock at the bank", "Check and debit are one step; two ATMs can't both pass the balance check"],
           ["The accounts map", "All bank threads", "ConcurrentHashMap", "Lookups and inserts are safe without a global lock"]
@@ -181,7 +211,8 @@ Optional<DebitResult> debitWithRetry(String card, long amount, String key) {
     }
 
     public AuthResult verifyPin(String card, String pin) {
-        Account a = account(card);
+        Account a = accounts.get(card);
+        if (a == null) return AuthResult.BLOCKED;            // unknown card: the ATM retains it
         synchronized (a) {
             if (a.wrongPins >= 3) return AuthResult.BLOCKED;
             if (hasher.matches(pin, a.pinHash)) { a.wrongPins = 0; return AuthResult.OK; }
@@ -236,57 +267,114 @@ Optional<DebitResult> debitWithRetry(String card, long amount, String key) {
         if (!today.equals(a.day)) { a.day = today; a.withdrawnToday = 0; }
     }
 }` },
-        { type: "text", html: `<p>The idempotency record lives inside the account and is written under the same lock as the balance, so "have I seen this key?", "is there enough money?" and "debit it" form one atomic step. A compare-and-set on an <code>AtomicLong</code> balance could make the debit lock-free, but the daily total and the idempotency record would then be separate updates; changing three things together needs a lock, or one immutable account snapshot swapped through an <code>AtomicReference</code>. With a database, the same step is <code>UPDATE accounts SET balance = balance - ? WHERE id = ? AND balance &gt;= ?</code> plus an insert into a table with a unique key on the idempotency key, in one transaction. In production the idempotency records would also expire after a retention period.</p>` },
-        { type: "compare", title: "The bank call and the ATM lock", items: [
-          { title: "Hold the ATM lock across the call", tone: "ok", html: `<p>The solution's choice. Simple and correct: a single-customer machine has nobody else to serve, and an operator refill waits at most for the call's timeout. Lock order is always ATM then account, so it cannot deadlock.</p>` },
-          { title: "Reserve, unlock, call, relock", tone: "info", html: `<p>Worth it if the call can be slow or status screens must stay live. Dispensing becomes a real, observable state that rejects customer actions while the call is in flight.</p>` }
-        ] },
-        { type: "steps", title: "Making Dispensing a real state", items: [
-          "Under the lock: validate, plan, move the planned notes from available to reserved, and set the state to <code>Dispensing(card, plan, txnId)</code>.",
-          "Release the lock and call the bank. Refills and status reads proceed; customer actions reach Dispensing and are rejected.",
-          "Re-acquire the lock. On OK, dispense the reserved notes and return to Authenticated. On a decline, return the reserved notes to available. On a jam, reverse the debit and go OutOfService."
-        ] }
+        { type: "text", html: `<p>The idempotency record lives inside the account and is written under the same lock as the balance, so "have I seen this key?", "is there enough money?" and "debit it" form one atomic step. A compare-and-set on an <code>AtomicLong</code> balance could make the debit lock-free, but the daily total and the idempotency record would then be separate updates; changing three things together needs a lock, or one immutable account snapshot swapped through an <code>AtomicReference</code>. With a database, the same step is <code>UPDATE accounts SET balance = balance - ? WHERE id = ? AND balance &gt;= ?</code> plus an insert into a table with a unique constraint on the idempotency key, in one transaction.</p>` },
+        { type: "callout", tone: "mistake", html: `<p>Counting wrong PINs only in the ATM's memory. The count resets when the customer takes the card to the next machine, so the real limit lives at the bank, keyed by card, as <code>wrongPins</code> above. The ATM's own count is a usability feature: it decides when this machine keeps the card.</p>` }
       ]
     },
     {
-      id: "security",
-      title: "PIN attempts, card retention and what never gets logged",
-      kicker: "Security",
+      id: "refill-during-call",
+      title: "\"Can an operator refill while the bank call is in flight?\"",
+      kicker: "Follow-up: releasing the lock",
       blocks: [
-        { type: "keypoints", items: [
-          "<strong>Two attempt counters, two purposes.</strong> The session's count in <code>CardInserted</code> decides when this machine retains the card. The bank's count per card spans every ATM, so a thief can't try two PINs at each of fifty machines. When the bank says BLOCKED, the ATM retains the card even on the first try.",
-          "<strong>The PIN never exists in plain text outside the PIN pad.</strong> The pad's secure module encrypts it into a PIN block; the ATM forwards the block and the bank's hardware security module verifies it against a salted slow hash. The <code>String pin</code> in the solution stands in for that block.",
-          "<strong>Inactivity ends the session.</strong> No input for a while in CardInserted or Authenticated returns the card; a card left in the slot is retained. A session number stops an old timer from ending a newer customer's session.",
-          "<strong>Records are masked by construction.</strong> The journal stores <code>card.masked()</code>, and <code>Card.toString</code> masks too, so a careless log line can't leak a full number."
+        { type: "text", html: `<p>In the solution the Atm holds its monitor across the bank call, so a refill or a status screen waits for up to the call's timeout. If calls can be slow, release the lock for the call. Once the lock is released, other threads can observe the machine mid-withdrawal, so that moment must become a real state, and the planned notes must be reserved so a refill or a second plan can't spend them.</p>` },
+        { type: "table", headers: ["Class", "Change"], rows: [
+          ["AtmState", "A fifth record, <code>Dispensing</code>, added to the <code>permits</code> list; its defaults reject every customer action"],
+          ["Atm", "<code>withdraw</code> runs in three steps: reserve under the lock, call the bank without it, finish under the lock"],
+          ["CashDispenser", "Nothing new: <code>take</code> reserves and <code>load</code> puts reserved notes back"],
+          ["Operator actions", "Nothing: a refill only adds counts; <code>takeOutOfService</code> already refuses anything but Idle"]
         ] },
-        { type: "code", lang: "java", title: "Redacted PIN block and an inactivity timeout", code: `/** The encrypted PIN block from the PIN pad. The ATM forwards it and never sees the digits. */
-record PinBlock(byte[] cipherText) {
-    @Override public String toString() { return "PinBlock[redacted]"; }
+        { type: "code", lang: "java", title: "Dispensing as a real state", code: `// The bank call is in flight. Every customer action reaches the interface defaults and is rejected.
+record Dispensing(Card card, long amount, Map<Long, Integer> plan, String txnId) implements AtmState {}
+
+// Atm.withdraw no longer holds the monitor across the bank call.
+Transaction withdraw(long amount) {
+    Dispensing d;
+    synchronized (this) {
+        if (!(state instanceof Authenticated a)) return state.withdraw(this, amount);   // the state rejects it
+        String txnId = UUID.randomUUID().toString();
+        if (amount <= 0 || amount % STEP != 0 || amount > PER_TXN_LIMIT)
+            return recordTxn(txnId, a.card(), amount, TxnStatus.DECLINED, "Invalid amount");
+        Optional<Map<Long, Integer>> plan = cash.plan(amount);
+        if (plan.isEmpty()) return recordTxn(txnId, a.card(), amount, TxnStatus.DECLINED, "Notes for this amount are not available");
+        cash.take(plan.get());                               // reserved: a refill or another plan can't spend them
+        d = new Dispensing(a.card(), amount, Map.copyOf(plan.get()), txnId);
+        state = d;
+    }
+    DebitResult debit;
+    try {
+        debit = bank.debit(d.card().number(), d.amount(), d.txnId());   // no lock: refills and status reads go ahead
+    } catch (RuntimeException e) {
+        debit = null;                                        // unknown outcome
+    }
+    synchronized (this) {
+        if (debit != DebitResult.OK) {
+            d.plan().forEach(cash::load);                    // un-reserve
+            state = new Authenticated(d.card());
+            if (debit == null) pendingReversals.add(new PendingReversal(d.card().number(), d.txnId()));
+            String reason = debit == null ? "Bank unavailable, reversal queued" : debit.name();
+            return recordTxn(d.txnId(), d.card(), d.amount(), TxnStatus.DECLINED, reason);
+        }
+        try {
+            hardware.dispense(d.plan());
+        } catch (DispenseException e) {
+            bank.reverse(d.card().number(), d.txnId());
+            hardware.returnCard();
+            state = new OutOfService(OutOfService.Reason.FAULT);
+            return recordTxn(d.txnId(), d.card(), d.amount(), TxnStatus.REVERSED, "Dispenser fault, debit reversed");
+        }
+        state = new Authenticated(d.card());
+        return recordTxn(d.txnId(), d.card(), d.amount(), TxnStatus.COMPLETED, "Dispensed");
+    }
+}` },
+        { type: "compare", items: [
+          { title: "Hold the lock across the call", tone: "ok", html: `<p>The solution's choice. Simple and obviously correct: a single-customer machine has nobody else to serve, an operator waits at most one timeout, and the lock order is always ATM then account.</p>` },
+          { title: "Reserve, unlock, call, relock", tone: "info", html: `<p>Worth it when calls can be slow or status screens must stay live. The price is a new state, a reservation that has to be undone on every non-OK path, and a few more cases to test.</p>` }
+        ] },
+        { type: "callout", tone: "interview", html: `<p>Lay out both and pick one: "Holding the lock is simpler and the only thing that waits is the operator. If the interviewer cares about a slow bank, I'd make Dispensing a real state and reserve the notes." Naming the cost of the clever option is what makes the answer senior.</p>` }
+      ]
+    },
+    {
+      id: "walk-away",
+      title: "\"What if the customer walks away mid-session, or leaves the cash?\"",
+      kicker: "Follow-up: timeouts",
+      blocks: [
+        { type: "text", html: `<p>Two different abandonments. A customer who walks away after the PIN leaves an authenticated session open for the next person; a customer who forgets the notes leaves them in the shutter. The first needs an inactivity timeout on the <code>Atm</code>; the second needs <code>CashHardware.dispense</code> to report whether the notes were taken, and the withdrawal to reverse if they weren't.</p>` },
+        { type: "code", lang: "java", title: "Inactivity timeout and retracted cash", code: `static final Duration INACTIVITY = Duration.ofSeconds(30);
+private final Clock clock;                                   // injected, so tests control time
+private Instant lastActivity;                                // guarded by this; set by every customer action
+
+/** Runs every few seconds on a ScheduledExecutorService, under the same monitor as every action. */
+synchronized void checkInactivity() {
+    boolean inSession = state instanceof CardInserted || state instanceof Authenticated;
+    if (inSession && Duration.between(lastActivity, clock.instant()).compareTo(INACTIVITY) > 0)
+        endSession();                                        // returns the card; the slot retains it if nobody takes it
 }
 
-// Inside Atm: an inactivity timer. The session number stops an old timer from ending a newer session.
-private long session;                                  // guarded by the monitor; bumped on every insertCard
+// CashHardware.dispense now reports whether the notes were taken before the shutter closed.
+enum Pickup { TAKEN, RETRACTED }
+Pickup dispense(Map<Long, Integer> notes) throws DispenseException;
 
-synchronized void onInactivity(long forSession) {
-    if (forSession != session) return;                 // that session already ended
-    if (state instanceof CardInserted || state instanceof Authenticated) endSession();
+// In runWithdrawal, inside the existing try (a fault still reverses as before):
+Pickup pickup = hardware.dispense(plan.get());
+if (pickup == Pickup.RETRACTED) {                            // the notes went back into the reject bin
+    bank.reverse(card.number(), txnId);
+    return recordTxn(txnId, card, amount, TxnStatus.REVERSED, "Cash not taken, retracted");
 }` },
-        { type: "table", title: "What may appear where", headers: ["Data", "Screen and receipt", "Journal", "Application logs"], rows: [
-          ["PIN or PIN block", "Never", "Never", "Never"],
-          ["Card number", "Masked (XXXX1234)", "Masked", "Masked"],
-          ["Balance", "Yes, to the cardholder", "No", "No"],
-          ["Transaction id, amount, status", "Yes", "Yes", "Yes"]
-        ] },
-        { type: "callout", tone: "mistake", html: `<p>Counting wrong PINs only in the ATM's memory. The count resets when the customer takes the card out and walks to the next machine, so the real limit has to live at the bank, keyed by card. The ATM's own count is a usability feature: it decides when to swallow the card.</p>` }
+        { type: "keypoints", items: [
+          "<strong>The check and the actions share one monitor</strong>, so a timeout can never end a session in the middle of a withdrawal, and an action that arrives just before the check refreshes <code>lastActivity</code> first.",
+          "<strong>Checking a timestamp beats scheduling one timer per session.</strong> A per-session timer has to be cancelled or ignored when the session ends early; a periodic check simply finds nothing to do.",
+          "<strong>Retracted notes are not put back in the cassettes.</strong> Like jammed notes, they go to the reject bin, and the REVERSED journal entry lets an engineer reconcile the bin.",
+          "<strong>Nothing sensitive leaks while waiting.</strong> The PIN only ever exists as an encrypted block from the keypad, and the journal and logs see <code>card.masked()</code>, never the full number."
+        ] }
       ]
     }
   ],
   takeaways: [
-    "Use the State pattern when states carry data and the list will grow; make states immutable records and swap them under one lock.",
-    "A cash chain must plan against real counts: try the most notes first and back off, or use bounded dynamic programming.",
-    "Plan before the debit, debit before the dispense, and reverse with the same key if the dispenser faults.",
-    "Idempotency keys make retries safe; a tombstone stops a late debit that a reversal overtook.",
-    "The ATM lock guards the machine; only the bank, with a per-account lock or conditional update, can guard the balance.",
-    "PIN limits live at the bank as well as the ATM, PINs stay encrypted end to end, and logs only ever see masked card numbers."
+    "Follow-ups should touch one or two classes: a state and the bank for deposits, the dispenser's planner for note mixes, the Atm for timeouts and timers, only the bank for cross-ATM races.",
+    "A new operation is a default method on the state interface plus one override; the State pattern pays for itself here.",
+    "Note planning becomes a Strategy when the rule must change; the chain and a fewest-notes search agree for Indian notes, and differ only for unusual denominations.",
+    "An unknown bank outcome is resolved with the same idempotency key: retry, then queue a reversal; a tombstone stops a late debit.",
+    "The ATM lock guards the machine; only the bank, with a per-account lock or a conditional update, can guard the balance.",
+    "Releasing the lock during the bank call is possible, but it turns a hidden moment into a real Dispensing state with reserved notes."
   ]
 };

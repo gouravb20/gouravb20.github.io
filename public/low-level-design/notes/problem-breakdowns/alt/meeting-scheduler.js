@@ -2,24 +2,17 @@
 // Go has no TreeMap: each room keeps a slice sorted by start and searches it with sort.Search.
 window.ALT = window.ALT || {};
 ALT["meeting-scheduler"] = { go: {
-"Public API": `func NewMeetingScheduler(rooms []Room, selection RoomSelectionStrategy) *MeetingScheduler
-func (m *MeetingScheduler) Book(roomID string, req MeetingRequest) (*Booking, error)  // ErrRoomUnavailable if taken
-func (m *MeetingScheduler) BookAny(q RoomQuery, req MeetingRequest) (*Booking, error) // best free room per the strategy
-func (m *MeetingScheduler) Cancel(bookingID string) error
-func (m *MeetingScheduler) Reschedule(bookingID, roomID string, when Interval) (*Booking, error) // all or nothing
-func (m *MeetingScheduler) CalendarOf(person string, window Interval) []*Booking // a person's meetings; shows clashes too
-func (m *MeetingScheduler) AddListener(l MeetingListener)`,
-
-"Intervals, rooms and bookings": `type Interval struct{ Start, End time.Time } // half-open [Start, End)
+"Interval, Room and Booking": `// Interval is half-open [Start, End): the end instant is not part of the meeting.
+// Build it with NewInterval; a struct literal would skip the check.
+type Interval struct{ Start, End time.Time }
 
 func NewInterval(start, end time.Time) (Interval, error) {
-	if !start.Before(end) {
+	if !start.Before(end) { // zero-length or reversed
 		return Interval{}, errors.New("start must be before end")
 	}
 	return Interval{start, end}, nil
 }
 
-// Overlaps: a meeting ending at 10:00 doesn't clash with one starting at 10:00.
 func (i Interval) Overlaps(o Interval) bool { return i.Start.Before(o.End) && o.Start.Before(i.End) }
 
 type Equipment uint8 // a bit set
@@ -32,7 +25,6 @@ const (
 
 type Room struct {
 	ID        string
-	Name      string
 	Floor     int
 	Capacity  int
 	Equipment Equipment
@@ -68,6 +60,13 @@ func (m MeetingRequest) At(when Interval) MeetingRequest {
 	return m
 }
 
+// People returns the organizer and attendees, sorted and without duplicates.
+func (m MeetingRequest) People() []string {
+	all := append([]string{m.Organizer}, m.Attendees...)
+	slices.Sort(all)
+	return slices.Compact(all)
+}
+
 // Booking is immutable once created: a reschedule makes a new one with the same ID.
 type Booking struct {
 	ID      string
@@ -77,15 +76,43 @@ type Booking struct {
 
 func (b *Booking) When() Interval { return b.Meeting.When }
 
-func (b *Booking) People() []string {
-	return append([]string{b.Meeting.Organizer}, b.Meeting.Attendees...)
-}
-
 func (b *Booking) MovedTo(roomID string, when Interval) *Booking {
 	return &Booking{ID: b.ID, RoomID: roomID, Meeting: b.Meeting.At(when)}
 }`,
 
-"Room schedule": `// A slice kept sorted by start replaces Java's TreeMap. Insert and remove shift the slice
+"Final class design": `type MeetingScheduler struct {
+	rooms     map[string]*RoomSchedule // fixed at construction
+	selection RoomSelectionStrategy
+
+	idx      sync.Mutex                     // guards the two maps; taken after room locks, never before
+	bookings map[string]*Booking            // id -> current version
+	byPerson map[string]map[string]struct{} // person -> booking ids
+
+	lmu       sync.RWMutex
+	listeners []MeetingListener
+}
+
+func (m *MeetingScheduler) Book(roomID string, req MeetingRequest) (*Booking, error)              // ErrRoomUnavailable
+func (m *MeetingScheduler) BookAny(q RoomQuery, req MeetingRequest) (*Booking, error)             // ErrNoRoomAvailable
+func (m *MeetingScheduler) Cancel(bookingID string) error
+func (m *MeetingScheduler) Reschedule(bookingID, roomID string, when Interval) (*Booking, error) // all or nothing
+func (m *MeetingScheduler) CalendarOf(person string, window Interval) []*Booking
+func (m *MeetingScheduler) AddListener(l MeetingListener)
+
+type RoomSchedule struct {
+	Room    Room
+	mu      sync.Mutex // guards byStart
+	byStart []*Booking // sorted by start, never overlapping
+}
+
+func (s *RoomSchedule) IsFree(when Interval) bool // the two neighbours only
+func (s *RoomSchedule) add(b *Booking)
+func (s *RoomSchedule) remove(b *Booking)
+
+type RoomSelectionStrategy interface{ Rank(rooms []Room, q RoomQuery) []Room }
+type MeetingListener interface{ OnChange(e MeetingEvent) }`,
+
+"RoomSchedule": `// A slice kept sorted by start replaces Java's TreeMap. Insert and remove shift the slice
 // (O(n) copying), cheap for a room's few dozen bookings a day; a B-tree such as
 // github.com/google/btree gives O(log n) updates if a room ever holds many more.
 type RoomSchedule struct {
@@ -105,7 +132,8 @@ func (s *RoomSchedule) IsFree(when Interval) bool {
 	if i > 0 && s.byStart[i-1].When().End.After(when.Start) { // starts before us, ends after our start
 		return false
 	}
-	return i == len(s.byStart) || !s.byStart[i].When().Start.Before(when.End) // starts at or after us
+	// Starts at or after our start (an equal start included): it must not start before our end.
+	return i == len(s.byStart) || !s.byStart[i].When().Start.Before(when.End)
 }
 
 // add inserts in start order. Caller holds mu and has checked IsFree.
@@ -120,7 +148,7 @@ func (s *RoomSchedule) remove(b *Booking) {
 	}
 }`,
 
-"Selection strategy and listeners": `type RoomSelectionStrategy interface {
+"Room selection and notifications": `type RoomSelectionStrategy interface {
 	// Rank returns the rooms that fit the query, best first.
 	Rank(rooms []Room, q RoomQuery) []Room
 }
@@ -146,7 +174,7 @@ func (SmallestFitFirst) Rank(rooms []Room, q RoomQuery) []Room {
 		if a.Capacity != b.Capacity {
 			return a.Capacity - b.Capacity
 		}
-		return strings.Compare(a.ID, b.ID)
+		return strings.Compare(a.ID, b.ID) // deterministic ties
 	})
 	return fit
 }
@@ -243,7 +271,7 @@ func (m *MeetingScheduler) Cancel(bookingID string) error {
 		}
 		s.remove(b)
 		delete(m.bookings, bookingID)
-		for _, p := range b.People() {
+		for _, p := range b.Meeting.People() {
 			delete(m.byPerson[p], bookingID) // delete on a nil map is a no-op
 		}
 		m.idx.Unlock()
@@ -264,7 +292,7 @@ func (m *MeetingScheduler) Reschedule(bookingID, roomID string, when Interval) (
 			return nil, err
 		}
 		from := m.rooms[old.RoomID]
-		locked := lockInOrder(from, to) // fixed order: no deadlock
+		locked := lockInOrder(from, to) // room-id order: no deadlock
 		m.idx.Lock()
 		current := m.bookings[bookingID] == old
 		m.idx.Unlock()
@@ -289,6 +317,7 @@ func (m *MeetingScheduler) Reschedule(bookingID, roomID string, when Interval) (
 	}
 }
 
+// CalendarOf returns a person's meetings in a window, clashes included.
 func (m *MeetingScheduler) CalendarOf(person string, window Interval) []*Booking {
 	var out []*Booking
 	m.idx.Lock()
@@ -308,7 +337,7 @@ func (m *MeetingScheduler) tryBook(s *RoomSchedule, req MeetingRequest) *Booking
 		s.mu.Unlock()
 		return nil
 	}
-	b := &Booking{ID: newID(), RoomID: s.Room.ID, Meeting: req} // newID: random, e.g. 16 bytes from crypto/rand as hex
+	b := &Booking{ID: newID(), RoomID: s.Room.ID, Meeting: req} // newID: 16 bytes from crypto/rand, hex-encoded
 	m.insert(s, b)                                              // check and insert under one lock
 	s.mu.Unlock()
 	m.publish(MeetingEvent{Type: Booked, Booking: b}) // outside the lock
@@ -321,7 +350,7 @@ func (m *MeetingScheduler) insert(s *RoomSchedule, b *Booking) {
 	m.idx.Lock()
 	defer m.idx.Unlock()
 	m.bookings[b.ID] = b
-	for _, p := range b.People() {
+	for _, p := range b.Meeting.People() {
 		if m.byPerson[p] == nil {
 			m.byPerson[p] = map[string]struct{}{}
 		}
@@ -380,9 +409,14 @@ func (m *MeetingScheduler) schedule(roomID string) (*RoomSchedule, error) {
 	return s, nil
 }`,
 
-"Scheduler in one screen": `type Interval struct{ Start, End time.Time } // [Start, End)
+"Scheduler in one screen": `type Interval struct{ Start, End time.Time } // [Start, End); NewInterval rejects Start >= End
 
 func (i Interval) Overlaps(o Interval) bool { return i.Start.Before(o.End) && o.Start.Before(i.End) }
+
+type Booking struct { // immutable; a move = new value, same ID
+	ID, RoomID string
+	Meeting    MeetingRequest
+}
 
 type RoomSchedule struct {
 	mu      sync.Mutex
@@ -393,77 +427,9 @@ func (s *RoomSchedule) IsFree(w Interval) bool // sort.Search, then the two neig
 
 func (m *MeetingScheduler) Book(roomID string, r MeetingRequest) (*Booking, error)     // lock room, IsFree, insert, unlock, notify
 func (m *MeetingScheduler) BookAny(q RoomQuery, r MeetingRequest) (*Booking, error)    // strategy ranks rooms; first tryBook wins
-func (m *MeetingScheduler) Cancel(id string) error                                      // re-check current version under the lock
-func (m *MeetingScheduler) Reschedule(id, roomID string, w Interval) (*Booking, error) // lock rooms by id; remove, check, add or restore`,
-
-"One-lookup neighbour check": `// Stored bookings never overlap, so sorted by start they are also sorted by end.
-// Of the bookings that start before our end, the last one ends latest: it is the only one to test.
-func (s *RoomSchedule) IsFreeOneLookup(when Interval) bool {
-	i := s.ceil(when.End) // first booking starting at or after our end
-	return i == 0 || !s.byStart[i-1].When().End.After(when.Start)
-}`,
-
-"Lock-free reads with a skip list": `// Go's standard library has no concurrent skip list. The closest match is copy-on-write:
-// writers (one at a time, under mu) build a new sorted slice and publish it atomically;
-// readers load the current slice without locking and never see a half-written one.
-type SnapshotSchedule struct {
-	Room    Room
-	mu      sync.Mutex                 // serialises writers: check-then-insert stays atomic
-	byStart atomic.Pointer[[]*Booking] // never modified in place once published
-}
-
-func (s *SnapshotSchedule) TryAdd(b *Booking) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	cur := s.load()
-	i := sort.Search(len(cur), func(i int) bool { return !cur[i].When().Start.Before(b.When().Start) })
-	if i > 0 && cur[i-1].When().End.After(b.When().Start) {
-		return false
-	}
-	if i < len(cur) && cur[i].When().Start.Before(b.When().End) {
-		return false
-	}
-	next := slices.Insert(slices.Clone(cur), i, b) // copy, then publish
-	s.byStart.Store(&next)
-	return true
-}
-
-// StartingBetween takes no lock: a consistent snapshot, fine for showing a room's day,
-// never for deciding a booking.
-func (s *SnapshotSchedule) StartingBetween(from, to time.Time) []*Booking {
-	var out []*Booking
-	for _, b := range s.load() {
-		if !b.When().Start.Before(from) && b.When().Start.Before(to) {
-			out = append(out, b)
-		}
-	}
-	return out
-}
-
-func (s *SnapshotSchedule) load() []*Booking {
-	if p := s.byStart.Load(); p != nil {
-		return *p
-	}
-	return nil
-}`,
-
-"The deadlock-prone version": `// DON'T: locks "from" then "to" in request order.
-// Goroutine 1 moves a meeting R1 -> R2 while goroutine 2 moves another R2 -> R1:
-// each holds its first lock and waits forever for the other's.
-// In Go it also deadlocks on a same-room move, because sync.Mutex is not reentrant.
-func (m *MeetingScheduler) rescheduleUnsafe(bookingID, roomID string, when Interval) (*Booking, error) {
-	old, err := m.find(bookingID)
-	if err != nil {
-		return nil, err
-	}
-	from, to := m.rooms[old.RoomID], m.rooms[roomID]
-	from.mu.Lock()
-	defer from.mu.Unlock()
-	to.mu.Lock()
-	defer to.mu.Unlock()
-	// remove, check, add or restore
-	return old.MovedTo(roomID, when), nil
-}`,
+func (m *MeetingScheduler) Cancel(id string) error                                      // look up, lock, re-check version, remove
+func (m *MeetingScheduler) Reschedule(id, roomID string, w Interval) (*Booking, error) // lock rooms by id; remove, check, add or restore
+func (m *MeetingScheduler) CalendarOf(person string, window Interval) []*Booking       // person index; shows clashes`,
 
 "Booking every occurrence or none": `type Recurrence struct {
 	FirstStart time.Time // in the meeting's time zone (time.LoadLocation)
@@ -477,7 +443,10 @@ func (r Recurrence) Occurrences() ([]Interval, error) {
 	out := make([]Interval, 0, r.Count)
 	for i := 0; i < r.Count; i++ {
 		start := r.FirstStart.AddDate(0, 0, i*r.EveryDays)
-		next := Interval{start, start.Add(r.Length)}
+		next, err := NewInterval(start, start.Add(r.Length))
+		if err != nil {
+			return nil, err
+		}
 		if len(out) > 0 && out[len(out)-1].Overlaps(next) {
 			return nil, errors.New("occurrences overlap each other")
 		}
@@ -507,7 +476,7 @@ func (m *MeetingScheduler) BookRecurring(roomID string, template MeetingRequest,
 	made := make([]*Booking, 0, len(slots))
 	for i, when := range slots {
 		b := &Booking{ID: fmt.Sprintf("%s/%d", series, i), RoomID: roomID, Meeting: template.At(when)}
-		m.insert(s, b)
+		m.insert(s, b) // room, id map and person index
 		made = append(made, b)
 	}
 	s.mu.Unlock()
@@ -517,6 +486,98 @@ func (m *MeetingScheduler) BookRecurring(roomID string, template MeetingRequest,
 	return made, nil
 }`,
 
+"Attendees must be free: person locks after the room lock": `// On MeetingScheduler. Global lock order: room mutexes (by room id), then person mutexes (by name), then idx.
+//   personMu            sync.Mutex             // guards personLocks only; a leaf lock, held briefly
+//   personLocks         map[string]*sync.Mutex
+//   attendeesMustBeFree bool                   // the product decision, fixed at construction
+
+var ErrAttendeeBusy = errors.New("an attendee is busy")
+
+func (m *MeetingScheduler) personLock(p string) *sync.Mutex {
+	m.personMu.Lock()
+	defer m.personMu.Unlock()
+	l, ok := m.personLocks[p]
+	if !ok {
+		l = &sync.Mutex{}
+		m.personLocks[p] = l
+	}
+	return l
+}
+
+// lockPeople locks each person once, in name order. People() is sorted and deduplicated,
+// which matters: a Go mutex is not reentrant, so locking the same person twice would hang.
+func (m *MeetingScheduler) lockPeople(people []string) []*sync.Mutex {
+	held := make([]*sync.Mutex, 0, len(people))
+	for _, p := range people {
+		l := m.personLock(p)
+		l.Lock()
+		held = append(held, l)
+	}
+	return held
+}
+
+// ConflictsFor returns every attendee's meetings that overlap the request; a reschedule passes its own ID.
+func (m *MeetingScheduler) ConflictsFor(req MeetingRequest, ignoreID string) []*Booking {
+	seen := map[string]bool{}
+	var out []*Booking
+	for _, p := range req.People() {
+		for _, b := range m.CalendarOf(p, req.When) {
+			if b.ID != ignoreID && !seen[b.ID] {
+				seen[b.ID] = true
+				out = append(out, b)
+			}
+		}
+	}
+	return out
+}
+
+func (m *MeetingScheduler) tryBook(s *RoomSchedule, req MeetingRequest) (*Booking, error) {
+	s.mu.Lock() // rooms first ...
+	var people []*sync.Mutex
+	if m.attendeesMustBeFree {
+		people = m.lockPeople(req.People()) // ... then people
+	}
+	unlock := func() {
+		for i := len(people) - 1; i >= 0; i-- {
+			people[i].Unlock()
+		}
+		s.mu.Unlock()
+	}
+	if !s.IsFree(req.When) {
+		unlock()
+		return nil, nil // room taken: BookAny tries the next room
+	}
+	if m.attendeesMustBeFree {
+		if clashes := m.ConflictsFor(req, ""); len(clashes) > 0 {
+			unlock()
+			return nil, fmt.Errorf("%w: %d clash(es)", ErrAttendeeBusy, len(clashes)) // another room won't help
+		}
+	}
+	b := &Booking{ID: newID(), RoomID: s.Room.ID, Meeting: req}
+	m.insert(s, b)
+	unlock()
+	m.publish(MeetingEvent{Type: Booked, Booking: b})
+	return b, nil
+}`,
+
+"The deadlock-prone version": `// DON'T: locks "from" then "to" in request order.
+// Goroutine 1 moves a meeting R1 -> R2 while goroutine 2 moves another R2 -> R1:
+// each holds its first lock and waits forever for the other's.
+// In Go it also deadlocks on a same-room move, because sync.Mutex is not reentrant.
+func (m *MeetingScheduler) rescheduleUnsafe(bookingID, roomID string, when Interval) (*Booking, error) {
+	old, err := m.find(bookingID)
+	if err != nil {
+		return nil, err
+	}
+	from, to := m.rooms[old.RoomID], m.rooms[roomID]
+	from.mu.Lock()
+	defer from.mu.Unlock()
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	// remove, check, add or restore
+	return old.MovedTo(roomID, when), nil
+}`,
+
 "Hotel inventory with holds": `type RoomType int
 
 const (
@@ -524,6 +585,24 @@ const (
 	Double
 	Suite
 )
+
+type ReservationStatus int
+
+const (
+	Held ReservationStatus = iota
+	Confirmed
+	CancelledRes
+	Expired
+)
+
+type Amenity int
+
+const (
+	Breakfast Amenity = iota
+	Spa
+)
+
+var amenityCentsPerNight = map[Amenity]int64{Breakfast: 2500, Spa: 4000} // read-only
 
 type Stay struct{ CheckIn, CheckOut time.Time } // UTC midnights; [CheckIn, CheckOut) = the nights slept
 
@@ -537,33 +616,51 @@ func (s Stay) Nights() []int64 {
 	return out
 }
 
-type Hold struct {
-	ID        string
-	Type      RoomType
-	Stay      Stay
-	ExpiresAt time.Time
+type Reservation struct {
+	ID, GuestID   string
+	Type          RoomType
+	Stay          Stay
+	HoldExpiresAt time.Time
+	Status        ReservationStatus
 }
 
-var ErrSoldOut = errors.New("sold out")
+var (
+	ErrSoldOut  = errors.New("sold out")
+	ErrHoldGone = errors.New("hold expired or unknown")
+)
 
 type HotelInventory struct {
-	rooms map[RoomType]int // how many of each type; fixed, read-only
-	now   func() time.Time
+	rooms        map[RoomType]int   // how many of each type; fixed, read-only
+	nightlyCents map[RoomType]int64 // rates in minor units; fixed, read-only
+	now          func() time.Time
 
-	mu        sync.Mutex                 // guards the three maps below
-	used      map[RoomType]map[int64]int // held + confirmed, per night
-	holds     map[string]Hold
-	confirmed map[string]Hold
+	mu           sync.Mutex // guards the three maps below
+	used         map[RoomType]map[int64]int // Held + Confirmed, per night
+	reservations map[string]Reservation
+	holds        map[string]Reservation // Held only, for cheap expiry
 }
 
-func NewHotelInventory(rooms map[RoomType]int, now func() time.Time) *HotelInventory {
-	return &HotelInventory{rooms: maps.Clone(rooms), now: now, used: map[RoomType]map[int64]int{},
-		holds: map[string]Hold{}, confirmed: map[string]Hold{}}
+func NewHotelInventory(rooms map[RoomType]int, rates map[RoomType]int64, now func() time.Time) *HotelInventory {
+	return &HotelInventory{rooms: maps.Clone(rooms), nightlyCents: maps.Clone(rates), now: now,
+		used: map[RoomType]map[int64]int{}, reservations: map[string]Reservation{}, holds: map[string]Reservation{}}
 }
 
-func (inv *HotelInventory) Hold(t RoomType, stay Stay, ttl time.Duration) (Hold, error) {
+// QuoteCents prices a stay on the server; never trust a total sent by the client. Read-only inputs, so no lock.
+func (inv *HotelInventory) QuoteCents(t RoomType, stay Stay, extras []Amenity) (int64, error) {
+	perNight := inv.nightlyCents[t]
+	for _, a := range extras {
+		perNight += amenityCentsPerNight[a]
+	}
+	n := int64(len(stay.Nights()))
+	if n > 0 && perNight > math.MaxInt64/n {
+		return 0, errors.New("price overflow")
+	}
+	return perNight * n, nil
+}
+
+func (inv *HotelInventory) Hold(guestID string, t RoomType, stay Stay, ttl time.Duration) (Reservation, error) {
 	if !stay.CheckIn.Before(stay.CheckOut) {
-		return Hold{}, errors.New("at least one night")
+		return Reservation{}, errors.New("at least one night")
 	}
 	inv.mu.Lock()
 	defer inv.mu.Unlock()
@@ -575,59 +672,65 @@ func (inv *HotelInventory) Hold(t RoomType, stay Stay, ttl time.Duration) (Hold,
 	}
 	for _, n := range stay.Nights() {
 		if perNight[n] >= inv.rooms[t] {
-			return Hold{}, fmt.Errorf("%w: room type %d, night %d", ErrSoldOut, t, n)
+			return Reservation{}, fmt.Errorf("%w: room type %d, night %d", ErrSoldOut, t, n)
 		}
 	}
 	for _, n := range stay.Nights() { // every night, or none
 		perNight[n]++
 	}
-	h := Hold{ID: newID(), Type: t, Stay: stay, ExpiresAt: inv.now().Add(ttl)}
-	inv.holds[h.ID] = h
-	return h, nil
+	r := Reservation{ID: newID(), GuestID: guestID, Type: t, Stay: stay, HoldExpiresAt: inv.now().Add(ttl), Status: Held}
+	inv.reservations[r.ID] = r
+	inv.holds[r.ID] = r
+	return r, nil
 }
 
-// Confirm: payment succeeded, so the held nights stay counted and the hold becomes a reservation.
-func (inv *HotelInventory) Confirm(holdID string) (string, error) {
+// Confirm: payment succeeded. Idempotent: a retried confirmation returns the same reservation.
+func (inv *HotelInventory) Confirm(id string) (Reservation, error) {
 	inv.mu.Lock()
 	defer inv.mu.Unlock()
 	inv.expireHolds()
-	h, ok := inv.holds[holdID]
-	if !ok {
-		return "", errors.New("hold expired or unknown")
+	r, ok := inv.reservations[id]
+	if ok && r.Status == Confirmed {
+		return r, nil
 	}
-	delete(inv.holds, holdID)
-	inv.confirmed[h.ID] = h
-	return h.ID, nil
+	if !ok || r.Status != Held {
+		return Reservation{}, ErrHoldGone
+	}
+	delete(inv.holds, id)
+	r.Status = Confirmed // r is a copy
+	inv.reservations[id] = r
+	return r, nil
 }
 
 func (inv *HotelInventory) Cancel(id string) {
 	inv.mu.Lock()
 	defer inv.mu.Unlock()
-	h, ok := inv.holds[id]
-	if ok {
-		delete(inv.holds, id)
-	} else if h, ok = inv.confirmed[id]; ok {
-		delete(inv.confirmed, id)
+	r, ok := inv.reservations[id]
+	if !ok || (r.Status != Held && r.Status != Confirmed) {
+		return
 	}
-	if ok {
-		inv.giveBack(h)
-	}
+	delete(inv.holds, id)
+	inv.giveBack(r)
+	r.Status = CancelledRes
+	inv.reservations[id] = r
 }
 
 func (inv *HotelInventory) expireHolds() { // lazy: on every call; caller holds mu
 	now := inv.now()
-	for id, h := range inv.holds {
-		if now.Before(h.ExpiresAt) {
+	for id, r := range inv.holds {
+		if now.Before(r.HoldExpiresAt) {
 			continue
 		}
-		inv.giveBack(h)
+		inv.giveBack(r)
+		r.Status = Expired
+		inv.reservations[id] = r
 		delete(inv.holds, id) // deleting while ranging over a map is allowed in Go
 	}
 }
 
-func (inv *HotelInventory) giveBack(h Hold) {
-	for _, n := range h.Stay.Nights() {
-		inv.used[h.Type][n]--
+func (inv *HotelInventory) giveBack(r Reservation) {
+	for _, n := range r.Stay.Nights() {
+		inv.used[r.Type][n]--
 	}
 }`,
 

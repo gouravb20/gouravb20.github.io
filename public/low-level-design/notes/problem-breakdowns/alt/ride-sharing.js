@@ -1,30 +1,11 @@
 // Go versions of the Ride Sharing code blocks, matched to the Java blocks by title. Imports are omitted.
 window.ALT = window.ALT || {};
 ALT["ride-sharing"] = { go: {
-"Public API": `// Riders
-func (s *RideService) Estimate(pickup, drop Location, t RideType) (FareBreakdown, error)
-func (s *RideService) RequestRide(riderID, requestID string, pickup, drop Location, t RideType) (*Ride, error) // idempotent
-func (s *RideService) Cancel(rideID, riderID string) error
-func (s *RideService) RateDriver(rideID, riderID string, stars int) error
-
-// Drivers
-func (s *RideService) RegisterDriver(d *Driver)
-func (s *RideService) GoOnline(driverID string, at Location) error
-func (s *RideService) GoOffline(driverID string) error
-func (s *RideService) UpdateLocation(driverID string, at Location) error // every few seconds per driver
-func (s *RideService) Accept(rideID, driverID string) error
-func (s *RideService) Decline(rideID, driverID string) error
-func (s *RideService) Arrived(rideID, driverID string) error
-func (s *RideService) Start(rideID, driverID string) error
-func (s *RideService) Complete(rideID, driverID string, actual TripMetrics) error
-
-// Broadcast mode, live tracking and payments (Deep Dives)
-func (s *RideService) OpenRequestsNear(driverID string) ([]*Ride, error)
-func (s *RideService) Claim(rideID, driverID string) error // first driver to claim wins
-func (s *RideService) AddTrackingListener(l TrackingListener) // live location and ETA for riders
-func (s *RideService) Payment(rideID string) (*Payment, bool)
-
-func (s *RideService) AddListener(l RideListener)`,
+"Broken: check, then set": `// Two dispatch goroutines, two riders, one nearby driver
+if d.Status() == DriverAvailable { // both goroutines see Available
+	d.setStatus(DriverOffered) // both write Offered
+	ride.offerTo(d)            // the same driver now holds two offers
+}`,
 
 "Value types and the transition table": `type Location struct{ Lat, Lng float64 }
 
@@ -56,13 +37,13 @@ type Vehicle struct {
 
 type Rider struct{ ID, Name string }
 
-// TripMetrics: estimated from a route before the trip, measured after it.
-type TripMetrics struct{ Km, Minutes float64 }
+// TripMetrics is the length and duration of a trip: estimated from a route before it, measured after it.
+type TripMetrics struct{ Meters, Seconds int64 }
 
-// FareBreakdown amounts are in minor units (paise); Surge is the multiplier applied to the subtotal.
+// FareBreakdown amounts are in paise. SurgePercent is 100 for no surge, 120 for 1.2x.
 type FareBreakdown struct {
 	Base, Distance, Time int64
-	Surge                float64
+	SurgePercent         int
 	Total                int64
 }
 
@@ -94,55 +75,485 @@ var next = map[RideStatus][]RideStatus{
 
 func (s RideStatus) CanMoveTo(to RideStatus) bool { return slices.Contains(next[s], to) }`,
 
-"Pricing strategies": `type PricingStrategy interface {
-	Price(t RideType, trip TripMetrics, surge float64) (FareBreakdown, error)
+"Final class design": `// RideService: one instance, built by NewRideService and passed to handlers; not a package-level singleton.
+type RideService struct {
+	pricing  PricingStrategy
+	matching MatchingStrategy
+	surge    SurgeProvider
+	routes   RouteEstimator
+	payments PaymentGateway
+	after    func(time.Duration, func()) // schedules offer timeouts; time.AfterFunc in production
+	now      func() time.Time
+	// drivers, rides, byRequest, index, listeners
 }
 
-type RateCard struct{ Base, PerKm, PerMinute, Minimum int64 } // paise
+func (s *RideService) Estimate(pickup, drop Location, t RideType) (FareBreakdown, error)
+func (s *RideService) RequestRide(riderID, requestID string, pickup, drop Location, t RideType) (*Ride, error) // idempotent
+func (s *RideService) Cancel(rideID, riderID string) error
+func (s *RideService) RateDriver(rideID, riderID string, stars int) error
+func (s *RideService) RegisterDriver(d *Driver)
+func (s *RideService) GoOnline(driverID string, at Location) error
+func (s *RideService) GoOffline(driverID string) error
+func (s *RideService) UpdateLocation(driverID string, at Location) error
+func (s *RideService) Accept(rideID, driverID string) error
+func (s *RideService) Decline(rideID, driverID string) error
+func (s *RideService) Arrived(rideID, driverID string) error
+func (s *RideService) Start(rideID, driverID string) error
+func (s *RideService) Complete(rideID, driverID string, actual TripMetrics) error
+func (s *RideService) AddListener(l RideListener)
 
-// MeteredPricing: base + per km + per minute from a rate card per ride type, times surge.
-// cards is never written after construction, so it is safe to share between goroutines.
-type MeteredPricing struct{ cards map[RideType]RateCard }
-
-func NewMeteredPricing(cards map[RideType]RateCard) *MeteredPricing {
-	return &MeteredPricing{cards: maps.Clone(cards)}
+type Ride struct {
+	mu         sync.Mutex // guards everything below
+	status     RideStatus
+	driver     *Driver     // offered to or assigned to; nil while searching
+	candidates []Candidate // ranked, not yet tried
 }
 
-func (p *MeteredPricing) Price(t RideType, trip TripMetrics, surge float64) (FareBreakdown, error) {
-	c, ok := p.cards[t]
-	if !ok {
-		return FareBreakdown{}, fmt.Errorf("no rate card for ride type %d", t)
-	}
-	distance := int64(math.Round(trip.Km * float64(c.PerKm))) // each line item rounded once
-	minutes := int64(math.Round(trip.Minutes * float64(c.PerMinute)))
-	total := max(c.Minimum, int64(math.Round(float64(c.Base+distance+minutes)*surge)))
-	return FareBreakdown{c.Base, distance, minutes, surge, total}, nil
+func (r *Ride) offerNext() (RideEvent, bool)
+func (r *Ride) accept(driverID string, nowMillis int64) (RideEvent, error)
+func (r *Ride) withdrawOffer(driverID string) bool // decline or timeout
+func (r *Ride) arrived(driverID string) (RideEvent, error)
+func (r *Ride) start(driverID string) (RideEvent, error)
+func (r *Ride) complete(driverID string, fare FareBreakdown) (RideEvent, error)
+func (r *Ride) cancel(reason CancelReason) (RideEvent, error)
+func (r *Ride) moveTo(next RideStatus) (RideEvent, error) // the only place status changes
+
+type Driver struct {
+	status atomic.Int32             // a DriverStatus, changed only by compare-and-swap
+	loc    atomic.Pointer[Location] // pings never lock
 }
 
-// FlatRatePricing: a fixed price per ride type, e.g. airport transfers; ignores distance, time and surge.
-type FlatRatePricing struct{ fares map[RideType]int64 }
+func (d *Driver) TryClaim() bool
+func (d *Driver) Release() bool
+func (d *Driver) StartTrip(nowMillis int64) bool
+func (d *Driver) EndTrip() bool
 
-func NewFlatRatePricing(fares map[RideType]int64) *FlatRatePricing {
-	return &FlatRatePricing{fares: maps.Clone(fares)}
+func (ix *DriverIndex) Update(d *Driver, at Location)
+func (ix *DriverIndex) Remove(d *Driver)
+func (ix *DriverIndex) Near(p Location, t RideType, radiusKm float64) []Candidate
+
+type PricingStrategy interface {
+	Price(t RideType, trip TripMetrics, surgePercent int) (FareBreakdown, error)
 }
-
-func (p *FlatRatePricing) Price(t RideType, _ TripMetrics, _ float64) (FareBreakdown, error) {
-	fare, ok := p.fares[t]
-	if !ok {
-		return FareBreakdown{}, fmt.Errorf("no flat fare for ride type %d", t)
-	}
-	return FareBreakdown{Base: fare, Surge: 1.0, Total: fare}, nil
-}
-
-type SurgeProvider interface{ MultiplierAt(pickup Location) float64 } // 1.0 means no surge
+type MatchingStrategy interface{ Rank(cs []Candidate) []Candidate }
+type SurgeProvider interface{ SurgePercentAt(pickup Location) int }
 type RouteEstimator interface{ Estimate(from, to Location) TripMetrics }
+type PaymentGateway interface {
+	Charge(idempotencyKey, riderID string, amountPaise int64) error
+}
+type RideListener interface{ OnEvent(e RideEvent) }`,
 
-// StraightLineEstimator: straight-line distance padded for real roads, at an average city speed of 25 km/h.
-type StraightLineEstimator struct{}
+"RideService: requests, offers and timeouts": `type RideListener interface{ OnEvent(e RideEvent) } // notifications, receipts
 
-func (StraightLineEstimator) Estimate(from, to Location) TripMetrics {
-	km := from.DistanceKm(to) * 1.3
-	return TripMetrics{km, km / 25.0 * 60}
+type PaymentGateway interface {
+	Charge(idempotencyKey, riderID string, amountPaise int64) error
+}
+
+const (
+	searchRadiusKm = 3.0
+	offerTimeout   = 15 * time.Second
+)
+
+type RideService struct {
+	pricing  PricingStrategy
+	matching MatchingStrategy
+	surge    SurgeProvider
+	routes   RouteEstimator
+	payments PaymentGateway
+	after    func(time.Duration, func()) // time.AfterFunc in production, a fake in tests
+	now      func() time.Time
+	index    *DriverIndex
+
+	drivers   sync.Map // driver id -> *Driver
+	rides     sync.Map // ride id -> *Ride
+	byRequest sync.Map // "riderID:requestID" -> *Ride
+
+	mu        sync.RWMutex // guards listeners
+	listeners []RideListener
+}
+
+func NewRideService(p PricingStrategy, m MatchingStrategy, s SurgeProvider, r RouteEstimator,
+	pay PaymentGateway, after func(time.Duration, func()), now func() time.Time) *RideService {
+	return &RideService{pricing: p, matching: m, surge: s, routes: r, payments: pay, after: after, now: now, index: NewDriverIndex()}
+}
+
+func (s *RideService) AddListener(l RideListener) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.listeners = append(s.listeners, l)
+}
+
+// ---- drivers
+
+func (s *RideService) RegisterDriver(d *Driver) { s.drivers.Store(d.ID, d) }
+
+func (s *RideService) GoOnline(driverID string, at Location) error {
+	d, err := s.driver(driverID)
+	if err != nil {
+		return err
+	}
+	if d.GoOnline() {
+		s.index.Update(d, at)
+	}
+	return nil
+}
+
+func (s *RideService) GoOffline(driverID string) error {
+	d, err := s.driver(driverID)
+	if err != nil {
+		return err
+	}
+	if d.GoOffline() {
+		s.index.Remove(d)
+	}
+	return nil
+}
+
+func (s *RideService) UpdateLocation(driverID string, at Location) error {
+	d, err := s.driver(driverID)
+	if err != nil {
+		return err
+	}
+	s.index.Update(d, at)
+	return nil
+}
+
+// ---- riders
+
+func (s *RideService) Estimate(pickup, drop Location, t RideType) (FareBreakdown, error) {
+	return s.pricing.Price(t, s.routes.Estimate(pickup, drop), s.surge.SurgePercentAt(pickup))
+}
+
+// RequestRide is idempotent: a retry with the same request id returns the same ride and never dispatches twice.
+func (s *RideService) RequestRide(riderID, requestID string, pickup, drop Location, t RideType) (*Ride, error) {
+	if pickup == drop {
+		return nil, errors.New("pickup and drop are the same place")
+	}
+	key := riderID + ":" + requestID
+	if v, ok := s.byRequest.Load(key); ok {
+		return v.(*Ride), nil
+	}
+	est, err := s.Estimate(pickup, drop, t)
+	if err != nil {
+		return nil, err
+	}
+	fresh := &Ride{ID: newID(), RiderID: riderID, Pickup: pickup, Drop: drop, Type: t, Estimate: est}
+	if v, loaded := s.byRequest.LoadOrStore(key, fresh); loaded { // atomic: of two racing copies, exactly one wins
+		return v.(*Ride), nil
+	}
+	s.rides.Store(fresh.ID, fresh)
+	fresh.setCandidates(s.matching.Rank(s.index.Near(pickup, t, searchRadiusKm)))
+	s.dispatch(fresh)
+	return fresh, nil
+}
+
+func (s *RideService) Cancel(rideID, riderID string) error {
+	r, err := s.ownedRide(rideID, riderID)
+	if err != nil {
+		return err
+	}
+	return s.emit(r.cancel(ByRider))
+}
+
+func (s *RideService) RateDriver(rideID, riderID string, stars int) error {
+	if stars < 1 || stars > 5 {
+		return errors.New("stars must be 1 to 5")
+	}
+	r, err := s.ownedRide(rideID, riderID)
+	if err != nil {
+		return err
+	}
+	d, err := r.driverToRate()
+	if err != nil {
+		return err
+	}
+	return d.Rate(stars)
+}
+
+// ---- driver responses
+
+func (s *RideService) Accept(rideID, driverID string) error {
+	r, err := s.ride(rideID)
+	if err != nil {
+		return err
+	}
+	return s.emit(r.accept(driverID, s.now().UnixMilli()))
+}
+
+func (s *RideService) Decline(rideID, driverID string) error {
+	r, err := s.ride(rideID)
+	if err != nil {
+		return err
+	}
+	s.retryIfWithdrawn(r, driverID)
+	return nil
+}
+
+func (s *RideService) Arrived(rideID, driverID string) error {
+	r, err := s.ride(rideID)
+	if err != nil {
+		return err
+	}
+	return s.emit(r.arrived(driverID))
+}
+
+func (s *RideService) Start(rideID, driverID string) error {
+	r, err := s.ride(rideID)
+	if err != nil {
+		return err
+	}
+	return s.emit(r.start(driverID))
+}
+
+func (s *RideService) Complete(rideID, driverID string, actual TripMetrics) error {
+	r, err := s.ride(rideID)
+	if err != nil {
+		return err
+	}
+	fare, err := s.pricing.Price(r.Type, actual, r.Estimate.SurgePercent) // surge locked at request time
+	if err != nil {
+		return err
+	}
+	if err := s.emit(r.complete(driverID, fare)); err != nil { // fails if not InProgress
+		return err
+	}
+	return s.payments.Charge(r.ID, r.RiderID, fare.Total) // ride id = idempotency key
+}
+
+// ---- dispatch
+
+func (s *RideService) dispatch(r *Ride) {
+	e, ok := r.offerNext()
+	if !ok {
+		return // the rider cancelled meanwhile
+	}
+	s.publish(e) // Offered (to the driver) or Cancelled (NoDriver)
+	if e.Status == Offered {
+		s.after(offerTimeout, func() { s.retryIfWithdrawn(r, e.DriverID) })
+	}
+}
+
+func (s *RideService) retryIfWithdrawn(r *Ride, driverID string) {
+	if r.withdrawOffer(driverID) { // false if accepted, cancelled or already withdrawn
+		s.dispatch(r)
+	}
+}
+
+func (s *RideService) emit(e RideEvent, err error) error {
+	if err == nil {
+		s.publish(e)
+	}
+	return err
+}
+
+func (s *RideService) publish(e RideEvent) { // always called after the ride's mutex is released
+	s.mu.RLock()
+	ls := slices.Clone(s.listeners)
+	s.mu.RUnlock()
+	for _, l := range ls {
+		func() {
+			defer func() { recover() }() // log; one listener must not break the others
+			l.OnEvent(e)
+		}()
+	}
+}
+
+func (s *RideService) ownedRide(rideID, riderID string) (*Ride, error) {
+	r, err := s.ride(rideID)
+	if err != nil {
+		return nil, err
+	}
+	if r.RiderID != riderID {
+		return nil, fmt.Errorf("ride %s is not yours", rideID)
+	}
+	return r, nil
+}
+
+func (s *RideService) ride(id string) (*Ride, error) {
+	if v, ok := s.rides.Load(id); ok {
+		return v.(*Ride), nil
+	}
+	return nil, fmt.Errorf("unknown ride %s", id)
+}
+
+func (s *RideService) driver(id string) (*Driver, error) {
+	if v, ok := s.drivers.Load(id); ok {
+		return v.(*Driver), nil
+	}
+	return nil, fmt.Errorf("unknown driver %s", id)
+}
+
+func newID() string {
+	b := make([]byte, 16)
+	rand.Read(b) // crypto/rand
+	return hex.EncodeToString(b)
+}`,
+
+"Ride: one lock per ride": `type CancelReason int
+
+const (
+	ByRider CancelReason = iota + 1
+	ByDriver
+	NoDriver
+)
+
+type RideEvent struct {
+	RideID, RiderID, DriverID string
+	Status                    RideStatus
+}
+
+type Ride struct {
+	ID, RiderID  string
+	Pickup, Drop Location
+	Type         RideType
+	Estimate     FareBreakdown // quoted at request time; its surge is locked in
+
+	mu           sync.Mutex // guards everything below
+	status       RideStatus
+	driver       *Driver
+	candidates   []Candidate
+	finalFare    FareBreakdown
+	cancelReason CancelReason
+	rated        bool
+}
+
+func (r *Ride) Status() RideStatus {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.status
+}
+
+func (r *Ride) CancelReason() CancelReason {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.cancelReason
+}
+
+func (r *Ride) setCandidates(ranked []Candidate) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.candidates = ranked
+}
+
+// offerNext claims the next free candidate and offers them the ride.
+// ok is false if the ride stopped searching meanwhile (the rider cancelled).
+func (r *Ride) offerNext() (RideEvent, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.status != Requested {
+		return RideEvent{}, false
+	}
+	for len(r.candidates) > 0 {
+		d := r.candidates[0].Driver
+		r.candidates = r.candidates[1:]
+		if d.TryClaim() { // CAS; if another ride got d first, try the next one
+			r.driver = d
+			e, err := r.moveTo(Offered)
+			return e, err == nil
+		}
+	}
+	r.cancelReason = NoDriver
+	e, err := r.moveTo(Cancelled)
+	return e, err == nil
+}
+
+func (r *Ride) accept(driverID string, nowMillis int64) (RideEvent, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := r.requireDriver(driverID, Offered); err != nil {
+		return RideEvent{}, err
+	}
+	r.driver.StartTrip(nowMillis) // Offered -> OnTrip; this ride holds the claim
+	return r.moveTo(Accepted)
+}
+
+// withdrawOffer handles a decline or a timeout. False if the offer is no longer live.
+func (r *Ride) withdrawOffer(driverID string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.status != Offered || r.driver.ID != driverID {
+		return false // already accepted, cancelled or withdrawn
+	}
+	r.driver.Release() // Offered -> Available
+	r.driver = nil
+	_, err := r.moveTo(Requested)
+	return err == nil
+}
+
+func (r *Ride) arrived(driverID string) (RideEvent, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := r.requireDriver(driverID, Accepted); err != nil {
+		return RideEvent{}, err
+	}
+	return r.moveTo(DriverArrived)
+}
+
+func (r *Ride) start(driverID string) (RideEvent, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := r.requireDriver(driverID, DriverArrived); err != nil {
+		return RideEvent{}, err
+	}
+	return r.moveTo(InProgress)
+}
+
+func (r *Ride) complete(driverID string, fare FareBreakdown) (RideEvent, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := r.requireDriver(driverID, InProgress); err != nil {
+		return RideEvent{}, err
+	}
+	r.finalFare = fare
+	r.driver.EndTrip() // OnTrip -> Available
+	return r.moveTo(Completed)
+}
+
+func (r *Ride) cancel(reason CancelReason) (RideEvent, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	was := r.status
+	e, err := r.moveTo(Cancelled) // fails once the trip has started, or if already over
+	if err != nil {
+		return e, err
+	}
+	r.cancelReason = reason
+	if was == Offered {
+		r.driver.Release()
+	} else if r.driver != nil {
+		r.driver.EndTrip()
+	}
+	return e, nil
+}
+
+// driverToRate allows one rating per completed ride.
+func (r *Ride) driverToRate() (*Driver, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.status != Completed || r.rated {
+		return nil, fmt.Errorf("ride %s cannot be rated now", r.ID)
+	}
+	r.rated = true
+	return r.driver, nil
+}
+
+func (r *Ride) moveTo(next RideStatus) (RideEvent, error) { // the only place status changes; caller holds mu
+	if !r.status.CanMoveTo(next) {
+		return RideEvent{}, fmt.Errorf("ride %s: %v -> %v is not allowed", r.ID, r.status, next)
+	}
+	r.status = next
+	e := RideEvent{RideID: r.ID, RiderID: r.RiderID, Status: next}
+	if r.driver != nil {
+		e.DriverID = r.driver.ID
+	}
+	return e, nil
+}
+
+func (r *Ride) requireDriver(driverID string, expected RideStatus) error {
+	if r.status != expected || r.driver == nil || r.driver.ID != driverID {
+		return fmt.Errorf("ride %s is %v; driver %s cannot do that now", r.ID, r.status, driverID)
+	}
+	return nil
 }`,
 
 "Drivers and the grid index": `type DriverStatus int32
@@ -229,7 +640,7 @@ func CellOf(l Location) Cell {
 	return Cell{int64(math.Floor(l.Lat / cellDegrees)), int64(math.Floor(l.Lng / cellDegrees))}
 }
 
-// Candidate: what matching needs about a driver, read once so that sorting sees stable values.
+// Candidate is what matching needs about a driver, read once so that sorting sees stable values.
 type Candidate struct {
 	Driver       *Driver
 	Km, Rating   float64
@@ -254,13 +665,13 @@ func (ix *DriverIndex) Update(d *Driver, loc Location) {
 		return // the common case: same cell, no shared lock at all
 	}
 	ix.mu.Lock()
-	if d.indexed {
-		delete(ix.cells[d.cell], d)
-	}
 	if ix.cells[now] == nil {
 		ix.cells[now] = map[*Driver]struct{}{}
 	}
 	ix.cells[now][d] = struct{}{}
+	if d.indexed {
+		delete(ix.cells[d.cell], d)
+	}
 	ix.mu.Unlock()
 	d.cell, d.indexed = now, true
 }
@@ -301,6 +712,60 @@ func (ix *DriverIndex) Near(p Location, t RideType, radiusKm float64) []Candidat
 	return out
 }`,
 
+"Pricing strategies": `type PricingStrategy interface {
+	Price(t RideType, trip TripMetrics, surgePercent int) (FareBreakdown, error)
+}
+
+type RateCard struct{ Base, PerKm, PerMinute, Minimum int64 } // paise
+
+// MeteredPricing: base + per km + per minute from a rate card per ride type, times surge; whole paise, half up.
+// cards is never written after construction, so it is safe to share between goroutines.
+type MeteredPricing struct{ cards map[RideType]RateCard }
+
+func NewMeteredPricing(cards map[RideType]RateCard) *MeteredPricing {
+	return &MeteredPricing{cards: maps.Clone(cards)}
+}
+
+func (p *MeteredPricing) Price(t RideType, trip TripMetrics, surgePercent int) (FareBreakdown, error) {
+	c, ok := p.cards[t]
+	if !ok {
+		return FareBreakdown{}, fmt.Errorf("no rate card for ride type %d", t)
+	}
+	distance := halfUp(trip.Meters*c.PerKm, 1000)
+	minutes := halfUp(trip.Seconds*c.PerMinute, 60)
+	total := max(c.Minimum, halfUp((c.Base+distance+minutes)*int64(surgePercent), 100))
+	return FareBreakdown{c.Base, distance, minutes, surgePercent, total}, nil
+}
+
+// halfUp divides and rounds half up; inputs are never negative.
+func halfUp(numerator, divisor int64) int64 { return (numerator + divisor/2) / divisor }
+
+// FlatRatePricing: a fixed price per ride type, e.g. airport transfers; ignores distance, time and surge.
+type FlatRatePricing struct{ fares map[RideType]int64 }
+
+func NewFlatRatePricing(fares map[RideType]int64) *FlatRatePricing {
+	return &FlatRatePricing{fares: maps.Clone(fares)}
+}
+
+func (p *FlatRatePricing) Price(t RideType, _ TripMetrics, _ int) (FareBreakdown, error) {
+	fare, ok := p.fares[t]
+	if !ok {
+		return FareBreakdown{}, fmt.Errorf("no flat fare for ride type %d", t)
+	}
+	return FareBreakdown{Base: fare, SurgePercent: 100, Total: fare}, nil
+}
+
+type SurgeProvider interface{ SurgePercentAt(pickup Location) int } // 100 means no surge
+type RouteEstimator interface{ Estimate(from, to Location) TripMetrics }
+
+// StraightLineEstimator: straight-line distance padded by 30% for real roads, at an average city speed of 25 km/h.
+type StraightLineEstimator struct{}
+
+func (StraightLineEstimator) Estimate(from, to Location) TripMetrics {
+	meters := int64(math.Round(from.DistanceKm(to) * 1300))
+	return TripMetrics{meters, meters * 3600 / 25_000}
+}`,
+
 "Matching strategies": `type MatchingStrategy interface {
 	Rank(cs []Candidate) []Candidate // best first
 }
@@ -332,475 +797,9 @@ func (LeastRecentlyAssigned) Rank(cs []Candidate) []Candidate {
 		return cmp.Or(cmp.Compare(a.LastAssigned, b.LastAssigned), cmp.Compare(a.Km, b.Km))
 	})
 	return out
-}`,
-
-"Ride: one lock per ride": `type CancelReason int
-
-const (
-	ByRider CancelReason = iota + 1
-	ByDriver
-	NoDriver
-)
-
-type RideEvent struct {
-	RideID, RiderID, DriverID string
-	Status                    RideStatus
 }
 
-type Ride struct {
-	ID, RiderID  string
-	Pickup, Drop Location
-	Type         RideType
-	Estimate     FareBreakdown // quoted at request time; its surge is locked in
-
-	mu           sync.Mutex // guards everything below
-	status       RideStatus
-	driver       *Driver
-	candidates   []Candidate
-	finalFare    FareBreakdown
-	cancelReason CancelReason
-	rated        bool
-}
-
-func (r *Ride) Status() RideStatus {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.status
-}
-
-func (r *Ride) CancelReason() CancelReason {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.cancelReason
-}
-
-func (r *Ride) setCandidates(ranked []Candidate) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.candidates = ranked
-}
-
-// offerNext claims the next free candidate and offers them the ride. ok is false if the ride
-// stopped searching meanwhile (the rider cancelled).
-func (r *Ride) offerNext() (RideEvent, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.status != Requested {
-		return RideEvent{}, false
-	}
-	for len(r.candidates) > 0 {
-		d := r.candidates[0].Driver
-		r.candidates = r.candidates[1:]
-		if d.TryClaim() { // CAS; if another ride got d first, try the next one
-			r.driver = d
-			e, err := r.moveTo(Offered)
-			return e, err == nil
-		}
-	}
-	r.cancelReason = NoDriver
-	e, err := r.moveTo(Cancelled)
-	return e, err == nil
-}
-
-func (r *Ride) accept(driverID string, nowMillis int64) (RideEvent, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if err := r.requireDriver(driverID, Offered); err != nil {
-		return RideEvent{}, err
-	}
-	r.driver.StartTrip(nowMillis) // Offered -> OnTrip; this ride holds the claim
-	return r.moveTo(Accepted)
-}
-
-// withdrawOffer handles a decline or a timeout. False if the offer is no longer live.
-func (r *Ride) withdrawOffer(driverID string) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.status != Offered || r.driver.ID != driverID {
-		return false // already accepted, cancelled or withdrawn
-	}
-	r.driver.Release() // Offered -> Available
-	r.driver = nil
-	_, err := r.moveTo(Requested)
-	return err == nil
-}
-
-func (r *Ride) arrived(driverID string) (RideEvent, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if err := r.requireDriver(driverID, Accepted); err != nil {
-		return RideEvent{}, err
-	}
-	return r.moveTo(DriverArrived)
-}
-
-func (r *Ride) start(driverID string) (RideEvent, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if err := r.requireDriver(driverID, DriverArrived); err != nil {
-		return RideEvent{}, err
-	}
-	return r.moveTo(InProgress)
-}
-
-func (r *Ride) complete(driverID string, fare FareBreakdown) (RideEvent, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if err := r.requireDriver(driverID, InProgress); err != nil {
-		return RideEvent{}, err
-	}
-	r.finalFare = fare
-	r.driver.EndTrip() // OnTrip -> Available
-	return r.moveTo(Completed)
-}
-
-func (r *Ride) cancel(reason CancelReason) (RideEvent, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	was := r.status
-	e, err := r.moveTo(Cancelled) // fails once the trip has started
-	if err != nil {
-		return e, err
-	}
-	r.cancelReason = reason
-	if was == Offered {
-		r.driver.Release()
-	} else if r.driver != nil {
-		r.driver.EndTrip()
-	}
-	return e, nil
-}
-
-// driverToRate allows one rating per completed ride.
-func (r *Ride) driverToRate() (*Driver, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.status != Completed || r.rated {
-		return nil, fmt.Errorf("ride %s cannot be rated now", r.ID)
-	}
-	r.rated = true
-	return r.driver, nil
-}
-
-func (r *Ride) moveTo(next RideStatus) (RideEvent, error) { // the only place status changes; caller holds mu
-	if !r.status.CanMoveTo(next) {
-		return RideEvent{}, fmt.Errorf("ride %s: %v -> %v is not allowed", r.ID, r.status, next)
-	}
-	r.status = next
-	e := RideEvent{RideID: r.ID, RiderID: r.RiderID, Status: next}
-	if r.driver != nil {
-		e.DriverID = r.driver.ID
-	}
-	return e, nil
-}
-
-func (r *Ride) requireDriver(driverID string, expected RideStatus) error {
-	if r.status != expected || r.driver == nil || r.driver.ID != driverID {
-		return fmt.Errorf("ride %s is %v; driver %s cannot do that now", r.ID, r.status, driverID)
-	}
-	return nil
-}`,
-
-"RideService: requests, offers and timeouts": `type RideListener interface{ OnEvent(e RideEvent) } // notifications, receipts
-
-type PaymentGateway interface {
-	Charge(idempotencyKey, riderID string, amount int64) error
-}
-
-const (
-	searchRadiusKm = 3.0
-	offerTimeout   = 15 * time.Second
-)
-
-type RideService struct {
-	pricing  PricingStrategy
-	matching MatchingStrategy
-	surge    SurgeProvider
-	routes   RouteEstimator
-	payments PaymentGateway
-	now      func() time.Time
-	index    *DriverIndex
-
-	drivers   sync.Map // driver id -> *Driver
-	rides     sync.Map // ride id -> *Ride
-	byRequest sync.Map // "riderID:requestID" -> *Ride
-
-	mu        sync.RWMutex // guards listeners
-	listeners []RideListener
-}
-
-func NewRideService(p PricingStrategy, m MatchingStrategy, s SurgeProvider, r RouteEstimator, pay PaymentGateway, now func() time.Time) *RideService {
-	return &RideService{pricing: p, matching: m, surge: s, routes: r, payments: pay, now: now, index: NewDriverIndex()}
-}
-
-func (s *RideService) AddListener(l RideListener) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.listeners = append(s.listeners, l)
-}
-
-// ---- drivers
-
-func (s *RideService) RegisterDriver(d *Driver) { s.drivers.Store(d.ID, d) }
-
-func (s *RideService) GoOnline(driverID string, at Location) error {
-	d, err := s.driver(driverID)
-	if err != nil {
-		return err
-	}
-	if d.GoOnline() {
-		s.index.Update(d, at)
-	}
-	return nil
-}
-
-func (s *RideService) GoOffline(driverID string) error {
-	d, err := s.driver(driverID)
-	if err != nil {
-		return err
-	}
-	if d.GoOffline() {
-		s.index.Remove(d)
-	}
-	return nil
-}
-
-func (s *RideService) UpdateLocation(driverID string, at Location) error {
-	d, err := s.driver(driverID)
-	if err != nil {
-		return err
-	}
-	s.index.Update(d, at)
-	return nil
-}
-
-// ---- riders
-
-func (s *RideService) Estimate(pickup, drop Location, t RideType) (FareBreakdown, error) {
-	return s.pricing.Price(t, s.routes.Estimate(pickup, drop), s.surge.MultiplierAt(pickup))
-}
-
-// RequestRide is idempotent: a retry with the same request id returns the same ride and never dispatches twice.
-func (s *RideService) RequestRide(riderID, requestID string, pickup, drop Location, t RideType) (*Ride, error) {
-	key := riderID + ":" + requestID
-	if v, ok := s.byRequest.Load(key); ok {
-		return v.(*Ride), nil
-	}
-	est, err := s.Estimate(pickup, drop, t)
-	if err != nil {
-		return nil, err
-	}
-	fresh := &Ride{ID: newID(), RiderID: riderID, Pickup: pickup, Drop: drop, Type: t, Estimate: est}
-	if v, loaded := s.byRequest.LoadOrStore(key, fresh); loaded { // atomic: one of two racing retries wins
-		return v.(*Ride), nil
-	}
-	s.rides.Store(fresh.ID, fresh)
-	fresh.setCandidates(s.matching.Rank(s.index.Near(pickup, t, searchRadiusKm)))
-	s.dispatch(fresh)
-	return fresh, nil
-}
-
-func (s *RideService) Cancel(rideID, riderID string) error {
-	r, err := s.ownedRide(rideID, riderID)
-	if err != nil {
-		return err
-	}
-	return s.emit(r.cancel(ByRider))
-}
-
-func (s *RideService) RateDriver(rideID, riderID string, stars int) error {
-	if stars < 1 || stars > 5 {
-		return errors.New("stars must be 1 to 5")
-	}
-	r, err := s.ownedRide(rideID, riderID)
-	if err != nil {
-		return err
-	}
-	d, err := r.driverToRate()
-	if err != nil {
-		return err
-	}
-	return d.Rate(stars)
-}
-
-// ---- driver responses
-
-func (s *RideService) Accept(rideID, driverID string) error {
-	r, err := s.ride(rideID)
-	if err != nil {
-		return err
-	}
-	return s.emit(r.accept(driverID, s.now().UnixMilli()))
-}
-
-func (s *RideService) Decline(rideID, driverID string) error {
-	r, err := s.ride(rideID)
-	if err != nil {
-		return err
-	}
-	s.retryIfWithdrawn(r, driverID)
-	return nil
-}
-
-func (s *RideService) Arrived(rideID, driverID string) error {
-	r, err := s.ride(rideID)
-	if err != nil {
-		return err
-	}
-	return s.emit(r.arrived(driverID))
-}
-
-func (s *RideService) Start(rideID, driverID string) error {
-	r, err := s.ride(rideID)
-	if err != nil {
-		return err
-	}
-	return s.emit(r.start(driverID))
-}
-
-func (s *RideService) Complete(rideID, driverID string, actual TripMetrics) error {
-	r, err := s.ride(rideID)
-	if err != nil {
-		return err
-	}
-	fare, err := s.pricing.Price(r.Type, actual, r.Estimate.Surge) // surge locked at request time
-	if err != nil {
-		return err
-	}
-	if err := s.emit(r.complete(driverID, fare)); err != nil { // fails if already completed
-		return err
-	}
-	return s.payments.Charge(r.ID, r.RiderID, fare.Total) // ride id as the idempotency key
-}
-
-// ---- dispatch
-
-func (s *RideService) dispatch(r *Ride) {
-	e, ok := r.offerNext()
-	if !ok {
-		return // cancelled meanwhile
-	}
-	s.publish(e) // Offered (to the driver) or Cancelled (no driver)
-	if e.Status == Offered {
-		time.AfterFunc(offerTimeout, func() { s.retryIfWithdrawn(r, e.DriverID) })
-	}
-}
-
-func (s *RideService) retryIfWithdrawn(r *Ride, driverID string) {
-	if r.withdrawOffer(driverID) { // false if accepted or cancelled first
-		s.dispatch(r)
-	}
-}
-
-func (s *RideService) emit(e RideEvent, err error) error {
-	if err == nil {
-		s.publish(e)
-	}
-	return err
-}
-
-func (s *RideService) publish(e RideEvent) { // called outside every ride lock
-	s.mu.RLock()
-	ls := slices.Clone(s.listeners)
-	s.mu.RUnlock()
-	for _, l := range ls {
-		func() {
-			defer func() { recover() }() // log; one listener must not break the others
-			l.OnEvent(e)
-		}()
-	}
-}
-
-func (s *RideService) ownedRide(rideID, riderID string) (*Ride, error) {
-	r, err := s.ride(rideID)
-	if err != nil {
-		return nil, err
-	}
-	if r.RiderID != riderID {
-		return nil, fmt.Errorf("ride %s is not yours", rideID)
-	}
-	return r, nil
-}
-
-func (s *RideService) ride(id string) (*Ride, error) {
-	if v, ok := s.rides.Load(id); ok {
-		return v.(*Ride), nil
-	}
-	return nil, fmt.Errorf("unknown ride %s", id)
-}
-
-func (s *RideService) driver(id string) (*Driver, error) {
-	if v, ok := s.drivers.Load(id); ok {
-		return v.(*Driver), nil
-	}
-	return nil, fmt.Errorf("unknown driver %s", id)
-}
-
-func newID() string {
-	b := make([]byte, 16)
-	rand.Read(b) // crypto/rand
-	return hex.EncodeToString(b)
-}`,
-
-"Surge from demand and supply": `// DemandSupplySurge: demand = open requests in a cell, supply = available drivers there.
-// A scheduler rebuilds the whole table and swaps it in with one atomic store; readers never lock.
-type DemandSupplySurge struct {
-	snapshot atomic.Pointer[map[Cell]float64] // the map is never modified after it is stored
-}
-
-const (
-	maxSurge    = 3.0
-	sensitivity = 0.5
-)
-
-func (s *DemandSupplySurge) MultiplierAt(pickup Location) float64 {
-	if m := s.snapshot.Load(); m != nil {
-		if v, ok := (*m)[CellOf(pickup)]; ok {
-			return v
-		}
-	}
-	return 1.0
-}
-
-func (s *DemandSupplySurge) Recompute(openRequests, availableDrivers map[Cell]int) {
-	next := make(map[Cell]float64, len(openRequests))
-	for cell, demand := range openRequests {
-		next[cell] = surgeMultiplier(demand, availableDrivers[cell])
-	}
-	s.snapshot.Store(&next)
-}
-
-func surgeMultiplier(demand, supply int) float64 {
-	if demand <= supply {
-		return 1.0
-	}
-	if supply == 0 {
-		return maxSurge
-	}
-	raw := 1.0 + (float64(demand)/float64(supply)-1.0)*sensitivity
-	return math.Round(min(maxSurge, raw)*10) / 10 // shown to riders in 0.1 steps
-}`,
-
-"Final fare: upfront price with a tolerance": `const tolerancePercent = 15
-
-// FinalFare: riders pay the quoted price unless the trip really changed (a detour, a new drop, a long jam).
-func FinalFare(p PricingStrategy, r *Ride, actual TripMetrics) (FareBreakdown, error) {
-	metered, err := p.Price(r.Type, actual, r.Estimate.Surge)
-	if err != nil {
-		return FareBreakdown{}, err
-	}
-	quoted := r.Estimate.Total
-	diff := metered.Total - quoted
-	if diff < 0 {
-		diff = -diff
-	}
-	if diff*100 <= quoted*tolerancePercent { // integer maths, no rounding drift
-		return r.Estimate, nil
-	}
-	return metered, nil
-}`,
-
-"A weighted scoring strategy": `// WeightedScore blends distance, rating and idle time into one score; lower is better.
+// WeightedScore blends distance, rating and idle time into one score; lower is better.
 // Weights come from configuration.
 type WeightedScore struct {
 	PerKm, PerRatingPoint, PerIdleMinute float64
@@ -808,15 +807,38 @@ type WeightedScore struct {
 }
 
 func (w WeightedScore) Rank(cs []Candidate) []Candidate {
-	now := w.Now().UnixMilli()
+	now := w.Now().UnixMilli() // one "now" for the whole sort
 	out := slices.Clone(cs)
 	slices.SortStableFunc(out, func(a, b Candidate) int { return cmp.Compare(w.score(a, now), w.score(b, now)) })
 	return out
 }
 
 func (w WeightedScore) score(c Candidate, now int64) float64 {
-	idleMinutes := min(float64(now-c.LastAssigned)/60_000, 60) // cap: idle beyond an hour adds nothing
+	idleMinutes := min(float64(now-c.LastAssigned)/60_000, 60) // idle beyond an hour adds nothing
 	return c.Km*w.PerKm - c.Rating*w.PerRatingPoint - idleMinutes*w.PerIdleMinute
+}`,
+
+"Stress test: one driver, many riders": `func TestADriverIsNeverClaimedTwice(t *testing.T) {
+	d := NewDriver("d1", Vehicle{"KA01AB1234", "Swift", Mini}, Location{12.97, 77.59})
+	d.GoOnline()
+	var winners atomic.Int32
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for range 16 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start // release every goroutine at once
+			if d.TryClaim() {
+				winners.Add(1)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	if winners.Load() != 1 || d.Status() != DriverOffered {
+		t.Fatalf("winners = %d, status = %d; want exactly one claim", winners.Load(), d.Status())
+	}
 }`,
 
 "Every illegal transition is rejected": `func TestOnlyTableTransitionsAreAllowed(t *testing.T) {
@@ -836,78 +858,13 @@ func (w WeightedScore) score(c Candidate, now int64) float64 {
 	}
 }`,
 
-"Broken: check, then set": `// Two dispatcher goroutines, two riders, one nearby driver
-if d.Status() == DriverAvailable { // both goroutines see Available
-	d.setStatus(DriverOffered) // both write Offered
-	ride.offerTo(d)            // the same driver is offered two rides
-}`,
-
-"Stress test: one driver, many riders": `func TestADriverIsNeverClaimedTwice(t *testing.T) {
-	d := NewDriver("d1", Vehicle{"KA01AB1234", "Swift", Mini}, Location{12.97, 77.59})
-	d.GoOnline()
-	var winners atomic.Int32
-	var wg sync.WaitGroup
-	start := make(chan struct{})
-	for i := 0; i < 16; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-start // release every goroutine at once
-			if d.TryClaim() {
-				winners.Add(1)
-			}
-		}()
-	}
-	close(start)
-	wg.Wait()
-	if winners.Load() != 1 || d.Status() != DriverOffered {
-		t.Fatalf("winners = %d, status = %d; want exactly one claim", winners.Load(), d.Status())
-	}
-}`,
-
-"Cancellation fees as a policy": `type CancellationPolicy interface {
-	FeeFor(status RideStatus, who CancelReason, sinceAccepted time.Duration) (int64, error) // paise
+"Ride sharing in one screen": `type PricingStrategy interface { // paise
+	Price(t RideType, trip TripMetrics, surgePercent int) (FareBreakdown, error)
 }
-
-// GracePeriodPolicy: free until the driver has been on the way for a grace period,
-// a flat fee after that, more once they have arrived.
-type GracePeriodPolicy struct{}
-
-const (
-	cancelGrace = 2 * time.Minute
-	cancelFee   = 50_00 // paise
-	arrivedFee  = 75_00
-)
-
-func (GracePeriodPolicy) FeeFor(status RideStatus, who CancelReason, sinceAccepted time.Duration) (int64, error) {
-	if who != ByRider {
-		return 0, nil // drivers and the system never charge riders
-	}
-	switch status {
-	case Requested, Offered:
-		return 0, nil
-	case Accepted:
-		if sinceAccepted <= cancelGrace {
-			return 0, nil
-		}
-		return cancelFee, nil
-	case DriverArrived:
-		return arrivedFee, nil
-	default:
-		return 0, fmt.Errorf("cannot cancel a ride that is %v", status)
-	}
-}
-
-// Inside Ride.cancel, holding r.mu, before moveTo(Cancelled):
-//   fee, err := policy.FeeFor(r.status, reason, sinceAccepted)`,
-
-"Ride sharing in one screen": `type PricingStrategy interface {
-	Price(t RideType, trip TripMetrics, surge float64) (FareBreakdown, error)
-}
-type MatchingStrategy interface{ Rank(cs []Candidate) []Candidate }
+type MatchingStrategy interface{ Rank(cs []Candidate) []Candidate } // best first
 
 type Driver struct {
-	status atomic.Int32             // Available -> Offered only by CompareAndSwap
+	status atomic.Int32             // Available -> Offered only by CompareAndSwap (TryClaim)
 	loc    atomic.Pointer[Location] // pings never lock
 }
 
@@ -918,10 +875,74 @@ type Ride struct {
 	candidates []Candidate
 }
 
-func (r *Ride) offerNext() (RideEvent, bool)                          // claim next free candidate, Offered
+func (r *Ride) offerNext() (RideEvent, bool)                          // CAS next free candidate; none left -> Cancelled(NoDriver)
 func (r *Ride) accept(driverID string, now int64) (RideEvent, error)
 func (r *Ride) withdrawOffer(driverID string) bool                    // decline or timeout; false if stale
-func (s RideStatus) CanMoveTo(to RideStatus) bool                     // explicit table`,
+func (r *Ride) moveTo(next RideStatus) (RideEvent, error)             // the only status change; checks the table
+
+// RideService (built once, passed around): RequestRide does LoadOrStore on riderID:requestID, ranks, dispatches;
+// dispatch = offerNext, publish, after(15s) -> withdrawOffer.
+// Complete prices the actual trip with the locked surge, then Charge(rideID as idempotency key).`,
+
+"Surge from demand and supply": `// DemandSupplySurge: demand = open requests in a cell, supply = available drivers there.
+// A scheduler rebuilds the whole table and swaps it in with one atomic store; readers never lock.
+type DemandSupplySurge struct {
+	snapshot atomic.Pointer[map[Cell]int] // the map is never modified after it is stored
+}
+
+const (
+	maxSurgePercent    = 300
+	sensitivityPercent = 50
+)
+
+func (s *DemandSupplySurge) SurgePercentAt(pickup Location) int {
+	if m := s.snapshot.Load(); m != nil {
+		if v, ok := (*m)[CellOf(pickup)]; ok {
+			return v
+		}
+	}
+	return 100
+}
+
+func (s *DemandSupplySurge) Recompute(openRequests, availableDrivers map[Cell]int) {
+	next := make(map[Cell]int, len(openRequests))
+	for cell, demand := range openRequests {
+		next[cell] = surgePercent(demand, availableDrivers[cell])
+	}
+	s.snapshot.Store(&next)
+}
+
+func surgePercent(demand, supply int) int {
+	if demand <= supply {
+		return 100
+	}
+	if supply == 0 {
+		return maxSurgePercent
+	}
+	raw := 100 + (demand*100/supply-100)*sensitivityPercent/100
+	return (min(maxSurgePercent, raw) + 5) / 10 * 10 // shown to riders in 0.1x steps
+}`,
+
+"Final fare: upfront price with a tolerance": `const tolerancePercent = 15
+
+// FinalFare: riders pay the quoted price unless the trip really changed (a detour, a new drop, a long jam).
+func FinalFare(p PricingStrategy, r *Ride, actual TripMetrics) (FareBreakdown, error) {
+	metered, err := p.Price(r.Type, actual, r.Estimate.SurgePercent)
+	if err != nil {
+		return FareBreakdown{}, err
+	}
+	quoted := r.Estimate.Total
+	diff := metered.Total - quoted
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff*100 <= quoted*tolerancePercent { // integer maths, no drift
+		return r.Estimate, nil
+	}
+	return metered, nil
+}
+
+// The only change in RideService.Complete:  fare, err := FinalFare(s.pricing, r, actual)`,
 
 "Broadcast mode: open requests and the first claim wins": `// On Ride: the first driver to tap claims the ride, if it is still searching and they are still free.
 func (r *Ride) claim(d *Driver, nowMillis int64) (RideEvent, bool) {
@@ -981,7 +1002,7 @@ func (s *RideService) Claim(rideID, driverID string) error {
 "Live tracking: forward the assigned driver's pings to the rider": `type LocationUpdate struct {
 	RideID, RiderID string
 	DriverAt        Location
-	ETAMinutes      float64
+	ETASeconds      int64
 }
 
 type TrackingListener interface{ OnLocation(u LocationUpdate) } // e.g. pushes to the rider's app over a WebSocket
@@ -1026,7 +1047,7 @@ func (t *RideTracker) OnPing(driverID string, at Location) {
 	if tr.ride.Status() == InProgress {
 		target = tr.ride.Drop
 	}
-	u := LocationUpdate{tr.ride.ID, tr.ride.RiderID, at, t.routes.Estimate(at, target).Minutes}
+	u := LocationUpdate{tr.ride.ID, tr.ride.RiderID, at, t.routes.Estimate(at, target).Seconds}
 	t.mu.RLock()
 	ls := slices.Clone(t.listeners)
 	t.mu.RUnlock()
@@ -1037,7 +1058,7 @@ func (t *RideTracker) OnPing(driverID string, at Location) {
 
 // Wiring in RideService:
 //   UpdateLocation: s.index.Update(d, at); s.tracker.OnPing(driverID, at)
-//   Accept or Claim: s.tracker.Start(r, driverID)    Complete or Cancel: s.tracker.Stop(driverID)`,
+//   Accept (or Claim): s.tracker.Start(r, driverID)    Complete or Cancel: s.tracker.Stop(driverID)`,
 
 "Payment with a status, charged once per ride": `type PaymentStatus int
 
@@ -1072,7 +1093,7 @@ func (p *Payment) Attempt(g PaymentGateway) (PaymentStatus, error) {
 		return p.status, nil
 	}
 	p.attempts++
-	err := g.Charge(p.RideID, p.RiderID, p.Amount) // ride id = idempotency key: a retry can't charge twice
+	err := g.Charge(p.RideID, p.RiderID, p.Amount) // ride id = idempotency key: a retry cannot charge twice
 	switch {
 	case err == nil:
 		p.status = PaymentSucceeded
@@ -1108,5 +1129,86 @@ func (s *PaymentService) Failed() []*Payment {
 	return out
 }
 
-// In RideService.Complete, replace the direct gateway call with: s.paymentService.Charge(r, fare.Total)`
+// In RideService.Complete, replace the direct gateway call with: s.paymentService.Charge(r, fare.Total)`,
+
+"Cancellation fees as a policy": `type CancellationPolicy interface {
+	FeeFor(status RideStatus, who CancelReason, sinceAccepted time.Duration) (int64, error) // paise
+}
+
+// GracePeriodPolicy: free until the driver has been on the way for a grace period,
+// a flat fee after that, more once they have arrived.
+type GracePeriodPolicy struct{}
+
+const (
+	cancelGrace = 2 * time.Minute
+	cancelFee   = 50_00 // paise
+	arrivedFee  = 75_00
+)
+
+func (GracePeriodPolicy) FeeFor(status RideStatus, who CancelReason, sinceAccepted time.Duration) (int64, error) {
+	if who != ByRider {
+		return 0, nil // drivers and the system never charge riders
+	}
+	switch status {
+	case Requested, Offered:
+		return 0, nil
+	case Accepted:
+		if sinceAccepted <= cancelGrace {
+			return 0, nil
+		}
+		return cancelFee, nil
+	case DriverArrived:
+		return arrivedFee, nil
+	default:
+		return 0, fmt.Errorf("cannot cancel a ride that is %v", status)
+	}
+}
+
+// Inside Ride.cancel, holding r.mu, before moveTo(Cancelled):
+//   fee, err := policy.FeeFor(r.status, reason, sinceAccepted)`,
+
+"A driver backs out: back to searching": `// The table gains one row:  Accepted: {DriverArrived, Requested, Cancelled},
+
+// On Ride: offerNo int, guarded by mu. offerNext increments it and puts it on the Offered event;
+// the timer passes it back, so an old timer can never withdraw a newer offer to the same driver.
+
+func (r *Ride) driverBacksOut(driverID string, fresh []Candidate) (RideEvent, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := r.requireDriver(driverID, Accepted); err != nil {
+		return RideEvent{}, err
+	}
+	r.driver.EndTrip() // OnTrip -> Available
+	r.driver = nil
+	r.candidates = slices.DeleteFunc(fresh, func(c Candidate) bool {
+		return c.Driver.ID == driverID // never re-offer the driver who left
+	})
+	return r.moveTo(Requested)
+}
+
+func (r *Ride) withdrawOffer(driverID string, offer int) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.status != Offered || offer != r.offerNo || r.driver.ID != driverID {
+		return false
+	}
+	r.driver.Release()
+	r.driver = nil
+	_, err := r.moveTo(Requested)
+	return err == nil
+}
+
+// On RideService
+func (s *RideService) DriverCancel(rideID, driverID string) error {
+	r, err := s.ride(rideID)
+	if err != nil {
+		return err
+	}
+	fresh := s.matching.Rank(s.index.Near(r.Pickup, r.Type, searchRadiusKm))
+	if err := s.emit(r.driverBacksOut(driverID, fresh)); err != nil {
+		return err
+	}
+	s.dispatch(r) // a new offer, a new number, a new timer
+	return nil
+}`
 } };

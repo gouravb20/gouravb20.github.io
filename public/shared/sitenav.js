@@ -69,7 +69,7 @@
     .sn *,.sn *::before,.sn *::after{box-sizing:border-box}
     .sn a{color:inherit;text-decoration:none}
     .sn svg{flex:none;display:block}
-    .sn-head{display:flex;align-items:center;gap:8px;padding:14px 12px 12px 14px;border-bottom:1px solid var(--border,#24304f)}
+    .sn-head{display:flex;align-items:center;gap:8px;box-sizing:border-box;padding:12px 12px 12px 14px;border-bottom:1px solid var(--border,#24304f)}
     .sn-home{display:flex;align-items:center;gap:10px;flex:1;min-width:0;font-weight:700;font-size:15px;border-radius:8px}
     .sn-mark{flex:none;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:#dc2626;color:#fff;font-size:14px;font-weight:800}
     .sn-close{display:none;flex:none;width:32px;height:32px;place-items:center;border-radius:8px;border:1px solid var(--border,#24304f);
@@ -130,7 +130,7 @@
       html.sn-collapsed{--sn-w:60px}
       html.sn-collapsed .sn-txt,html.sn-collapsed .sn-soon,html.sn-collapsed .sn-btn-icon,html.sn-collapsed .sn-kids,
       html.sn-collapsed .sn-fold span,html.sn-collapsed .sn-back span,html.sn-collapsed .sn-group,html.sn-collapsed .sn-section{display:none}
-      html.sn-collapsed .sn-head{justify-content:center;padding:14px 0 12px}
+      html.sn-collapsed .sn-head{justify-content:center;padding:12px 0}
       html.sn-collapsed .sn-home{flex:none}
       html.sn-collapsed .sn-body{padding:10px 8px}
       html.sn-collapsed .sn-link,html.sn-collapsed .sn-back,html.sn-collapsed .sn-fold{justify-content:center;padding:8px 0}
@@ -285,6 +285,16 @@
     });
     document.addEventListener("keydown", e => { if (drawer && e.key === "Escape") { e.preventDefault(); setDrawer(false); } });
     docked.addEventListener("change", () => { if (docked.matches) setDrawer(false); });
+
+    // Docked beside the page, the sidebar's header is as tall as the page's top bar, so their bottom rules line up.
+    // Each page and look sizes its own top bar, so measure it rather than hard-code a height.
+    const head = wrap.querySelector(".sn-head");
+    if (topbar && head) {
+      const alignHead = () => { head.style.minHeight = docked.matches ? topbar.offsetHeight + "px" : ""; };
+      new ResizeObserver(alignHead).observe(topbar);
+      docked.addEventListener("change", alignHead);
+      alignHead();
+    }
 
     const reveal = () => {
       const active = body.querySelector(".chapter-item.active") || body.querySelector(".sn-current");

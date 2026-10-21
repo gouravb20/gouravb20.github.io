@@ -1,20 +1,81 @@
 // Go versions of the ATM code blocks, matched to the Java blocks by title. Imports are omitted.
 window.ALT = window.ALT || {};
 ALT["atm"] = { go: {
-"Public API": `// Customer actions, interpreted by the current state
-func (a *ATM) InsertCard(card Card) error
-func (a *ATM) EnterPin(pin string) (PinResult, error) // PinOK, PinWrong or PinCardRetained
-func (a *ATM) Balance() (int64, error)                 // paise
-func (a *ATM) Withdraw(amount int64) (Transaction, error)
-func (a *ATM) EjectCard() error
+"Final class design": `type ATM struct {
+	mu       sync.Mutex     // guards cash, journal and state
+	bank     BankService    // injected: owns balances and PINs
+	hardware CashHardware   // injected: dispenser and card slot
+	cash     *CashDispenser
+	journal  []Transaction
+	state    ATMState
+}
 
-// Operator actions
-func (a *ATM) Refill(note int64, count int) error
+func (a *ATM) InsertCard(card Card) error
+func (a *ATM) EnterPin(pin string) (PinResult, error)
+func (a *ATM) Balance() (int64, error)                    // paise
+func (a *ATM) Withdraw(amount int64) (Transaction, error) // paise
+func (a *ATM) EjectCard() error
+func (a *ATM) Refill(note int64, count int) error // operator
 func (a *ATM) TakeOutOfService() error
 func (a *ATM) Restore() error
-func (a *ATM) Journal() []Transaction`,
+func (a *ATM) Journal() []Transaction
+
+type ATMState interface { // every action rejects unless the state overrides it
+	InsertCard(a *ATM, card Card) error
+	EnterPin(a *ATM, pin string) (PinResult, error)
+	Balance(a *ATM) (int64, error)
+	Withdraw(a *ATM, amount int64) (Transaction, error)
+	EjectCard(a *ATM) error
+}
+
+// Idle{}, CardInserted{card, wrongPins}, Authenticated{card}, OutOfService{reason}: immutable values
+
+type CashDispenser struct{ head *Cassette } // largest note first
+
+func (d *CashDispenser) Plan(amount int64) (map[int64]int, bool) // reads counts only
+func (d *CashDispenser) Take(plan map[int64]int) error           // all or nothing
+func (d *CashDispenser) Load(note int64, count int) error
+func (d *CashDispenser) Total() int64
+
+type Cassette struct {
+	note  int64
+	count int
+	next  *Cassette // the next smaller note
+}
+
+func (c *Cassette) Plan(amount int64, plan map[int64]int) bool // most notes first, back off on failure
+
+type BankService interface {
+	VerifyPin(cardNumber, pin string) AuthResult
+	Balance(cardNumber string) int64
+	Debit(cardNumber string, amount int64, idempotencyKey string) DebitResult
+	Reverse(cardNumber, idempotencyKey string)
+}
+
+type CashHardware interface {
+	Dispense(notes map[int64]int) error
+	ReturnCard()
+	RetainCard()
+}
+
+type Card struct{ Number string }
+
+type Transaction struct {
+	ID, ATMID, MaskedCard string
+	Amount                int64
+	Status                TxnStatus
+	Reason                string
+	At                    time.Time
+}`,
 
 "Values and the bank interface": `type Card struct{ Number string }
+
+func NewCard(number string) (Card, error) {
+	if len(number) < 4 {
+		return Card{}, errors.New("bad card number")
+	}
+	return Card{number}, nil
+}
 
 func (c Card) Masked() string { return "XXXX" + c.Number[len(c.Number)-4:] }
 func (c Card) String() string { return "Card[" + c.Masked() + "]" } // never print the full number
@@ -78,6 +139,87 @@ type CashHardware interface {
 	RetainCard()
 }`,
 
+"Session states": `// ATMState says what each customer action means right now. States are immutable values;
+// the ATM swaps them while holding its mutex.
+type ATMState interface {
+	InsertCard(a *ATM, card Card) error
+	EnterPin(a *ATM, pin string) (PinResult, error)
+	Balance(a *ATM) (int64, error)
+	Withdraw(a *ATM, amount int64) (Transaction, error)
+	EjectCard(a *ATM) error
+}
+
+// rejectAll answers "not now" to every action; each state embeds it and overrides what it allows.
+type rejectAll struct{ name string }
+
+func (r rejectAll) err(action string) error { return fmt.Errorf("cannot %s while %s", action, r.name) }
+
+func (r rejectAll) InsertCard(*ATM, Card) error               { return r.err("insert a card") }
+func (r rejectAll) EnterPin(*ATM, string) (PinResult, error)  { return 0, r.err("enter a PIN") }
+func (r rejectAll) Balance(*ATM) (int64, error)               { return 0, r.err("check the balance") }
+func (r rejectAll) Withdraw(*ATM, int64) (Transaction, error) { return Transaction{}, r.err("withdraw") }
+func (r rejectAll) EjectCard(*ATM) error                      { return r.err("eject a card") }
+
+type Idle struct{ rejectAll }
+
+func (Idle) InsertCard(a *ATM, card Card) error {
+	a.state = cardInserted(card, 0)
+	return nil
+}
+
+type CardInserted struct {
+	rejectAll
+	card      Card
+	wrongPins int
+}
+
+func (s CardInserted) EnterPin(a *ATM, pin string) (PinResult, error) {
+	r := a.bank.VerifyPin(s.card.Number, pin)
+	if r == AuthOK {
+		a.state = authenticated(s.card)
+		return PinOK, nil
+	}
+	if r == AuthBlocked || s.wrongPins+1 >= MaxPinAttempts {
+		a.retainCard() // ends the session
+		return PinCardRetained, nil
+	}
+	a.state = cardInserted(s.card, s.wrongPins+1) // a new value, not a mutated counter
+	return PinWrong, nil
+}
+
+func (CardInserted) EjectCard(a *ATM) error { a.endSession(); return nil }
+
+type Authenticated struct {
+	rejectAll
+	card Card
+}
+
+func (s Authenticated) Balance(a *ATM) (int64, error) { return a.bank.Balance(s.card.Number), nil }
+
+func (s Authenticated) Withdraw(a *ATM, amount int64) (Transaction, error) {
+	return a.runWithdrawal(s.card, amount), nil
+}
+
+func (Authenticated) EjectCard(a *ATM) error { a.endSession(); return nil }
+
+type Reason int
+
+const (
+	OutOfCash Reason = iota
+	Fault
+	Maintenance
+)
+
+type OutOfService struct { // rejects every customer action
+	rejectAll
+	reason Reason
+}
+
+func idle() ATMState                           { return Idle{rejectAll{"Idle"}} }
+func cardInserted(c Card, wrong int) ATMState { return CardInserted{rejectAll{"CardInserted"}, c, wrong} }
+func authenticated(c Card) ATMState           { return Authenticated{rejectAll{"Authenticated"}, c} }
+func outOfService(r Reason) ATMState          { return OutOfService{rejectAll{"OutOfService"}, r} }`,
+
 "Inventory-aware dispense chain": `// Cassette is one link in the chain: one note value. Not safe alone: the ATM's mutex guards it.
 type Cassette struct {
 	note  int64 // paise
@@ -96,7 +238,7 @@ func (c *Cassette) Plan(amount int64, plan map[int64]int) bool {
 		rest := amount - int64(use)*c.note
 		if rest == 0 || (c.next != nil && c.next.Plan(rest, plan)) {
 			if use > 0 {
-				plan[c.note] = use
+				plan[c.note] = use // only the successful path writes
 			}
 			return true
 		}
@@ -149,87 +291,6 @@ func (d *CashDispenser) Total() int64 {
 	}
 	return sum
 }`,
-
-"Session states": `// ATMState says what each customer action means right now. States are immutable values;
-// the ATM swaps them while holding its mutex.
-type ATMState interface {
-	InsertCard(a *ATM, card Card) error
-	EnterPin(a *ATM, pin string) (PinResult, error)
-	Balance(a *ATM) (int64, error)
-	Withdraw(a *ATM, amount int64) (Transaction, error)
-	EjectCard(a *ATM) error
-}
-
-// rejectAll answers "not now" to every action; each state embeds it and overrides what it allows.
-type rejectAll struct{ name string }
-
-func (r rejectAll) err(action string) error { return fmt.Errorf("cannot %s while %s", action, r.name) }
-
-func (r rejectAll) InsertCard(*ATM, Card) error               { return r.err("insert a card") }
-func (r rejectAll) EnterPin(*ATM, string) (PinResult, error)  { return 0, r.err("enter a PIN") }
-func (r rejectAll) Balance(*ATM) (int64, error)               { return 0, r.err("check the balance") }
-func (r rejectAll) Withdraw(*ATM, int64) (Transaction, error) { return Transaction{}, r.err("withdraw") }
-func (r rejectAll) EjectCard(*ATM) error                      { return r.err("eject a card") }
-
-type Idle struct{ rejectAll }
-
-func (Idle) InsertCard(a *ATM, card Card) error {
-	a.state = cardInserted(card, 0)
-	return nil
-}
-
-type CardInserted struct {
-	rejectAll
-	card      Card
-	wrongPins int
-}
-
-func (s CardInserted) EnterPin(a *ATM, pin string) (PinResult, error) {
-	r := a.bank.VerifyPin(s.card.Number, pin)
-	if r == AuthOK {
-		a.state = authenticated(s.card)
-		return PinOK, nil
-	}
-	if r == AuthBlocked || s.wrongPins+1 >= MaxPinAttempts {
-		a.retainCard() // ends the session
-		return PinCardRetained, nil
-	}
-	a.state = cardInserted(s.card, s.wrongPins+1)
-	return PinWrong, nil
-}
-
-func (CardInserted) EjectCard(a *ATM) error { a.endSession(); return nil }
-
-type Authenticated struct {
-	rejectAll
-	card Card
-}
-
-func (s Authenticated) Balance(a *ATM) (int64, error) { return a.bank.Balance(s.card.Number), nil }
-
-func (s Authenticated) Withdraw(a *ATM, amount int64) (Transaction, error) {
-	return a.runWithdrawal(s.card, amount), nil
-}
-
-func (Authenticated) EjectCard(a *ATM) error { a.endSession(); return nil }
-
-type Reason int
-
-const (
-	OutOfCash Reason = iota
-	Fault
-	Maintenance
-)
-
-type OutOfService struct { // rejects every customer action
-	rejectAll
-	reason Reason
-}
-
-func idle() ATMState                         { return Idle{rejectAll{"Idle"}} }
-func cardInserted(c Card, wrong int) ATMState { return CardInserted{rejectAll{"CardInserted"}, c, wrong} }
-func authenticated(c Card) ATMState          { return Authenticated{rejectAll{"Authenticated"}, c} }
-func outOfService(r Reason) ATMState         { return OutOfService{rejectAll{"OutOfService"}, r} }`,
 
 "Atm": `const (
 	Rs             int64 = 100        // paise per rupee
@@ -382,10 +443,15 @@ func (a *ATM) record(id string, card Card, amount int64, status TxnStatus, reaso
 	// ...
 }
 
-type CardInserted struct { // 3rd wrong PIN: retain the card
+type CardInserted struct { // 3rd wrong PIN or AuthBlocked: retain
 	rejectAll
 	card      Card
 	wrongPins int
+}
+
+type Authenticated struct { // Balance, Withdraw, EjectCard
+	rejectAll
+	card Card
 }
 
 type Cassette struct { // chain link, largest note first
@@ -394,129 +460,188 @@ type Cassette struct { // chain link, largest note first
 	next  *Cassette
 }
 
-// (c *Cassette) Plan(amount int64, plan map[int64]int) bool: most notes first, back off on failure
+// (c *Cassette) Plan(amount, plan) bool: most notes first, back off on failure
+// (d *CashDispenser) Plan(amount) (map[int64]int, bool); Take(plan) error
 
-// ATM: every exported method holds a.mu.
+// ATM: every exported method holds a.mu (state, cash, journal).
 // runWithdrawal: validate, plan (reads only), bank.Debit(key), take notes, dispense;
-// on a dispense error: bank.Reverse(key) and outOfService(Fault).
+// on a dispense error: bank.Reverse(key), return the card, outOfService(Fault).
 
-type BankService interface {
+type BankService interface { // owns balances and PINs
 	VerifyPin(card, pin string) AuthResult
 	Debit(card string, amount int64, key string) DebitResult // atomic per account, idempotent
 	Reverse(card, key string)
 }`,
 
-"Same rules as an enum switch": `type Status int
+"Deposits: one more action, one more bank call": `// ATMState gains Deposit; rejectAll answers it, so Idle, CardInserted and OutOfService need no edits.
+func (r rejectAll) Deposit(*ATM) (Transaction, error) { return Transaction{}, r.err("deposit") }
 
-const (
-	StatusIdle Status = iota
-	StatusCardInserted
-	StatusAuthenticated
-	StatusOutOfService
-)
+// Authenticated is the only state that allows it.
+func (s Authenticated) Deposit(a *ATM) (Transaction, error) { return a.runDeposit(s.card), nil }
 
-type SwitchATM struct {
-	mu        sync.Mutex
-	status    Status
-	card      *Card // meaningful only in CardInserted and Authenticated
-	wrongPins int   // meaningful only in CardInserted
-}
+// BankService gains an idempotent credit:
+//	Credit(cardNumber string, amount int64, idempotencyKey string)
+// CashHardware gains the note acceptor, which counts and checks the notes:
+//	AcceptNotes() (map[int64]int, error)
 
-func (a *SwitchATM) EnterPin(pin string) (PinResult, error) {
+// On ATM: depositBin map[int64]int, guarded by a.mu and emptied by an operator.
+func (a *ATM) Deposit() (Transaction, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	switch a.status {
-	case StatusCardInserted:
-		// verify, count, maybe retain
-		return PinOK, nil
-	default:
-		return 0, fmt.Errorf("cannot enter a PIN in status %d", a.status)
+	return a.state.Deposit(a)
+}
+
+func (a *ATM) runDeposit(card Card) Transaction {
+	id := uuid.NewString()
+	notes, err := a.hardware.AcceptNotes()
+	if err != nil {
+		return a.record(id, card, 0, Declined, "note acceptor fault")
 	}
-}
-
-func (a *SwitchATM) EjectCard() error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	switch a.status {
-	case StatusCardInserted, StatusAuthenticated:
-		a.card, a.wrongPins, a.status = nil, 0, StatusIdle // forget one reset and the next customer inherits it
-		return nil
-	default:
-		return errors.New("no card to eject")
+	var amount int64
+	for note, n := range notes {
+		amount += note * int64(n)
 	}
-}
-
-// ... and the same switch again in InsertCard, Balance and Withdraw`,
-
-"Greedy chain that fails on 600": `type GreedyLink struct {
-	note  int64
-	count int
-	next  *GreedyLink
-}
-
-func (l *GreedyLink) Plan(amount int64, plan map[int64]int) bool {
-	use := int(min(int64(l.count), amount/l.note)) // take as many as fit, never fewer
-	if use > 0 {
-		plan[l.note] = use
+	if amount == 0 {
+		return a.record(id, card, 0, Declined, "no valid notes")
 	}
-	rest := amount - int64(use)*l.note
-	return rest == 0 || (l.next != nil && l.next.Plan(rest, plan))
+	for note, n := range notes {
+		a.depositBin[note] += n // not the cassettes: unverified notes
+	}
+	a.bank.Credit(card.Number, amount, id) // the amount comes from the counted notes, never the keypad
+	return a.record(id, card, amount, Completed, "deposited")
+}`,
+
+"NotePlanner: fewest notes by dynamic programming": `// NotePlanner turns an amount into notes. The cassettes own the counts; a planner only reads them.
+type NotePlanner interface {
+	Plan(amount int64, available map[int64]int) (map[int64]int, bool) // note -> count
 }
 
-// Cassettes: Rs 500 x 10, Rs 200 x 10, no Rs 100. Plan(600) takes one 500, leaves 100 and fails,
-// although 200 + 200 + 200 works. It also leaves a half-filled plan behind on failure.`,
+// CashDispenser.Plan delegates; counts() copies note -> count from the chain. Take, Load and Total don't change.
+func (d *CashDispenser) Plan(amount int64) (map[int64]int, bool) { return d.planner.Plan(amount, d.counts()) }
 
-"Fewest notes by dynamic programming": `// FewestNotes returns the fewest notes that make amount using at most counts[i] notes of value notes[i].
-// Amounts are in units of Rs 100, so a Rs 10,000 cap means a table of 101 cells.
-func FewestNotes(amount int, notes, counts []int) ([]int, bool) {
+// FewestNotes finds the fewest notes for any set of denominations, by bounded change-making.
+type FewestNotes struct{}
+
+func (FewestNotes) Plan(amount int64, available map[int64]int) (map[int64]int, bool) {
+	const unit = 100 * Rs // every note and amount is a multiple of Rs 100
+	if amount%unit != 0 {
+		return nil, false
+	}
+	target := int(amount / unit)
+	notes := slices.Sorted(maps.Keys(available))
 	const none = math.MaxInt
-	n := len(notes)
-	best := make([]int, amount+1) // fewest notes for each sub-amount so far
-	take := make([][]int, n)      // notes of type i chosen at that step
-	for i := range take {
-		take[i] = make([]int, amount+1)
-	}
-	for a := 1; a <= amount; a++ {
+	best := make([]int, target+1) // fewest notes for each sub-amount so far
+	for a := 1; a <= target; a++ {
 		best[a] = none
 	}
-	for i := 0; i < n; i++ {
-		for a := amount; a > 0; a-- { // downwards: lower cells still hold the previous row
-			for k := 1; k <= counts[i] && k*notes[i] <= a; k++ {
-				if prev := best[a-k*notes[i]]; prev != none && prev+k < best[a] {
+	take := make([][]int, len(notes)) // notes of type i used for that sub-amount
+	for i, note := range notes {
+		take[i] = make([]int, target+1)
+		value, count := int(note/unit), available[note]
+		for a := target; a > 0; a-- { // downwards: lower cells still hold the previous row
+			for k := 1; k <= count && k*value <= a; k++ {
+				if prev := best[a-k*value]; prev != none && prev+k < best[a] {
 					best[a], take[i][a] = prev+k, k
 				}
 			}
 		}
 	}
-	if best[amount] == none {
+	if best[target] == none {
 		return nil, false
 	}
-	out := make([]int, n)
-	for i, a := n-1, amount; i >= 0; i-- {
-		out[i] = take[i][a]
-		a -= out[i] * notes[i]
+	plan := map[int64]int{}
+	for i, a := len(notes)-1, target; i >= 0; i-- {
+		if k := take[i][a]; k > 0 {
+			plan[notes[i]] = k
+			a -= k * int(notes[i]/unit)
+		}
 	}
-	return out, true
+	return plan, true
+}
+
+// Without hides some notes ("no Rs 2000, please"), then asks another planner (a decorator).
+type Without struct {
+	Excluded map[int64]bool
+	Inner    NotePlanner
+}
+
+func (w Without) Plan(amount int64, available map[int64]int) (map[int64]int, bool) {
+	view := map[int64]int{}
+	for note, n := range available {
+		if !w.Excluded[note] {
+			view[note] = n
+		}
+	}
+	return w.Inner.Plan(amount, view)
 }`,
 
-"Retry with the same key, then reverse": `type PendingReversal struct{ Card, Key string }
+"Retry with the same key, then queue a reversal": `var ErrBankTimeout = errors.New("bank timeout") // the bank's outcome is unknown
 
-// debitWithRetry tries up to three times with the same key, so the bank applies the debit at most once.
-// a.client is a bank client whose Debit returns ErrTimeout when the outcome is unknown.
-// a.pendingReversals is guarded by a.mu; a background goroutine drains it until the bank confirms.
+// BankClient is the bank seen over the network: any call can time out.
+type BankClient interface {
+	Debit(card string, amount int64, key string) (DebitResult, error)
+	Reverse(card, key string) error
+}
+
+type PendingReversal struct{ Card, Key string }
+
+// reversalQueue has its own mutex: it is added to while a.mu is held, and drained by a
+// background goroutine that does not hold a.mu.
+type reversalQueue struct {
+	mu    sync.Mutex
+	items []PendingReversal
+}
+
+func (q *reversalQueue) add(r PendingReversal) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.items = append(q.items, r)
+}
+
+func (q *reversalQueue) peek() (PendingReversal, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if len(q.items) == 0 {
+		return PendingReversal{}, false
+	}
+	return q.items[0], true
+}
+
+func (q *reversalQueue) pop() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.items = q.items[1:]
+}
+
+// debitWithRetry tries up to three times with one key: the bank applies the debit at most once.
 func (a *ATM) debitWithRetry(card string, amount int64, key string) (DebitResult, bool) {
 	for attempt := 1; attempt <= 3; attempt++ {
 		r, err := a.client.Debit(card, amount, key)
 		if err == nil {
 			return r, true
 		}
-		if !errors.Is(err, ErrTimeout) {
+		if !errors.Is(err, ErrBankTimeout) {
 			break
 		}
-		// Outcome unknown; the same key makes a retry safe (back off briefly in real code).
+		// Unknown outcome. The same key makes the retry safe; real code backs off between tries.
 	}
-	a.pendingReversals = append(a.pendingReversals, PendingReversal{card, key})
-	return 0, false // tell the customer to try later; dispense nothing
+	a.reversals.add(PendingReversal{card, key}) // undo whatever may have happened
+	return 0, false
+}
+
+// In runWithdrawal the debit becomes:
+//	r, ok := a.debitWithRetry(card.Number, amount, id)
+//	if !ok { return a.record(id, card, amount, Declined, "bank unavailable, reversal queued") }
+
+// drainReversals runs every few seconds on one goroutine: each reversal is sent until the bank answers.
+func (a *ATM) drainReversals() {
+	for {
+		r, ok := a.reversals.peek()
+		if !ok || a.client.Reverse(r.Card, r.Key) != nil {
+			return // nothing left, or try again on the next run
+		}
+		a.reversals.pop() // only this goroutine removes, so peek then pop is safe
+	}
 }`,
 
 "Bank: atomic, idempotent debit": `type debit struct {
@@ -538,15 +663,35 @@ type account struct {
 }
 
 type InMemoryBank struct {
-	accounts map[string]*account     // by card number; filled at startup and read-only after, so safe to share
+	accounts sync.Map                    // card number -> *account; safe for concurrent lookups and inserts
 	matches  func(pin, hash string) bool // constant-time check against the slow hash
-	today    func() string
+	today    func() string               // injected clock, as yyyy-mm-dd
+}
+
+func (b *InMemoryBank) Open(card, pinHash string, balance, dailyLimit int64) {
+	b.accounts.Store(card, &account{pinHash: pinHash, balance: balance, dailyLimit: dailyLimit, debits: map[string]debit{}})
+}
+
+func (b *InMemoryBank) lookup(card string) (*account, bool) {
+	v, ok := b.accounts.Load(card)
+	if !ok {
+		return nil, false
+	}
+	return v.(*account), true
+}
+
+func (b *InMemoryBank) mustLookup(card string) *account {
+	a, ok := b.lookup(card)
+	if !ok {
+		panic("unknown card") // only reachable after VerifyPin succeeded, so a programming error
+	}
+	return a
 }
 
 func (b *InMemoryBank) VerifyPin(card, pin string) AuthResult {
-	a := b.accounts[card]
-	if a == nil {
-		return AuthBlocked
+	a, ok := b.lookup(card)
+	if !ok {
+		return AuthBlocked // unknown card: the ATM retains it
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -565,14 +710,14 @@ func (b *InMemoryBank) VerifyPin(card, pin string) AuthResult {
 }
 
 func (b *InMemoryBank) Balance(card string) int64 {
-	a := b.accounts[card] // only called after VerifyPin succeeded
+	a := b.mustLookup(card)
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.balance
 }
 
 func (b *InMemoryBank) Debit(card string, amount int64, key string) DebitResult {
-	a := b.accounts[card]
+	a := b.mustLookup(card)
 	a.mu.Lock() // one account at a time; others run in parallel
 	defer a.mu.Unlock()
 	if seen, ok := a.debits[key]; ok {
@@ -594,7 +739,7 @@ func (b *InMemoryBank) Debit(card string, amount int64, key string) DebitResult 
 }
 
 func (b *InMemoryBank) Reverse(card, key string) {
-	a := b.accounts[card]
+	a := b.mustLookup(card)
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	b.rollDay(a)
@@ -620,22 +765,105 @@ func (b *InMemoryBank) rollDay(a *account) {
 	}
 }`,
 
-"Redacted PIN block and an inactivity timeout": `// PinBlock is the encrypted PIN block from the PIN pad. The ATM forwards it and never sees the digits.
-type PinBlock struct{ cipherText []byte }
+"Dispensing as a real state": `// Dispensing: the bank call is in flight. It embeds rejectAll, so every customer action is refused.
+type Dispensing struct {
+	rejectAll
+	card   Card
+	amount int64
+	plan   map[int64]int // never changed after construction
+	txnID  string
+}
 
-func (PinBlock) String() string { return "PinBlock[redacted]" }
-
-// Inside ATM: an inactivity timer. The session number stops an old timer from ending a newer session.
-// a.session is guarded by a.mu and bumped on every InsertCard.
-func (a *ATM) OnInactivity(forSession int64) {
+// reserve runs under a.mu: validate, plan, take the notes and enter Dispensing.
+// A nil *Dispensing means the withdrawal already ended with the returned result.
+func (a *ATM) reserve(amount int64) (*Dispensing, Transaction, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if forSession != a.session {
-		return // that session already ended
+	auth, ok := a.state.(Authenticated)
+	if !ok {
+		t, err := a.state.Withdraw(a, amount) // the state rejects it
+		return nil, t, err
 	}
+	id := uuid.NewString()
+	if amount <= 0 || amount%Step != 0 || amount > PerTxnLimit {
+		return nil, a.record(id, auth.card, amount, Declined, "invalid amount"), nil
+	}
+	plan, found := a.cash.Plan(amount)
+	if !found {
+		return nil, a.record(id, auth.card, amount, Declined, "notes for this amount are not available"), nil
+	}
+	_ = a.cash.Take(plan) // reserved: a refill or another plan can't spend them
+	d := &Dispensing{rejectAll{"Dispensing"}, auth.card, amount, plan, id}
+	a.state = *d
+	return d, Transaction{}, nil
+}
+
+// Withdraw no longer holds a.mu across the bank call.
+func (a *ATM) Withdraw(amount int64) (Transaction, error) {
+	d, t, err := a.reserve(amount)
+	if d == nil {
+		return t, err
+	}
+	debit, callErr := a.client.Debit(d.card.Number, d.amount, d.txnID) // no lock: refills and status reads go ahead
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if callErr != nil || debit != DebitOK {
+		for note, n := range d.plan {
+			_ = a.cash.Load(note, n) // un-reserve
+		}
+		a.state = authenticated(d.card)
+		reason := debit.String()
+		if callErr != nil { // unknown outcome: make sure it ends up undone
+			a.reversals.add(PendingReversal{d.card.Number, d.txnID})
+			reason = "bank unavailable, reversal queued"
+		}
+		return a.record(d.txnID, d.card, d.amount, Declined, reason), nil
+	}
+	if err := a.hardware.Dispense(d.plan); err != nil {
+		if a.client.Reverse(d.card.Number, d.txnID) != nil {
+			a.reversals.add(PendingReversal{d.card.Number, d.txnID})
+		}
+		a.hardware.ReturnCard()
+		a.state = outOfService(Fault)
+		return a.record(d.txnID, d.card, d.amount, Reversed, "dispenser fault, debit reversed"), nil
+	}
+	a.state = authenticated(d.card)
+	return a.record(d.txnID, d.card, d.amount, Completed, "dispensed"), nil
+}`,
+
+"Inactivity timeout and retracted cash": `const Inactivity = 30 * time.Second
+
+// On ATM, guarded by a.mu: lastActivity time.Time, set by every customer action;
+// clock func() time.Time, injected so tests control time.
+
+// CheckInactivity runs every few seconds on a ticker goroutine, under the same mutex as every action.
+func (a *ATM) CheckInactivity() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	switch a.state.(type) {
 	case CardInserted, Authenticated:
-		a.endSession()
+		if a.clock().Sub(a.lastActivity) > Inactivity {
+			a.endSession() // returns the card; the slot retains it if nobody takes it
+		}
 	}
+}
+
+// CashHardware.Dispense now reports whether the notes were taken before the shutter closed:
+//	Dispense(notes map[int64]int) (Pickup, error)
+type Pickup int
+
+const (
+	Taken Pickup = iota
+	Retracted
+)
+
+// afterDispense is called by runWithdrawal when Dispense returned no error.
+func (a *ATM) afterDispense(p Pickup, card Card, amount int64, id string) Transaction {
+	if p == Retracted { // the notes went back into the reject bin
+		a.bank.Reverse(card.Number, id)
+		return a.record(id, card, amount, Reversed, "cash not taken, retracted")
+	}
+	return a.record(id, card, amount, Completed, "dispensed")
 }`
 } };
