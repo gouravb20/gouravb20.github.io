@@ -26,6 +26,7 @@ window.DATA.chapters.push(
   {
     id: `parking-lot`, part: 1, number: 3, difficulty: `easy`,
     title: `Parking Lot: swappable pricing and allocation, safe under concurrency`,
+    references: [{ title: `awesome-low-level-design: Parking Lot`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/parking-lot.md` }],
     overview: `Spots by vehicle type, a ticket on entry and a fee on exit. The interesting parts are what varies (how fees are computed, how a spot is chosen) and what must never happen (two cars claiming the same spot). The design puts pricing and allocation behind <strong>Strategy</strong> interfaces and claims spots with an <strong>atomic</strong> <code>tryOccupy()</code>, so concurrent entries can't race.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [
@@ -192,8 +193,9 @@ class ParkingLot {
   {
     id: `elevator`, part: 3, number: 4, difficulty: `hard`,
     title: `Elevator System: dispatching calls and the SCAN schedule`,
+    references: [{ title: `awesome-low-level-design: Elevator System`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/elevator-system.md` }],
     source: { title: `Hello Interview: Elevator (LLD) problem breakdown`, url: `https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/elevator` },
-    overview: `N elevators serve F floors. Passengers press hall buttons (floor and direction) and cabin buttons (destination). The controller must send each hall call to the best elevator, and each elevator must serve its stops in a sensible order. Each elevator keeps two sorted sets, stops on the way up and stops on the way down, and follows the <strong>SCAN</strong> idea: keep going while stops remain ahead, then reverse. Its direction is a <strong>State</strong> (Idle, MovingUp, MovingDown) that decides each step, displays follow it as <strong>Observers</strong>, and each car runs on its own thread. Dispatch is a cost function, which makes it a natural <strong>Strategy</strong>.`,
+    overview: `N elevators serve F floors. Passengers press hall buttons (floor and direction) and cabin buttons (destination). The controller must send each hall call to the best elevator, and each elevator must serve its stops in a sensible order. Each elevator keeps two sorted sets, stops on the way up and stops on the way down, and follows the <strong>SCAN</strong> idea: keep going while stops remain ahead, then reverse. Its direction is a <strong>State</strong> (Idle, MovingUp, MovingDown) that decides each step, and each car runs on its own thread. Dispatch is a cost function, which makes it a natural <strong>Strategy</strong>.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [
         { type: `list`, title: `Requirements`, items: [
@@ -209,6 +211,7 @@ class ParkingLot {
           [`How is time modelled?`, `Each car runs on its own thread, one floor per second; tests call tick() instead`, `A Runnable per car, plus a deterministic step()`],
           [`What does "best elevator" mean?`, `Lowest cost: closest, preferring ones already heading that way`, `The dispatch cost function`],
           [`Door timing, weight, emergencies?`, `Out of scope to start`, `Fewer states`],
+          [`Floor displays or monitoring dashboards?`, `Out of scope`, `Nothing needs to be notified, so no Observer`],
           [`Do hall calls know their destination?`, `No, up/down buttons only`, `Destination dispatch is a follow-up`],
           [`Should a car going up stop for someone who pressed DOWN?`, `No: stops are direction-aware`, `Two TreeSets: stops on the way up and stops on the way down`],
           [`Invalid floors? A call for the floor the car is on?`, `Reject out-of-range floors; a cabin press for the current floor is already served`, `Validation in addRequest`],
@@ -222,12 +225,11 @@ class ParkingLot {
         { type: `keypoints`, items: [
           `<strong>Two TreeSets per elevator.</strong> <code>up</code> holds floors to stop at on the way up (UP hall calls, cabin floors above) in ascending order; <code>down</code> holds floors to stop at on the way down in <em>descending</em> order. In both, <code>ceiling(floor)</code> is the next stop ahead, so SCAN is one O(log n) call either way, and a car going up never stops for someone who pressed DOWN.`,
           `<strong>Direction is a State.</strong> <code>IdleState</code>, <code>MovingUpState</code> and <code>MovingDownState</code> each decide what one step does and which state comes next; doors and maintenance are more states (Deep Dives).`,
-          `<strong>Observers</strong> (floor displays, dashboards) get an immutable status after every step. <code>ElevatorController</code> picks a car for each hall call through a <strong>DispatchStrategy</strong>.`,
+          `<code>ElevatorController</code> picks a car for each hall call through a <strong>DispatchStrategy</strong>.`,
           `<strong>Each car is a Runnable</strong> that calls <code>step()</code> once a second on its own thread; tests call <code>tick()</code> to step every car by hand.`
         ] },
         { type: `code`, lang: `java`, title: `Public API`, code: `void requestElevator(int floor, Direction dir);   // hall button
 void selectFloor(int elevatorId, int floor);      // cabin button
-void addObserver(ElevatorObserver observer);      // per elevator: displays, dashboards
 void start(ExecutorService pool);                 // run each car on its own thread
 void tick();                                      // or advance every car one step (tests)` }
       ] },
@@ -241,9 +243,6 @@ record Request(int floor, Direction direction, Source source) {
     static Request cabin(int floor)             { return new Request(floor, Direction.IDLE, Source.CABIN); }
 }
 
-record ElevatorStatus(int id, int floor, Direction direction) {}
-interface ElevatorObserver { void onUpdate(ElevatorStatus status); }   // floor displays, a monitoring dashboard
-
 final class Elevator implements Runnable {
     static final int MIN_FLOOR = 0, MAX_FLOOR = 9;
     final int id;
@@ -255,12 +254,9 @@ final class Elevator implements Runnable {
     int floor = MIN_FLOOR;
     private ElevatorState state = new IdleState();
 
-    private final List<ElevatorObserver> observers = new CopyOnWriteArrayList<>();
     private volatile boolean running = true;
 
     Elevator(int id) { this.id = id; }
-
-    void addObserver(ElevatorObserver o) { observers.add(o); }
 
     synchronized void addRequest(Request r) {
         if (r.floor() < MIN_FLOOR || r.floor() > MAX_FLOOR) throw new IllegalArgumentException("No floor " + r.floor());
@@ -269,15 +265,8 @@ final class Elevator implements Runnable {
         else if (r.floor() < floor) down.add(r.floor());      // a cabin press for this floor is already served
     }
 
-    /** One tick: the state decides and moves under the lock; observers hear about it after the lock is released. */
-    void step() {
-        ElevatorStatus now;
-        synchronized (this) {
-            state = state.move(this);
-            now = new ElevatorStatus(id, floor, state.direction());
-        }
-        for (ElevatorObserver o : observers) o.onUpdate(now);
-    }
+    /** One tick: the current state decides and moves, under the same lock as addRequest. */
+    synchronized void step() { state = state.move(this); }
 
     @Override public void run() {                          // one thread per car when running for real
         while (running) {
@@ -378,16 +367,15 @@ final class ElevatorController {
     void stop() { elevators.forEach(Elevator::shutdown); }
 }` },
         { type: `callout`, tone: `insight`, html: `<p>Why two <code>TreeSet</code>s, one reversed? SCAN asks one question: "what is the next stop ahead of me in this direction?" Sorting <code>down</code> in descending order makes that <code>ceiling(floor)</code> in both sets, in O(log n), and sets ignore repeated presses of the same button. Keeping the sets separate is what makes stops direction-aware: a DOWN call at floor 7 sits in <code>down</code>, so a car passing 7 on its way up doesn't stop for it.</p>` },
-        { type: `callout`, tone: `warning`, html: `<p>Thread safety: button presses arrive on request threads while each car's own thread runs <code>step()</code>. Both touch the same <code>TreeSet</code>s, floor and state, so <strong>both</strong> happen under the elevator's lock: <code>addRequest</code> is synchronized and <code>step()</code> runs <code>state.move</code> inside <code>synchronized (this)</code>. A common version of this design synchronizes only <code>addRequest</code> and lets the elevator thread move unlocked, which lets a press change a <code>TreeSet</code> while <code>move</code> is reading it. Observers live in a <code>CopyOnWriteArrayList</code> and are told after the lock is released, with an immutable <code>ElevatorStatus</code>, so a slow display can't stall the car.</p>` },
-        { type: `text`, html: `<p>The structure (two TreeSets with the down set reversed, direction states, Observer, a Runnable per car) follows the <a href="https://github.com/ashishps1/awesome-low-level-design/blob/main/solutions/java/src/elevatorsystem/Elevator.java" target="_blank" rel="noopener">awesome-low-level-design elevator solution</a>; the code here is written independently, with every shared field guarded by the elevator's lock.</p>` }
+        { type: `callout`, tone: `warning`, html: `<p>Thread safety: button presses arrive on request threads while each car's own thread runs <code>step()</code>. Both touch the same <code>TreeSet</code>s, floor and state, so <strong>both</strong> happen under the elevator's lock: <code>addRequest</code>, <code>step()</code> (which runs <code>state.move</code>) and <code>cost</code> are all synchronized on the elevator. A common version of this design synchronizes only <code>addRequest</code> and lets the elevator thread move unlocked, which lets a press change a <code>TreeSet</code> while <code>move</code> is reading it. Each car has its own lock, so cars never wait for each other.</p>` },
+        { type: `text`, html: `<p>The structure (two TreeSets with the down set reversed, direction states, a Runnable per car) follows the <a href="https://github.com/ashishps1/awesome-low-level-design/blob/main/solutions/java/src/elevatorsystem/Elevator.java" target="_blank" rel="noopener">awesome-low-level-design elevator solution</a>; the code here is written independently, with every shared field guarded by the elevator's lock. Floor displays, and the Observer pattern that would feed them, are left out because nothing in the requirements needs them.</p>` }
       ] },
       { id: `walkthrough`, title: `Walking through it`, kicker: `Check it works`, blocks: [
         { type: `steps`, items: [
           `Elevator 0 is idle at floor 0. A hall call at floor 5 going UP costs 5 for it, so 5 goes into its <code>up</code> set; on the next step <code>IdleState</code> sees an up-stop ahead and returns <code>MovingUpState</code>.`,
           `On the way, a passenger selects floor 3. It is above the car, so it joins <code>up</code>; <code>up.ceiling(2)</code> is now 3, so the car stops at 3 first, then continues to 5.`,
           `At 5, someone selects floor 1. It is below, so it joins <code>down</code>. Nothing is left in <code>up</code> and no DOWN call is above, so <code>MovingUpState</code> returns <code>MovingDownState</code>, and <code>down.ceiling(5)</code> (descending) is 1.`,
-          `Meanwhile a hall call at floor 4 going UP: elevator 0 is going DOWN past it, so it pays the +100 penalty, and an idle elevator wins the call.`,
-          `After every step each car tells its observers, for example the lobby display, its floor and direction.`
+          `Meanwhile a hall call at floor 4 going UP: elevator 0 is going DOWN past it, so it pays the +100 penalty, and an idle elevator wins the call.`
         ] }
       ] }
     ],
@@ -403,14 +391,13 @@ final class ElevatorController {
       { term: `Hall call vs cabin call`, def: `A hall call has a floor and a direction and can go to any car; a cabin call belongs to one car.`, why: `Only hall calls need dispatch.` },
       { term: `Tick-based simulation`, def: `Time advances in discrete steps driven by a scheduler.`, why: `Deterministic and easy to test.` },
       { term: `State pattern for direction`, def: `<code>IdleState</code>, <code>MovingUpState</code>, <code>MovingDownState</code>; each decides one step and returns the next state. Doors and maintenance add more states.`, why: `Keeps each direction's rules in one class instead of if-chains on a direction field.` },
-      { term: `Observer for displays`, def: `Observers receive an immutable <code>ElevatorStatus</code> after each step, outside the lock.`, why: `Displays and dashboards plug in without touching movement, and can't stall a car.` },
       { term: `A thread per car`, def: `Each <code>Elevator</code> is a <code>Runnable</code> that calls <code>step()</code> every second; tests call <code>tick()</code> instead.`, why: `Cars move independently, and the same logic stays deterministic under test.` }
     ],
     interview: [
       { q: `How does an elevator decide where to go next?`, a: `It keeps two sorted sets: stops on the way up (ascending) and stops on the way down (descending). Moving up, the next target is up.ceiling(floor), the smallest up-stop at or above; moving down, down.ceiling(floor), which with the reversed order is the largest down-stop at or below. If none is ahead, it still travels to the farthest call in the other set that lies ahead, then turns. That is SCAN, also called the elevator algorithm.`, diff: `easy` },
       { q: `Why keep a separate set for down-stops, sorted in reverse?`, a: `Separate sets keep the caller's direction: a DOWN call at 7 is in the down set, so a car passing 7 on its way up doesn't stop for it. Reversing the down set's order means the same call, ceiling(floor), returns the next stop ahead in both directions, so the two moving states are mirror images.`, diff: `medium` },
       { q: `How do you choose which elevator answers a hall call?`, a: `Compute a cost for each elevator and pick the minimum. A simple cost is the distance, with a big penalty when the elevator is moving away or in the other direction, so it would have to turn around first. Because the rule is likely to change, I put it behind a dispatch strategy.`, diff: `medium` },
-      { q: `What concurrency issues exist here?`, a: `Each car's thread runs step() while button presses arrive on request threads, and both touch the same TreeSets, floor and state. TreeSet isn't thread-safe, so addRequest, cost and the state's move all run under the elevator's lock; synchronizing only addRequest is a classic bug, because the car's thread would read the sets unlocked. Observers are kept in a CopyOnWriteArrayList and notified after the lock is released, with an immutable status. Each car has its own lock, so cars never block each other, and the controller's list of cars never changes, so it needs no lock.`, diff: `medium` },
+      { q: `What concurrency issues exist here?`, a: `Each car's thread runs step() while button presses arrive on request threads, and both touch the same TreeSets, floor and state. TreeSet isn't thread-safe, so addRequest, cost and the state's move all run under the elevator's lock; synchronizing only addRequest is a classic bug, because the car's thread would read the sets unlocked. Each car has its own lock, so cars never block each other, and the controller's list of cars never changes, so it needs no lock.`, diff: `medium` },
       { q: `How would you improve the cost function?`, a: `Count the stops the elevator must serve before reaching the caller, not just distance; add load or weight; prefer cars already stopping at that floor; and age requests so none waits forever. Each variant is a new strategy class.`, diff: `hard` },
       { q: `What is destination dispatch?`, a: `Passengers enter their destination in the lobby instead of pressing up or down. The system knows origin and destination for every passenger and groups people going to nearby floors into the same car, which cuts stops per trip. The controller assigns a car and tells the passenger which one to take.`, diff: `medium` }
     ],
@@ -420,7 +407,7 @@ final class ElevatorController {
     TreeSet<Integer> down;                         // descending: next down-stop = down.ceiling(floor)
     int floor; ElevatorState state;                // all guarded by this
     synchronized void addRequest(Request r);       // HALL by its direction, CABIN by above or below
-    void step();                                   // state = state.move(this) under the lock; notify after
+    synchronized void step();                      // state = state.move(this)
     public void run();                             // step() every second on its own thread
 }
 interface ElevatorState { Direction direction(); ElevatorState move(Elevator e); }
@@ -440,6 +427,7 @@ interface DispatchStrategy { Elevator choose(List<Elevator> cars, int floor, Dir
   {
     id: `lru-cache`, part: 2, number: 5, difficulty: `medium`,
     title: `LRU Cache: O(1) get and put, generic and thread-safe`,
+    references: [{ title: `awesome-low-level-design: LRU Cache`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/lru-cache.md` }],
     overview: `A fixed-capacity cache that evicts the least recently used entry when full, with <code>get</code> and <code>put</code> in O(1). It is a pure data-structure problem: a <strong>hash map</strong> finds an entry in O(1), and a <strong>doubly linked list</strong> ordered by recency moves or removes it in O(1). Sentinel nodes remove edge cases, generics make it reusable, and because <code>get</code> reorders the list, every operation needs the same lock.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [
@@ -595,6 +583,7 @@ interface DispatchStrategy { Elevator choose(List<Elevator> cars, int floor, Dir
   {
     id: `splitwise`, part: 2, number: 6, difficulty: `medium`,
     title: `Splitwise: splitting expenses and keeping balances`,
+    references: [{ title: `awesome-low-level-design: Splitwise`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/splitwise.md` }],
     overview: `Users add expenses paid by one person and split equally, by exact amounts or by percentages; the app shows who owes whom. Two things are tested: <strong>money handling</strong> (store the smallest unit as <code>long</code>, distribute rounding remainders deliberately) and <strong>balance bookkeeping</strong> (net each pair so only one direction is stored). Splitting rules sit behind a <strong>Strategy</strong> interface.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [
@@ -769,6 +758,7 @@ while (!creditors.isEmpty() && !debtors.isEmpty()) {
   {
     id: `vending-machine`, part: 1, number: 7, difficulty: `easy`,
     title: `Vending Machine: the State pattern`,
+    references: [{ title: `awesome-low-level-design: Vending Machine`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/vending-machine.md` }],
     overview: `Insert money, select a product, get it with change, or cancel for a refund, and fail clearly on invalid actions such as selecting before paying, selecting something out of stock, or not having enough money. Behaviour depends on what the machine is doing right now, which is exactly what the <strong>State</strong> pattern models: one class per state, and the machine delegates every action to its current state.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [
@@ -924,6 +914,7 @@ class VendingMachine {
   {
     id: `pub-sub`, part: 2, number: 8, difficulty: `medium`,
     title: `Pub-Sub / Notification Broker: the Observer pattern, asynchronously`,
+    references: [{ title: `awesome-low-level-design: Pub-Sub System`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/pub-sub-system.md` }],
     overview: `Topics, subscribe and unsubscribe, and publish that delivers to every current subscriber. The catch is in the last requirement: a slow or failing subscriber must not block or break the others. The design is the <strong>Observer</strong> pattern with asynchronous delivery: each subscriber gets its own single-thread executor, so its messages arrive in order and a slow subscriber only delays itself, and exceptions are caught per delivery.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [

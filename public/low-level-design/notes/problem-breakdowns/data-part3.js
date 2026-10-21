@@ -190,6 +190,7 @@ final class Game {
   {
     id: `logging-service`, part: 2, number: 0, difficulty: `medium`,
     title: `Logging Service: levels, destinations and formats that vary independently`,
+    references: [{ title: `awesome-low-level-design: Logging Framework`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/logging-framework.md` }],
     overview: `Design the in-process logging library an application calls with <code>logger.info("user signed in")</code>, in the spirit of Log4j or SLF4J: severity levels, several destinations per logger, a minimum level and a format per destination, and thread-safe writes that never interleave. The requirement that shapes everything is that <strong>format and destination type vary independently</strong>, so you <strong>compose</strong> a formatter with a sink instead of writing a class for every combination.`,
     source: { title: `Hello Interview: Logging Service (LLD) problem breakdown`, url: `https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/logging-service` },
     problem: [
@@ -366,6 +367,7 @@ final class Logger { List<Destination> ds; void log(Level l, String m); }` },
   {
     id: `movie-ticket-booking`, part: 2, number: 0, difficulty: `medium`,
     title: `Movie Ticket Booking: shows, seat maps and exactly-one-wins booking`,
+    references: [{ title: `awesome-low-level-design: Movie Ticket Booking System`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/movie-ticket-booking-system.md` }],
     overview: `A BookMyShow-style system: search movies, browse a theatre's shows, see a showtime's free seats, book several seats in one reservation, and cancel. The data model is a small hierarchy (theatre, screen, showtime, seat), and the interview-defining requirement is that when two people book the same seat at once, <strong>exactly one succeeds</strong>, and a multi-seat booking is <strong>all or nothing</strong>.`,
     source: { title: `Hello Interview: Movie Ticket Booking (LLD) problem breakdown`, url: `https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/bookmyshow` },
     problem: [

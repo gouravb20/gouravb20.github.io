@@ -3,7 +3,6 @@ window.ALT = window.ALT || {};
 ALT["elevator"] = { go: {
 "Public API": `func (c *ElevatorController) RequestElevator(floor int, dir Direction) error // hall button
 func (c *ElevatorController) SelectFloor(elevatorID, floor int) error        // cabin button
-func (e *Elevator) AddObserver(o ElevatorObserver)                          // displays, dashboards
 func (c *ElevatorController) Start(ctx context.Context)                     // run each car on its own goroutine
 func (c *ElevatorController) Tick()                                         // or advance every car one step (tests)`,
 
@@ -28,13 +27,6 @@ type Request struct {
 	Direction Direction
 	Source    Source
 }
-
-type ElevatorStatus struct {
-	ID, Floor int
-	Direction Direction
-}
-
-type ElevatorObserver interface{ OnUpdate(s ElevatorStatus) } // floor displays, a monitoring dashboard
 
 const MinFloor, MaxFloor = 0, 9
 
@@ -80,18 +72,9 @@ type Elevator struct {
 	state ElevatorState
 	up    sortedSet // stops on the way up; next = up.ceiling(floor)
 	down  sortedSet // stops on the way down; next = down.floor(floor), Go's version of a descending TreeSet
-
-	obsMu     sync.RWMutex
-	observers []ElevatorObserver // guarded by obsMu
 }
 
 func NewElevator(id int) *Elevator { return &Elevator{ID: id, state: IdleState{}} }
-
-func (e *Elevator) AddObserver(o ElevatorObserver) {
-	e.obsMu.Lock()
-	defer e.obsMu.Unlock()
-	e.observers = append(e.observers, o)
-}
 
 func (e *Elevator) AddRequest(r Request) error {
 	if r.Floor < MinFloor || r.Floor > MaxFloor {
@@ -112,19 +95,11 @@ func (e *Elevator) AddRequest(r Request) error {
 	return nil
 }
 
-// Step is one tick: the state decides and moves under the lock; observers hear about it afterwards.
+// Step is one tick: the current state decides and moves, under the same mutex as AddRequest.
 func (e *Elevator) Step() {
 	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.state = e.state.Move(e)
-	now := ElevatorStatus{e.ID, e.floor, e.state.Direction()}
-	e.mu.Unlock()
-
-	e.obsMu.RLock()
-	obs := slices.Clone(e.observers)
-	e.obsMu.RUnlock()
-	for _, o := range obs {
-		o.OnUpdate(now)
-	}
 }
 
 // Run steps once a second until ctx is cancelled: one goroutine per car when running for real.
@@ -351,7 +326,7 @@ func (d *DestinationDispatcher) Assign(r TripRequest) int {
 }
 
 func (e *Elevator) AddRequest(r Request) error // Hall by its direction, Cabin by above or below
-func (e *Elevator) Step()                       // state = state.Move(e) under mu; notify after
+func (e *Elevator) Step()                       // state = state.Move(e) under mu
 func (e *Elevator) Run(ctx context.Context)     // Step every second on its own goroutine
 
 type ElevatorState interface {

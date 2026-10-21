@@ -521,6 +521,7 @@ final class RateLimiter {
     {
       id: `file-system`, part: 2, number: 2, difficulty: `medium`,
       title: `File System: an in-memory, Unix-style tree`,
+      references: [{ title: `awesome-low-level-design: File directory (Java solution)`, url: `https://github.com/ashishps1/awesome-low-level-design/tree/main/solutions/java/src/filedirectory` }],
       overview: `Build an in-memory file system with one root, folders that contain files and folders, and files that hold text. It must create, delete, list, rename and move entries, resolve absolute paths like <code>/home/ana/notes.txt</code>, and give the full path of any node, staying fast with tens of thousands of entries and deep hierarchies. The design that works is a <strong>Composite</strong> tree: an abstract <code>Node</code> with <code>File</code> and <code>Directory</code>, children kept in a map by name, a <strong>parent pointer</strong> on every node, a <code>FileSystem</code> facade that parses paths in one place, and a small family of specific exceptions.`,
       source: { title: `Hello Interview: File System (LLD) problem breakdown`, url: `https://www.hellointerview.com/learn/low-level-design/problem-breakdowns/file-system` },
       problem: [

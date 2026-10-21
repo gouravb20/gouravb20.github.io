@@ -16,6 +16,7 @@ window.DATA.chapters.push(
   {
     id: `tic-tac-toe`, part: 1, number: 0, difficulty: `easy`,
     title: `Tic-Tac-Toe: an N x N board, O(1) win counters and a clean turn loop`,
+    references: [{ title: `awesome-low-level-design: Tic Tac Toe`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/tic-tac-toe.md` }],
     overview: `Two players, X and O, take turns marking cells on an N x N grid (3 x 3 by default); the first to fill a whole row, column or diagonal wins, and a full grid with no line is a draw. It is the classic 45-minute warm-up, so the bar is a tidy model rather than clever features: a <strong>Board</strong> that only knows cells, a <strong>Game</strong> that owns turns and outcome, one <strong>GameState</strong> enum, validation before any mutation, and the trick interviewers wait for: an <strong>O(1) win check</strong> from per-line counters instead of scanning the grid after every move. Unlike Connect Four there is no gravity and the board size is a parameter, which is why the counters work so neatly here.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [
@@ -251,6 +252,7 @@ final class GameManager {
   {
     id: `snake-and-ladders`, part: 1, number: 0, difficulty: `easy`,
     title: `Snake and Ladders: a jump map, swappable dice and a turn queue`,
+    references: [{ title: `awesome-low-level-design: Snake and Ladder`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/snake-and-ladder.md` }],
     overview: `Players take turns rolling a die and moving along a 100-cell board; landing on a ladder's foot carries them up, landing on a snake's head sends them down, and the first to land exactly on 100 wins. It is the classic 60-minute machine-coding warm-up, and it rewards restraint: snakes and ladders are one <strong>jump map</strong> validated once, the board is <strong>immutable</strong>, the dice sit behind an <strong>interface</strong> so tests are deterministic, and the game exposes a step-wise <strong>playTurn()</strong> that a loop, a test or a UI can drive.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [
@@ -526,6 +528,7 @@ final class Game {                     // synchronized: one lock per game
   {
     id: `atm`, part: 2, number: 0, difficulty: `medium`,
     title: `ATM: session states, an inventory-aware cash chain and all-or-nothing withdrawals`,
+    references: [{ title: `awesome-low-level-design: ATM`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/atm.md` }],
     overview: `An ATM lets a cardholder authenticate with a PIN, check a balance and withdraw cash, while the bank, not the machine, owns the money. Two patterns earn their place: the <strong>State</strong> pattern for the session (idle, card inserted, authenticated, out of service), and a <strong>Chain of Responsibility</strong> of note cassettes that plans each withdrawal against the notes actually loaded. The requirement that defines the interview is that a withdrawal is <strong>all or nothing</strong> across two systems that share no transaction: plan the notes, debit the bank with an idempotency key, dispense, and reverse the debit if the dispenser jams.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [
@@ -917,6 +920,7 @@ interface BankService {
   {
     id: `meeting-scheduler`, part: 2, number: 0, difficulty: `medium`,
     title: `Meeting Room Scheduler: interval overlap, a lock per room and no double booking`,
+    references: [{ title: `awesome-low-level-design: Hotel Management System (the hotel booking variant)`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/hotel-management-system.md` }],
     overview: `Book conference rooms for time slots: a specific room, or any free room big enough and equipped for the meeting; cancel and reschedule; notify attendees; show a person's calendar. Asked at ClearTrip, Flipkart, Google and Atlassian, often dressed as hotel booking. Two ideas carry the design: <strong>interval overlap</strong> on half-open slots <code>[start, end)</code>, checked against only the two sorted neighbours in a per-room <code>TreeMap</code>, and <strong>no double booking</strong>, because check-then-insert runs under a <strong>lock per room</strong>. Room choice is a <strong>Strategy</strong>, notifications are an <strong>Observer</strong>, and a reschedule into another room locks both rooms in a fixed order.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [
@@ -1259,7 +1263,7 @@ final class MeetingScheduler {
   {
     id: `ride-sharing`, part: 3, number: 0, difficulty: `hard`,
     title: `Ride Sharing: pricing and matching strategies, a ride state machine, one driver per ride`,
-    source: { title: `awesome-low-level-design: Designing a Ride-Sharing Service`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/ride-sharing-service.md` },
+    references: [{ title: `awesome-low-level-design: Ride-Sharing Service`, url: `https://github.com/ashishps1/awesome-low-level-design/blob/main/problems/ride-sharing-service.md` }],
     overview: `An Uber or Ola style cab booking core: a rider gets a fare estimate and requests a ride, the system offers it to nearby drivers one at a time until someone accepts, and the ride moves from request to drop-off. It is a flagship machine-coding round because it tests three things at once: <strong>Strategy</strong> for the rules that keep changing (pricing with surge, driver matching), an <strong>explicit state machine</strong> for a lifecycle where an illegal step costs money, and <strong>concurrency</strong> on a scarce shared resource: two riders must never get the same driver, and one ride must never get two.`,
     problem: [
       { id: `requirements`, title: `What we are building`, kicker: `Requirements`, blocks: [

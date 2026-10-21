@@ -45,6 +45,7 @@ const chapter = z.strictObject({
   title: text,
   overview: text,
   source: z.strictObject({ title: text, url: z.url() }).optional(),
+  references: z.array(z.strictObject({ title: text, url: z.url() })).min(1).optional(),
   difficulty: z.enum(["easy", "medium", "hard"]).optional(),
   concepts: z.array(concept),
   labs: z.array(z.string()),

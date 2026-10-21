@@ -40,6 +40,8 @@ interface Chapter {
   overview: string;
   /** The page this chapter is based on, shown under the overview as "Reference: <title>". */
   source?: { title: string; url: string };
+  /** Further worked solutions of the same problem, shown next to the source. */
+  references?: { title: string; url: string }[];
   /** Shown as a green, yellow or red badge in the sidebar, chapter header and dashboard. */
   difficulty?: "easy" | "medium" | "hard";
   concepts: Concept[];

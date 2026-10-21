@@ -47,6 +47,8 @@ const embeddedLabs = hasLab(ch.main) || hasLab(deep?.sections) || hasLab(ch.prob
 const firstTab = isProblem ? "problem" : ch.main ? "main" : deep ? "learn" : "concepts";
 const tabClass = (tab: string, extra = "") => ["tab", extra, tab === firstTab && "active"].filter(Boolean).join(" ");
 
+const refs = [...(ch.source ? [ch.source] : []), ...(ch.references ?? [])];
+
 const pagePath = chapterPath(notes, ch);
 const bookTitle = plain(book.title);
 const title = `${plain(ch.title)} · ${book.shortTitle ?? bookTitle}`;
@@ -65,7 +67,7 @@ const structuredData = [
     educationalLevel: "Professional",
     teaches: ch.concepts.map(c => plain(c.term)),
     isPartOf: { "@type": "Course", name: bookTitle, url: abs(appPath(notes)) },
-    ...(ch.source && { isBasedOn: ch.source.url }),
+    ...(refs.length > 0 && { isBasedOn: refs.length === 1 ? refs[0].url : refs.map(r => r.url) }),
     position: index + 1,
   },
   {
@@ -87,7 +89,11 @@ const structuredData = [
       : <Fragment set:html={`${unitNoun(ch)} ${ch.number} &middot; ${parts[ch.part]}`} />}</div>
     <h1 set:html={ch.title} />
     <div class="overview-text" set:html={ch.overview} />
-    {ch.source && <div class="chapter-source">Reference: <a href={ch.source.url} target="_blank" rel="noopener" set:html={ch.source.title} /> &#8599;</div>}
+    {refs.length > 0 && (
+      <div class="chapter-source">{refs.length === 1 ? "Reference" : "References"}: {refs.map((r, i) => (
+        <>{i > 0 && " · "}<a href={r.url} target="_blank" rel="noopener" set:html={r.title} /> &#8599;</>
+      ))}</div>
+    )}
   </div>
 
   {isProblem ? (
