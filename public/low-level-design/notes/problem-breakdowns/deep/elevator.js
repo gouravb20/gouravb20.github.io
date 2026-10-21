@@ -9,62 +9,64 @@ DEEP["elevator"] = {
       kicker: "Refinement: hall call direction",
       blocks: [
         { type: "problem", html: `<p>The basic design stores stops as plain floor numbers. A car at floor 5 going up with stops {7, 8} receives a DOWN hall call from floor 7. Floor 7 is already in the set, so the car stops there on its way up, and the person who wanted to go down either boards a car heading the wrong way or watches it leave. The set lost the one fact that mattered: which way they want to go.</p>` },
-        { type: "idea", html: `<p>Store requests as <strong>(floor, type)</strong>, where type is PICKUP_UP, PICKUP_DOWN or DESTINATION. Moving up, a car stops for PICKUP_UP and DESTINATION requests at a floor; moving down, for PICKUP_DOWN and DESTINATION. It still <em>travels</em> toward every request, so a DOWN call above it is served on the way back.</p>` },
-        { type: "code", lang: "java", title: "Requests with a type, and the stop rule", code: `enum RequestType { PICKUP_UP, PICKUP_DOWN, DESTINATION }
-
-record Request(int floor, RequestType type) {}     // equals/hashCode by both fields
+        { type: "idea", html: `<p>Keep the direction, and keep the sorted order SCAN depends on: replace the one <code>TreeSet</code> with <strong>two</strong>. <code>up</code> holds floors to stop at while moving up (UP hall calls, and destinations above the car); <code>down</code> holds floors to stop at while moving down. Moving up, the next stop is <code>up.ceiling(floor)</code>; moving down, <code>down.floor(floor)</code>, both O(log n). When nothing is left ahead in <code>up</code>, the car still travels to the highest DOWN call above it (<code>down.last()</code>), turns there and serves it on the way back.</p>` },
+        { type: "code", lang: "java", title: "Direction-aware stops in two TreeSets", code: `enum RequestType { PICKUP_UP, PICKUP_DOWN, DESTINATION }
 
 class Elevator {
     private static final int MIN_FLOOR = 0, MAX_FLOOR = 9;
     private int floor = 0;
     private Direction dir = Direction.IDLE;
-    private final Set<Request> requests = new HashSet<>();
+    // Floors to stop at while moving up, and while moving down. Sorted, so SCAN's
+    // "next stop ahead" is ceiling/floor in O(log n). Guarded by this.
+    private final TreeSet<Integer> up = new TreeSet<>(), down = new TreeSet<>();
 
-    synchronized boolean addRequest(Request r) {
-        if (r.floor() < MIN_FLOOR || r.floor() > MAX_FLOOR) return false;   // invalid floor
-        if (r.floor() == floor) return true;                                  // already here
-        requests.add(r);
+    synchronized boolean addRequest(int f, RequestType type) {
+        if (f < MIN_FLOOR || f > MAX_FLOOR) return false;               // invalid floor
+        switch (type) {
+            case PICKUP_UP   -> up.add(f);
+            case PICKUP_DOWN -> down.add(f);
+            case DESTINATION -> { if (f != floor) (f > floor ? up : down).add(f); }   // on the sweep that reaches it
+        }
         return true;
     }
 
     synchronized void step() {
-        if (requests.isEmpty()) { dir = Direction.IDLE; return; }
+        if (up.isEmpty() && down.isEmpty()) { dir = Direction.IDLE; return; }
         if (dir == Direction.IDLE) dir = directionToNearest();
-
-        RequestType pickup = dir == Direction.UP ? RequestType.PICKUP_UP : RequestType.PICKUP_DOWN;
-        boolean stop = requests.remove(new Request(floor, pickup))
-                     | requests.remove(new Request(floor, RequestType.DESTINATION));   // non-short-circuit: remove both
-        if (stop) {                                       // doors open; don't move this tick
-            if (requests.isEmpty()) dir = Direction.IDLE;
-            return;
-        }
-        if (!hasRequestsAhead()) {                        // only opposite-direction work left
-            dir = dir == Direction.UP ? Direction.DOWN : Direction.UP;
-            return;                                       // re-check stops at this floor next tick
-        }
-        floor += dir == Direction.UP ? 1 : -1;
+        if ((dir == Direction.UP ? up : down).remove(floor)) return;     // doors open; only same-direction stops
+        Integer target = nextTarget();
+        if (target == null) { dir = dir == Direction.UP ? Direction.DOWN : Direction.UP; return; }
+        floor += Integer.signum(target - floor);
     }
 
-    private boolean hasRequestsAhead() {                  // any type: we travel toward all of them
-        for (Request r : requests) {
-            if (dir == Direction.UP && r.floor() > floor) return true;
-            if (dir == Direction.DOWN && r.floor() < floor) return true;
+    // SCAN (LOOK): the next stop ahead in this direction; if none, the farthest opposite-direction
+    // call ahead (go there, then turn); if none, null means reverse.
+    private Integer nextTarget() {
+        if (dir == Direction.UP) {
+            Integer next = up.ceiling(floor);
+            if (next != null) return next;
+            return !down.isEmpty() && down.last() > floor ? down.last() : null;
         }
-        return false;
+        Integer next = down.floor(floor);
+        if (next != null) return next;
+        return !up.isEmpty() && up.first() < floor ? up.first() : null;
     }
 
-    private Direction directionToNearest() {              // deterministic: nearest, lower floor on ties
-        Request best = null;
-        for (Request r : requests) {
-            int d = Math.abs(r.floor() - floor);
-            if (best == null || d < Math.abs(best.floor() - floor) || (d == Math.abs(best.floor() - floor) && r.floor() < best.floor())) best = r;
+    private Direction directionToNearest() {              // deterministic: nearest stop, ties go up
+        int best = Integer.MAX_VALUE;
+        Direction d = Direction.UP;
+        for (TreeSet<Integer> s : List.of(up, down)) {
+            Integer above = s.ceiling(floor), below = s.floor(floor);
+            if (above != null && above - floor < best) { best = above - floor; d = Direction.UP; }
+            if (below != null && floor - below < best) { best = floor - below; d = Direction.DOWN; }
         }
-        return best.floor() > floor ? Direction.UP : Direction.DOWN;
+        return d;
     }
 }` },
         { type: "keypoints", items: [
-          "<strong>Stopping</strong> is direction-aware; <strong>travelling</strong> is not. <code>hasRequestsAhead</code> counts every request type, or a DOWN call above the car would never be reached.",
-          "Never pick from a <code>HashSet</code> with <code>iterator().next()</code>: its order isn't defined, so the simulation would behave differently between runs. Use a deterministic rule such as nearest floor, lower floor on ties.",
+          "<strong>Stopping</strong> is direction-aware; <strong>travelling</strong> is not. <code>nextTarget</code> falls back to the farthest opposite-direction call ahead, or a DOWN call above the car would never be reached.",
+          "<strong>Why two TreeSets, not a HashSet of (floor, type):</strong> a hash set remembers direction but forgets order, so every tick becomes a linear scan for \"anything ahead?\" and \"nearest?\". Two sorted sets answer both with <code>ceiling</code>, <code>floor</code>, <code>first</code> and <code>last</code> in O(log n), and still ignore duplicate presses.",
+          "With a small, fixed number of floors, two <code>boolean[]</code> arrays scanned in O(F) are also fine; say so, then use <code>TreeSet</code> as the general answer.",
           "Boundary floors need no special case: at the top floor nothing is ahead, so the car reverses naturally.",
           "Dispatch should also be honest about direction: prefer cars moving toward the caller in the caller's direction and whose remaining stops reach at least that far, then idle cars, then any car."
         ] },

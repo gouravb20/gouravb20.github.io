@@ -129,7 +129,7 @@ func (c *ElevatorController) Tick() {
 	}
 }`,
 
-"Requests with a type, and the stop rule": `type RequestType int
+"Direction-aware stops in two TreeSets": `type RequestType int
 
 const (
 	PickupUp RequestType = iota
@@ -137,90 +137,134 @@ const (
 	Destination
 )
 
-type Request struct { // comparable, so it works directly as a map key
-	Floor int
-	Type  RequestType
+// sortedSet is a sorted slice without duplicates: Go's stand-in for a TreeSet.
+type sortedSet []int
+
+func (s *sortedSet) add(f int) {
+	if i, found := slices.BinarySearch(*s, f); !found {
+		*s = slices.Insert(*s, i, f)
+	}
 }
 
-const minFloor, maxFloor = 0, 9
+func (s *sortedSet) remove(f int) bool {
+	i, found := slices.BinarySearch(*s, f)
+	if found {
+		*s = slices.Delete(*s, i, i+1)
+	}
+	return found
+}
+
+func (s sortedSet) ceiling(f int) (int, bool) { // smallest >= f
+	i, _ := slices.BinarySearch(s, f)
+	if i < len(s) {
+		return s[i], true
+	}
+	return 0, false
+}
+
+func (s sortedSet) floor(f int) (int, bool) { // largest <= f
+	i, found := slices.BinarySearch(s, f)
+	if found {
+		return s[i], true
+	}
+	if i > 0 {
+		return s[i-1], true
+	}
+	return 0, false
+}
+
+const MinFloor, MaxFloor = 0, 9
 
 type Elevator struct {
-	mu       sync.Mutex
+	mu       sync.Mutex // guards everything below
 	floor    int
 	dir      Direction
-	requests map[Request]struct{}
+	up, down sortedSet // floors to stop at while moving up / down
 }
 
-func (e *Elevator) AddRequest(r Request) bool {
+func (e *Elevator) AddRequest(f int, t RequestType) bool {
+	if f < MinFloor || f > MaxFloor {
+		return false
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if r.Floor < minFloor || r.Floor > maxFloor {
-		return false // invalid floor
+	switch {
+	case t == PickupUp:
+		e.up.add(f)
+	case t == PickupDown:
+		e.down.add(f)
+	case f > e.floor: // a destination joins the sweep that reaches it
+		e.up.add(f)
+	case f < e.floor:
+		e.down.add(f)
 	}
-	if r.Floor == e.floor {
-		return true // already here
-	}
-	e.requests[r] = struct{}{}
 	return true
 }
 
 func (e *Elevator) Step() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if len(e.requests) == 0 {
+	if len(e.up) == 0 && len(e.down) == 0 {
 		e.dir = Idle
 		return
 	}
 	if e.dir == Idle {
 		e.dir = e.directionToNearest()
 	}
-	pickup := PickupDown
+	same := &e.down
 	if e.dir == Up {
-		pickup = PickupUp
+		same = &e.up
 	}
-	_, stopForPickup := e.requests[Request{e.floor, pickup}]
-	_, stopForDest := e.requests[Request{e.floor, Destination}]
-	if stopForPickup || stopForDest { // doors open; don't move this tick
-		delete(e.requests, Request{e.floor, pickup})
-		delete(e.requests, Request{e.floor, Destination})
-		if len(e.requests) == 0 {
-			e.dir = Idle
+	if same.remove(e.floor) { // doors open; only same-direction stops
+		return
+	}
+	target, ok := e.nextTarget()
+	if !ok { // nothing ahead: reverse
+		if e.dir == Up {
+			e.dir = Down
+		} else {
+			e.dir = Up
 		}
 		return
 	}
-	if !e.hasRequestsAhead() { // only opposite-direction work left
-		e.reverse()
-		return // re-check stops at this floor next tick
-	}
-	if e.dir == Up {
+	if target > e.floor {
 		e.floor++
 	} else {
 		e.floor--
 	}
 }
 
-func (e *Elevator) hasRequestsAhead() bool { // any type: we travel toward all of them
-	for r := range e.requests {
-		if (e.dir == Up && r.Floor > e.floor) || (e.dir == Down && r.Floor < e.floor) {
-			return true
+// nextTarget is SCAN (LOOK): the next stop ahead; else the farthest opposite-direction call ahead.
+func (e *Elevator) nextTarget() (int, bool) {
+	if e.dir == Up {
+		if next, ok := e.up.ceiling(e.floor); ok {
+			return next, true
 		}
+		if n := len(e.down); n > 0 && e.down[n-1] > e.floor {
+			return e.down[n-1], true
+		}
+		return 0, false
 	}
-	return false
+	if next, ok := e.down.floor(e.floor); ok {
+		return next, true
+	}
+	if len(e.up) > 0 && e.up[0] < e.floor {
+		return e.up[0], true
+	}
+	return 0, false
 }
 
-// directionToNearest is deterministic (nearest, lower floor on ties): map iteration order is random in Go.
-func (e *Elevator) directionToNearest() Direction {
-	best, bestDist := 0, -1
-	for r := range e.requests {
-		d := abs(r.Floor - e.floor)
-		if bestDist < 0 || d < bestDist || (d == bestDist && r.Floor < best) {
-			best, bestDist = r.Floor, d
+func (e *Elevator) directionToNearest() Direction { // nearest stop, ties go up
+	best, d := math.MaxInt, Up
+	for _, s := range []sortedSet{e.up, e.down} {
+		if a, ok := s.ceiling(e.floor); ok && a-e.floor < best {
+			best, d = a-e.floor, Up
+		}
+		if b, ok := s.floor(e.floor); ok && e.floor-b < best {
+			best, d = e.floor-b, Down
 		}
 	}
-	if best > e.floor {
-		return Up
-	}
-	return Down
+	return d
 }`,
 
 "States decide what a tick means": `type CabinState interface {
