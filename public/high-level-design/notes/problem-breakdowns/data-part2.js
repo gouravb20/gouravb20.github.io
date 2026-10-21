@@ -1,9 +1,8 @@
 // Problem breakdowns, part 2: Flash Sale, as one problem page (Problem, Solution, Deep Dives, Core Concepts, Q&A, By Level, Cheatsheet).
 // Original study notes. The problem follows Hello Interview's Flash Sale breakdown:
 // https://www.hellointerview.com/learn/system-design/problem-breakdowns/flash-sale
-window.DATA.parts[2] = `Part II &middot; Flash Sale`;
 window.DATA.chapters.push({
-  id: `flash-sale`, part: 2, number: 2,
+  id: `flash-sale`, part: 2, number: 1, difficulty: `medium`,
   title: `Flash Sale: 20,000 consoles for 10 million buyers`,
   overview: `A flash sale sells a small, fixed stock to a crowd hundreds of times larger, all within seconds of a published start time. The running example is a games-console launch: 20,000 units at 10:00, about 10 million people waiting. The product surface is tiny (view, reserve, pay), so the interview is about the qualities: <strong>never sell a unit twice</strong>, survive a traffic cliff that arrives all at once, and give real people a fair chance against bots. The key move is the <strong>reservation</strong>: secure the unit in milliseconds with an atomic operation, then let the slow, external payment happen against a short hold.`,
   source: { title: `Hello Interview: Design a Flash Sale System`, url: `https://www.hellointerview.com/learn/system-design/problem-breakdowns/flash-sale` },

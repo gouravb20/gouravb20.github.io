@@ -4,7 +4,7 @@
 window.DATA = {
   book: {
     title: `System Design Problem Breakdowns`,
-    subtitle: `Classic system design interview problems, each worked through on one page: the problem, a solution from a simple design to a scalable one, the deep dives an interviewer pushes on, and what is expected at each level, with labs embedded where each decision comes up. Part I: <strong>YouTube Top K</strong>, the most-viewed videos for the last hour, day, month and all time at ~70 billion views a day. Part II: <strong>Flash Sale</strong>, 20,000 consoles for 10 million buyers without overselling. The problems follow Hello Interview's <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k" target="_blank" rel="noopener" style="color:var(--accent)">Top K</a> and <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/flash-sale" target="_blank" rel="noopener" style="color:var(--accent)">Flash Sale</a> breakdowns; these notes and labs are written independently, so read the original walkthroughs there.`,
+    subtitle: `Classic system design interview problems, each worked through on one page: the problem, a solution from a simple design to a scalable one, the deep dives an interviewer pushes on, and what is expected at each level, with labs embedded where each decision comes up. Problems are grouped and ordered by difficulty, <strong style="color:var(--level-easy)">easy</strong>, <strong style="color:var(--level-medium)">medium</strong> and <strong style="color:var(--level-hard)">hard</strong>: <strong>Flash Sale</strong> (medium), 20,000 consoles for 10 million buyers without overselling; <strong>YouTube Top K</strong> (hard), the most-viewed videos for the last hour, day, month and all time at ~70 billion views a day. The problems follow Hello Interview's <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k" target="_blank" rel="noopener" style="color:var(--accent)">Top K</a> and <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/flash-sale" target="_blank" rel="noopener" style="color:var(--accent)">Flash Sale</a> breakdowns; these notes and labs are written independently, so read the original walkthroughs there.`,
     storageKey: `problem_breakdowns_notes_v1`,
     appId: `problem-breakdowns-notes`,
     exportPrefix: `problem-breakdowns-progress`,
@@ -15,9 +15,13 @@ window.DATA = {
     shortTitle: `Problem Breakdowns`,
     tagline: `Interactive interview prep`
   },
+  // Problems are grouped by difficulty; chapterOrder lists them easiest first, and the loader sorts and numbers them.
   parts: {
-    1: `Part I &middot; YouTube Top K`
+    1: `Easy`,
+    2: `Medium`,
+    3: `Hard`
   },
+  chapterOrder: [`flash-sale`, `top-k`],
   fourQuestions: [
     { cls: `what`, q: `Pin down the contract`, text: `Both problems hide their difficulty in the requirements. For Top K: which windows, sliding or tumbling, exact or approximate, how fresh, how large K can be. For a flash sale: never oversell, how long a hold lasts, and what "fair" means. Propose concrete defaults and let the interviewer push back.`, answer: `Top K: Problem tab &middot; Flash Sale: Problem tab.` },
     { cls: `where`, q: `Let the numbers choose`, text: `70 billion views a day is ~800K events per second, which rules out one database write per view. 10 million buyers for 20,000 consoles is ~1M requests per second aimed at a single stock row that takes ~1,000 locked updates a second. One number each, and the hard part is obvious.`, answer: `Top K: Problem tab (estimates) &middot; Flash Sale: Problem tab.` },
@@ -38,7 +42,7 @@ window.DATA = {
   ],
   chapters: [
     {
-      id: `top-k`, part: 1, number: 1,
+      id: `top-k`, part: 3, number: 2, difficulty: `hard`,
       title: `YouTube Top K: the most-viewed videos per time window`,
       overview: `Return the top K most-viewed videos for the last hour, day, month and all time, with exact counts, at most a minute of lag and reads in tens of milliseconds, while roughly 70 billion views a day stream in. The answer itself is tiny; the difficulty is keeping counts that are fit to rank over moving windows for billions of videos. The design that works partitions the view stream by video ID, aggregates in a stream processor before writing, keeps a running total per window, and publishes precomputed answers to a cache.`,
       source: { title: `Hello Interview: Top K (YouTube) problem breakdown`, url: `https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k` },

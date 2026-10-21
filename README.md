@@ -15,7 +15,7 @@ The site is built with [Astro](https://astro.build) as plain static HTML. The hu
 |---|---|---|---|---|---|
 | System Design Core Concepts (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials)) | [`notes/core-concepts`](public/high-level-design/notes/core-concepts/) | 18 | 228 | 31 | 116 |
 | System Design Advanced Topics (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search) and [Arpit Bhayani](https://arpitbhayani.me/blogs/morris-counter/)) | [`notes/advanced-topics`](public/high-level-design/notes/advanced-topics/) | 10 | 125 | 20 | 54 |
-| System Design Problem Breakdowns: YouTube Top K and Flash Sale (inspired by [Hello Interview](https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k)) | [`notes/problem-breakdowns`](public/high-level-design/notes/problem-breakdowns/) | 2 | 36 | 15 | 35 |
+| System Design Problem Breakdowns: ordered by difficulty, Flash Sale (medium) and YouTube Top K (hard) (inspired by [Hello Interview](https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k)) | [`notes/problem-breakdowns`](public/high-level-design/notes/problem-breakdowns/) | 2 | 36 | 15 | 35 |
 
 Paths in the table are relative to `public/high-level-design/`. Also included: [`isolation-anomalies.md`](public/high-level-design/isolation-anomalies.md), a one-page map of transaction isolation anomalies.
 

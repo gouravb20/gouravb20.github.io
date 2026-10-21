@@ -78,4 +78,6 @@ export const jsonLd = (data: unknown) => JSON.stringify(data).replace(/</g, "\\u
 /** One row of an app's search.json; `where` is e.g. "Ch 3", `text` is lower-cased plain text to match against. */
 export interface SearchItem { where: string; kind: string; title: string; snippet: string; href: string; text: string }
 
-export const sortedParts = (n: Notes) => Object.keys(n.parts).map(Number).sort((a, b) => a - b);
+/** Parts in order, skipping any with no chapters yet (e.g. a difficulty level nobody has written a problem for). */
+export const sortedParts = (n: Notes) =>
+  Object.keys(n.parts).map(Number).filter(p => n.chapters.some(c => c.part === p)).sort((a, b) => a - b);
