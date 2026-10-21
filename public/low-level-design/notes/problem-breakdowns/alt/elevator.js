@@ -18,7 +18,7 @@ const (
 	Destination
 )
 
-// Request is a comparable struct: two requests are equal when floor and type match.
+// Request is a comparable struct, so it can be a map key: two requests are equal when floor and type match.
 type Request struct {
 	Floor int
 	Type  RequestType
@@ -37,9 +37,9 @@ func (c *ElevatorController) Step()                                         // a
 type Elevator struct {
 	ID           int
 	mu           sync.Mutex
-	currentFloor int           // 0..9
-	state        ElevatorState // Idle, MovingUp or MovingDown
-	up, down     sortedSet     // stops for the upward and downward sweeps
+	currentFloor int                  // 0..9
+	direction    Direction            // Up, Down or Idle
+	requests     map[Request]struct{} // a set: the stops it owes, each with its reason
 }
 
 func (e *Elevator) AddRequest(r Request) bool
@@ -47,11 +47,6 @@ func (e *Elevator) Step()
 func (e *Elevator) CurrentFloor() int
 func (e *Elevator) Direction() Direction
 func (e *Elevator) IsCommittedTo(floor int, dir Direction) bool // used by dispatch
-
-type ElevatorState interface {
-	Direction() Direction
-	Move(e *Elevator) ElevatorState
-}
 
 type DispatchStrategy interface {
 	Choose(cars []*Elevator, call Request) *Elevator
@@ -95,12 +90,6 @@ func (c *ElevatorController) SelectFloor(elevatorID, floor int) bool {
 func (c *ElevatorController) Step() { // the simulation clock
 	for _, e := range c.elevators {
 		e.Step()
-	}
-}
-
-func (c *ElevatorController) Start(ctx context.Context) { // or: each car ticks on its own goroutine
-	for _, e := range c.elevators {
-		go e.Run(ctx)
 	}
 }`,
 
@@ -156,18 +145,156 @@ func (CommittedFirst) Choose(cars []*Elevator, call Request) *Elevator {
 
 func IsValidFloor(f int) bool { return f >= MinFloor && f <= MaxFloor }
 
-// sortedSet is a sorted slice without duplicates: Go's stand-in for a TreeSet.
+type Elevator struct {
+	ID int
+
+	mu           sync.Mutex // guards everything below: button presses and the clock both reach a car
+	currentFloor int        // every car starts on the ground floor
+	direction    Direction
+	requests     map[Request]struct{}
+}
+
+func NewElevator(id int) *Elevator { return &Elevator{ID: id, requests: map[Request]struct{}{}} }
+
+func (e *Elevator) AddRequest(r Request) bool {
+	if !IsValidFloor(r.Floor) { // reject, but don't panic
+		return false
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if r.Floor != e.currentFloor { // already here: nothing to do
+		e.requests[r] = struct{}{} // a repeated press is the same key
+	}
+	return true
+}
+
+func (e *Elevator) Step() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if len(e.requests) == 0 { // 1. nothing to do
+		e.direction = Idle
+		return
+	}
+	if e.direction == Idle { // 2. pick a direction
+		e.direction = e.towardNearest()
+	}
+	pickup := PickupDown
+	if e.direction == Up {
+		pickup = PickupUp
+	}
+	here, dest := Request{e.currentFloor, pickup}, Request{e.currentFloor, Destination}
+	_, a := e.requests[here]
+	_, b := e.requests[dest]
+	if a || b { // 3. stop, don't move
+		delete(e.requests, here)
+		delete(e.requests, dest)
+		if len(e.requests) == 0 {
+			e.direction = Idle
+		}
+		return
+	}
+	if !e.hasRequestsAhead(e.direction) { // 4. turn, don't move
+		if e.direction == Up {
+			e.direction = Down
+		} else {
+			e.direction = Up
+		}
+		return
+	}
+	if e.direction == Up { // 5. move
+		e.currentFloor++
+	} else {
+		e.currentFloor--
+	}
+}
+
+// hasRequestsAhead counts every type: the car travels toward every stop, even ones it won't stop for yet.
+func (e *Elevator) hasRequestsAhead(dir Direction) bool {
+	for r := range e.requests {
+		if (dir == Up && r.Floor > e.currentFloor) || (dir == Down && r.Floor < e.currentFloor) {
+			return true
+		}
+	}
+	return false
+}
+
+// towardNearest breaks ties toward the lower floor, so the choice never depends on map order.
+func (e *Elevator) towardNearest() Direction {
+	best, bestD := -1, 0
+	for r := range e.requests {
+		d := r.Floor - e.currentFloor
+		if d < 0 {
+			d = -d
+		}
+		if best < 0 || d < bestD || (d == bestD && r.Floor < best) {
+			best, bestD = r.Floor, d
+		}
+	}
+	if best > e.currentFloor {
+		return Up
+	}
+	return Down
+}
+
+func (e *Elevator) CurrentFloor() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.currentFloor
+}
+
+func (e *Elevator) Direction() Direction {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.direction
+}
+
+// IsCommittedTo: sweeping in dir toward floor, with a matching stop at or beyond it.
+func (e *Elevator) IsCommittedTo(floor int, dir Direction) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.direction != dir || (dir == Up && e.currentFloor > floor) || (dir == Down && e.currentFloor < floor) {
+		return false
+	}
+	pickup := PickupDown
+	if dir == Up {
+		pickup = PickupUp
+	}
+	for r := range e.requests {
+		beyond := (dir == Up && r.Floor >= floor) || (dir == Down && r.Floor <= floor)
+		if beyond && (r.Type == Destination || r.Type == pickup) {
+			return true
+		}
+	}
+	return false
+}`,
+
+"Elevator in one screen": `type Request struct {
+	Floor int
+	Type  RequestType // PickupUp, PickupDown, Destination
+}
+
+func (c *ElevatorController) RequestElevator(floor int, t RequestType) bool // validate, choose car, AddRequest
+func (c *ElevatorController) SelectFloor(elevatorID, floor int) bool       // Destination on that car
+func (c *ElevatorController) Step()                                         // every car steps once
+
+type Elevator struct {
+	mu           sync.Mutex
+	currentFloor int
+	direction    Direction
+	requests     map[Request]struct{} // guarded by mu
+}
+
+func (e *Elevator) AddRequest(r Request) bool // bad floor false; current floor no-op; else add
+func (e *Elevator) Step() // empty: Idle | idle: toward nearest | stop here: remove, no move
+// | nothing ahead: turn, no move | else move one floor
+// DispatchStrategy: committed car, else idle car, else nearest`,
+
+"Two sorted sets: next stop in O(log n)": `// Go has no TreeSet: a sorted slice without duplicates, searched with slices.BinarySearch, plays its role.
 type sortedSet []int
 
 func (s *sortedSet) add(f int) {
 	if i, found := slices.BinarySearch(*s, f); !found {
 		*s = slices.Insert(*s, i, f)
-	}
-}
-
-func (s *sortedSet) remove(f int) {
-	if i, found := slices.BinarySearch(*s, f); found {
-		*s = slices.Delete(*s, i, i+1)
 	}
 }
 
@@ -179,37 +306,17 @@ func (s sortedSet) ceiling(f int) (int, bool) { // smallest >= f
 	return 0, false
 }
 
-func (s sortedSet) floor(f int) (int, bool) { // largest <= f
-	i, found := slices.BinarySearch(s, f)
-	if found {
-		return s[i], true
-	}
-	if i > 0 {
-		return s[i-1], true
-	}
-	return 0, false
-}
-
-type Elevator struct {
-	ID int
-
-	mu           sync.Mutex // guards everything below
-	currentFloor int        // every car starts on the ground floor
-	state        ElevatorState
-	up           sortedSet // stops for the upward sweep; next = up.ceiling(currentFloor)
-	down         sortedSet // stops for the downward sweep; next = down.floor(currentFloor), Go's descending TreeSet
-}
-
-func NewElevator(id int) *Elevator { return &Elevator{ID: id, state: IdleState{}} }
+// On Elevator, guarded by mu: up and down replace the request set.
+//   up, down sortedSet // both ascending; the next down-stop is the largest <= currentFloor
 
 func (e *Elevator) AddRequest(r Request) bool {
-	if !IsValidFloor(r.Floor) { // reject, but don't panic
+	if !IsValidFloor(r.Floor) {
 		return false
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	switch {
-	case r.Floor == e.currentFloor: // already here: nothing to do
+	case r.Floor == e.currentFloor:
 	case r.Type == PickupUp:
 		e.up.add(r.Floor)
 	case r.Type == PickupDown:
@@ -222,124 +329,53 @@ func (e *Elevator) AddRequest(r Request) bool {
 	return true
 }
 
-// Step is one tick: the current state decides whether to stop, move or turn.
-func (e *Elevator) Step() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.state = e.state.Move(e)
-}
-
-func (e *Elevator) CurrentFloor() int {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return e.currentFloor
-}
-
-func (e *Elevator) Direction() Direction {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return e.state.Direction()
-}
-
-// IsCommittedTo reports whether the car is sweeping in dir toward floor with a stop at or beyond it.
-func (e *Elevator) IsCommittedTo(floor int, dir Direction) bool {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.state.Direction() != dir {
-		return false
+// nextGoingUp: an up-stop ahead, else the highest DOWN call above (go there, then turn); false means turn now.
+func (e *Elevator) nextGoingUp() (int, bool) {
+	if next, ok := e.up.ceiling(e.currentFloor); ok {
+		return next, true
 	}
-	if dir == Up {
-		_, ok := e.up.ceiling(floor) // an up-stop at or above the caller
-		return e.currentFloor <= floor && ok
+	if n := len(e.down); n > 0 && e.down[n-1] > e.currentFloor {
+		return e.down[n-1], true
 	}
-	_, ok := e.down.floor(floor) // a down-stop at or below the caller
-	return e.currentFloor >= floor && ok
-}
-
-// Run steps once a second until ctx is cancelled: optional, one goroutine per car.
-func (e *Elevator) Run(ctx context.Context) {
-	t := time.NewTicker(time.Second)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			e.Step()
-		}
-	}
+	return 0, false
 }`,
 
-"Direction states: Idle, MovingUp, MovingDown": `// ElevatorState is the State pattern: each state decides one tick of movement.
-// Move is called only from Step, with e.mu held.
+"State classes for service, doors and maintenance": `// ElevatorState says what one tick means, once that depends on more than direction.
 type ElevatorState interface {
-	Direction() Direction
-	Move(e *Elevator) ElevatorState
+	Tick(e *Elevator) ElevatorState
 }
 
-type IdleState struct{}
-type MovingUpState struct{}
-type MovingDownState struct{}
+// InService runs the five cases from the solution, now reporting whether the car stopped at a floor.
+type InService struct{}
 
-func (IdleState) Direction() Direction { return Idle }
-
-func (s IdleState) Move(e *Elevator) ElevatorState {
-	if _, ok := e.up.ceiling(e.currentFloor); ok { // up-stops at or above
-		return MovingUpState{}
-	}
-	if _, ok := e.down.floor(e.currentFloor); ok { // down-stops at or below
-		return MovingDownState{}
-	}
-	if len(e.up) > 0 { // only UP calls below: go down to them
-		return MovingDownState{}
-	}
-	if len(e.down) > 0 { // only DOWN calls above: go up to them
-		return MovingUpState{}
+func (s InService) Tick(e *Elevator) ElevatorState {
+	if e.scanOneTick() {
+		return &DoorsOpen{ticksLeft: 3}
 	}
 	return s
 }
 
-func (MovingUpState) Direction() Direction { return Up }
-
-func (s MovingUpState) Move(e *Elevator) ElevatorState {
-	if next, ok := e.up.ceiling(e.currentFloor); ok { // the next up-stop ahead
-		if next == e.currentFloor {
-			e.up.remove(next) // stop here this tick; don't move
-		} else {
-			e.currentFloor++
-		}
-		return s
-	}
-	if n := len(e.down); n > 0 && e.down[n-1] > e.currentFloor { // the highest DOWN call is above: go there, then turn
-		e.currentFloor++
-		return s
-	}
-	if len(e.up) == 0 && len(e.down) == 0 {
-		return IdleState{}
-	}
-	return MovingDownState{}
+type DoorsOpen struct {
+	ticksLeft int // touched only inside Step, with the car's mutex held
 }
 
-func (MovingDownState) Direction() Direction { return Down }
+func (d *DoorsOpen) Tick(*Elevator) ElevatorState {
+	d.ticksLeft--
+	if d.ticksLeft > 0 {
+		return d
+	}
+	return InService{}
+}
 
-func (s MovingDownState) Move(e *Elevator) ElevatorState {
-	if next, ok := e.down.floor(e.currentFloor); ok { // the highest down-stop at or below
-		if next == e.currentFloor {
-			e.down.remove(next)
-		} else {
-			e.currentFloor--
-		}
-		return s
-	}
-	if len(e.up) > 0 && e.up[0] < e.currentFloor { // the lowest UP call is below: go there, then turn
-		e.currentFloor--
-		return s
-	}
-	if len(e.up) == 0 && len(e.down) == 0 {
-		return IdleState{}
-	}
-	return MovingUpState{}
-}`,
+type Maintenance struct{}
+
+func (m Maintenance) Tick(*Elevator) ElevatorState {
+	return m // ignores requests until an engineer resets it
+}
+
+// On Elevator, under e.mu: Step sets e.state = e.state.Tick(e);
+// EnterMaintenance clears the requests and sets Maintenance{}; Reset sets InService{}.
+// Dispatch skips a car whose state is Maintenance.`,
 
 "Express cars: floors a car serves, and dispatch that respects them": `// On Elevator: the floors this car serves; nil means every floor. Never changed, so safe to read without the mutex.
 //   servedFloors map[int]bool // e.g. {0: true, 5: true, 9: true} for the express car
@@ -362,54 +398,24 @@ func (s ServedFloorsOnly) Choose(cars []*Elevator, call Request) *Elevator {
 	return s.Inner.Choose(able, call)
 }`,
 
-"Cancelling: remember why each stop exists": `// Each sweep maps a floor to the reasons it is a stop; the floor stays a stop until its last reason goes.
-// Go has no sorted map, so keep the sorted floors next to the reasons.
-// On Elevator, upSweep and downSweep (both *sweep) replace up and down; the states read sweep.floors.
-type sweep struct {
-	floors  sortedSet
-	reasons map[int]map[RequestType]bool
-}
-
-func (s *sweep) add(r Request) {
-	if s.reasons[r.Floor] == nil {
-		s.reasons[r.Floor] = map[RequestType]bool{}
-		s.floors.add(r.Floor)
-	}
-	s.reasons[r.Floor][r.Type] = true
-}
-
-func (s *sweep) cancel(r Request) bool {
-	why := s.reasons[r.Floor]
-	if !why[r.Type] {
-		return false // nothing to cancel
-	}
-	delete(why, r.Type)
-	if len(why) == 0 { // last reason gone: no stop here
-		delete(s.reasons, r.Floor)
-		s.floors.remove(r.Floor)
-	}
-	return true
-}
-
+"Cancelling a request": `// RemoveRequest is the inverse of AddRequest. Each request keeps its type, so cancelling a destination
+// at 7 never drops an UP call that is also waiting at 7.
 func (e *Elevator) RemoveRequest(r Request) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	switch r.Type {
-	case PickupUp:
-		return e.upSweep.cancel(r)
-	case PickupDown:
-		return e.downSweep.cancel(r)
-	default: // a destination was filed in whichever sweep reaches it
-		return e.upSweep.cancel(r) || e.downSweep.cancel(r)
+	if _, ok := e.requests[r]; !ok {
+		return false // never there, or already served
 	}
+	delete(e.requests, r)
+	return true
 }`,
 
 "Hand-off: callers enqueue, the car drains each tick": `// Callers only send on a buffered channel; the car's own goroutine drains it at the start of each tick,
-// so only that goroutine ever touches up and down.
+// so only that goroutine ever touches the request set.
 type Elevator struct {
 	pending  chan Request                 // written by any goroutine
 	snapshot atomic.Pointer[CarSnapshot] // what dispatch reads from other goroutines
-	// currentFloor, state, up, down: touched only by Step
+	// currentFloor, direction, requests: touched only by Step
 }
 
 type CarSnapshot struct {
@@ -433,43 +439,16 @@ func (e *Elevator) Step() { // only this car's goroutine calls Step
 	for drained := false; !drained; {
 		select {
 		case r := <-e.pending:
-			e.file(r) // the old AddRequest body, now private
+			if r.Floor != e.currentFloor {
+				e.requests[r] = struct{}{}
+			}
 		default:
 			drained = true
 		}
 	}
-	e.state = e.state.Move(e)
-	e.snapshot.Store(&CarSnapshot{e.currentFloor, e.state.Direction()})
+	e.scanOneTick() // the five cases from the solution
+	e.snapshot.Store(&CarSnapshot{e.currentFloor, e.direction})
 }`,
-
-"Doors and maintenance as ElevatorStates": `// More states, same interface: each decides what one tick means.
-type DoorsOpenState struct {
-	resume    ElevatorState // the direction to carry on in
-	ticksLeft int           // touched only inside Step, with the elevator's mutex held
-}
-
-func (d *DoorsOpenState) Direction() Direction { return d.resume.Direction() }
-
-func (d *DoorsOpenState) Move(*Elevator) ElevatorState {
-	d.ticksLeft--
-	if d.ticksLeft > 0 {
-		return d
-	}
-	return d.resume
-}
-
-type MaintenanceState struct{}
-
-func (MaintenanceState) Direction() Direction { return Idle }
-
-func (s MaintenanceState) Move(*Elevator) ElevatorState {
-	return s // ignores stops until an engineer resets it
-}
-
-// In MovingUpState (and MovingDownState), a stop now holds the doors open for three ticks:
-//   if next == e.currentFloor { e.up.remove(next); return &DoorsOpenState{resume: s, ticksLeft: 3} }
-// On Elevator, under e.mu: EnterMaintenance clears up and down and sets MaintenanceState{}; Reset sets IdleState{}.
-// Dispatch skips a car in maintenance, so it never gets hall calls.`,
 
 "A different request, a different dispatcher": `type TripRequest struct{ From, To int }
 
@@ -492,25 +471,5 @@ func (d *DestinationDispatcher) Assign(r TripRequest) int {
 	best.AddRequest(Request{r.From, pickup})
 	best.AddPendingDestination(r.From, r.To) // becomes a destination once the passenger boards
 	return best.ID
-}`,
-
-"Elevator in one screen": `type Request struct {
-	Floor int
-	Type  RequestType // PickupUp, PickupDown, Destination
-}
-
-func (c *ElevatorController) RequestElevator(floor int, t RequestType) bool // validate, choose car, AddRequest
-func (c *ElevatorController) SelectFloor(elevatorID, floor int) bool       // Destination on that car
-func (c *ElevatorController) Step()                                         // every car steps once
-
-type Elevator struct {
-	mu       sync.Mutex
-	up, down sortedSet // next up-stop: up.ceiling(currentFloor); next down-stop: down.floor(currentFloor)
-}
-
-func (e *Elevator) AddRequest(r Request) bool // bad floor false; current floor no-op; file by sweep
-func (e *Elevator) Step()                     // state = state.Move(e) under mu
-
-// IdleState, MovingUpState, MovingDownState: stop (no move), move one floor, or turn
-// DispatchStrategy: committed car, else idle car, else nearest`
+}`
 } };
