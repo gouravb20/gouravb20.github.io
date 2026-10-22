@@ -169,6 +169,9 @@ p, li, td, th, .concept-def, .concept-why, .concept-example,
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+/* In tables, "anywhere" also shrinks a column's minimum width to one letter, so short words like "Driver" split
+   mid-word next to a long column. Break words only when one genuinely doesn't fit. */
+td, th { overflow-wrap: break-word; word-break: normal; }
 
 /* Question color tags */
 .q { font-weight: 700; padding: 0 4px; border-radius: 4px; white-space: nowrap; }
