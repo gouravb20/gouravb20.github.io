@@ -57,7 +57,8 @@
       { path: "books/#library", icon: "pdf", title: "PDF library" }
     ] },
     { id: "slides", path: "slides/", icon: "slides", title: "Slides", kids: [
-      { path: "slides/database-guide/", icon: "deck", title: "A Field Guide to Databases" }
+      { path: "slides/database-guide/", icon: "deck", title: "A Field Guide to Databases" },
+      { path: "slides/database-anatomy-part2/", icon: "deck", title: "Database Anatomy, Part 2" }
     ] }
   ];
 

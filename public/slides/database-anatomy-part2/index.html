@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Database Anatomy, Part 2: Analytics, Lakehouses &amp; Vectors</title>
+<meta name="description" content="Database Anatomy, Part 2: a 17-slide visual guide to the analytical and specialized side of databases: OLAP and columnar storage, warehouses and lakehouses, vector search with HNSW, time-series, graph and search engines.">
+<link rel="canonical" href="https://gouravb20.github.io/learn/slides/database-anatomy-part2/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="System Design Notes">
+<meta property="og:title" content="Database Anatomy, Part 2: Analytics, Lakehouses &amp; Vectors">
+<meta property="og:description" content="A 17-slide visual guide to OLAP and columnar storage, warehouses and lakehouses, vector search with HNSW and time-series databases.">
+<meta property="og:url" content="https://gouravb20.github.io/learn/slides/database-anatomy-part2/">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* ============================================================
+     LAYOUT CONCEPT: vertical scroll-snap keynote. Each <section.slide>
+     is one full-viewport frame. Fixed progress rail + counter + arrows.
+     Mermaid + logo tiles always sit on a light panel so brand marks and
+     diagrams read in either page theme.
+     ============================================================ */
+  :root {
+    /* color — cool blueprint neutrals, indigo accent, amber highlight (light) */
+    --bg: #eef0f4;
+    --surface: #ffffff;
+    --surface-2: #f5f7fa;
+    --fg: #14171d;
+    --muted: #5a6473;
+    --faint: #8b94a3;
+    --accent: #2f54eb;
+    --accent-soft: #e7ecff;
+    --on-accent: #ffffff;
+    --warm: #d9480f;
+    --warm-soft: #ffece0;
+    --good: #2b8a3e;
+    --border: #dfe3ea;
+    --border-strong: #c6ccd6;
+    --shadow: 0 1px 2px rgba(20,23,29,.06), 0 8px 24px rgba(20,23,29,.07);
+    --code-bg: #0f1420;
+    --code-fg: #e6e9f2;
+    /* type */
+    --display: "Sora", "Segoe UI", system-ui, sans-serif;
+    --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b0e14;
+      --surface: #141923;
+      --surface-2: #1b212d;
+      --fg: #e7eaf1;
+      --muted: #9aa4b4;
+      --faint: #6d7688;
+      --accent: #7f9bff;
+      --accent-soft: #1d2640;
+      --on-accent: #0b0e14;
+      --warm: #ff9e5e;
+      --warm-soft: #3a2415;
+      --good: #69db7c;
+      --border: #242b38;
+      --border-strong: #333c4d;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.45);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e14;
+    --surface: #141923;
+    --surface-2: #1b212d;
+    --fg: #e7eaf1;
+    --muted: #9aa4b4;
+    --faint: #6d7688;
+    --accent: #7f9bff;
+    --accent-soft: #1d2640;
+    --on-accent: #0b0e14;
+    --warm: #ff9e5e;
+    --warm-soft: #3a2415;
+    --good: #69db7c;
+    --border: #242b38;
+    --border-strong: #333c4d;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.45);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- deck scroller ---------- */
+  #deck {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-snap-type: y proximity;
+    scroll-behavior: smooth;
+    scroll-padding-top: 0;
+  }
+  @media (prefers-reduced-motion: reduce) { #deck { scroll-behavior: auto; } }
+  /* --- removed stray placeholder face --- */
+
+  .slide {
+    min-height: 100dvh;
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 22px;
+    padding: clamp(28px, 5vw, 72px);
+    padding-block: clamp(64px, 8vh, 96px);
+    position: relative;
+    border-bottom: 1px solid var(--border);
+  }
+  .slide > * { width: 100%; max-width: 1120px; margin-inline: auto; }
+
+  /* ---------- typography ---------- */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  h1 { font-family: var(--display); font-weight: 700; line-height: 1.02;
+       font-size: clamp(2.3rem, 6.5vw, 4.6rem); letter-spacing: -.02em;
+       margin: 0; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 650; line-height: 1.05;
+       font-size: clamp(1.7rem, 3.8vw, 2.8rem); letter-spacing: -.015em;
+       margin: 0; text-wrap: balance; }
+  h3 { font-family: var(--display); font-weight: 600; font-size: 1.05rem; margin: 0; letter-spacing: -.01em; }
+  p { margin: 0; }
+  .lead { font-size: clamp(1.05rem, 1.7vw, 1.35rem); color: var(--muted); max-width: 46ch; }
+  .muted { color: var(--muted); }
+  strong { font-weight: 650; }
+  code, .mono { font-family: var(--mono); }
+  mark { background: var(--warm-soft); color: var(--warm); padding: 0 .25em; border-radius: 3px; font-weight: 600; }
+  .accent { color: var(--accent); }
+
+  /* ---------- fixed chrome ---------- */
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--warm));
+    z-index: 50; transition: width .25s ease; }
+  #hud { position: fixed; z-index: 50; right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    display: flex; align-items: center; gap: 8px; }
+  .hud-btn, #theme-toggle {
+    width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border-strong);
+    background: var(--surface); color: var(--fg); cursor: pointer; font-size: 16px;
+    display: grid; place-items: center; box-shadow: var(--shadow); font-family: var(--body);
+  }
+  .hud-btn:hover, #theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  #counter { font-family: var(--mono); font-size: .8rem; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0 10px; height: 38px; display: grid; place-items: center; min-width: 58px; box-shadow: var(--shadow);}
+  #theme-toggle { position: fixed; top: calc(14px + env(safe-area-inset-top,0px)); right: 16px; z-index: 50; }
+  button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .kbd { font-family: var(--mono); font-size: .7rem; border: 1px solid var(--border-strong);
+    border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--muted); background: var(--surface-2); }
+
+  /* ---------- cards / grids ---------- */
+  .grid { display: grid; gap: 16px; }
+  .cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .cols-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 860px){ .cols-3, .cols-4 { grid-template-columns: repeat(2,1fr);} }
+  @media (max-width: 560px){ .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr;} }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px; box-shadow: var(--shadow); min-width: 0; }
+  .card h3 { margin-bottom: 6px; }
+  .card p { font-size: .92rem; color: var(--muted); }
+  .card .num { font-family: var(--mono); font-size: .72rem; color: var(--faint); letter-spacing: .1em; }
+  .card.axis { display: flex; flex-direction: column; gap: 4px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono);
+    font-size: .72rem; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border-strong);
+    color: var(--muted); background: var(--surface-2); white-space: nowrap; }
+  .pill.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  .pill.warm { color: var(--warm); border-color: var(--warm); background: var(--warm-soft); }
+  .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+  ul.ticks { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 9px; }
+  /* every block on a slide starts at the left edge of the centred content column,
+     even when its own rules reset margins (ul.ticks) or it is narrower than the column (dl.kv, notes) */
+  .slide > *:not(.foot) { margin-left: max(0px, calc((100% - 1120px) / 2)); margin-right: auto; }
+  ul.ticks li { position: relative; padding-left: 22px; color: var(--muted); font-size: .96rem; }
+  ul.ticks li::before { content: "▸"; position: absolute; left: 0; color: var(--accent); font-size: .85em; top: 2px; }
+  ul.ticks li strong { color: var(--fg); }
+
+  /* ---------- db logo chips ---------- */
+  .db-row { display: flex; flex-wrap: wrap; gap: 12px; }
+  .db { display: flex; align-items: center; gap: 11px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px 10px 10px; box-shadow: var(--shadow); }
+  .db-lg { padding: 14px 18px 14px 12px; }
+  .logo-tile { width: 38px; height: 38px; border-radius: 9px; background: #fff;
+    border: 1px solid #e7e9ef; display: grid; place-items: center; flex: none; overflow: hidden; }
+  .db-lg .logo-tile { width: 48px; height: 48px; }
+  .logo-tile svg { width: 64%; height: 64%; display: block; }
+  .logo-tile .mono-mark { font-family: var(--mono); font-weight: 700; font-size: .8rem; color: var(--brand, #333); }
+  .db-name { font-family: var(--display); font-weight: 600; font-size: 1rem; line-height: 1.1; }
+  .db-sub { display: block; font-family: var(--mono); font-size: .68rem; color: var(--faint); font-weight: 400; margin-top: 2px; letter-spacing: .03em; }
+
+  /* ---------- diagram / mermaid panel (always light) ---------- */
+  .panel-light { background: #f8fafc; border: 1px solid #dfe3ea; border-radius: 14px;
+    padding: 16px; box-shadow: var(--shadow); overflow-x: auto; }
+  .mermaid { display: flex; justify-content: center; min-height: 40px; }
+  .mermaid svg { max-width: 100%; height: auto; }
+  .cap { font-family: var(--mono); font-size: .72rem; color: var(--faint); text-align: center; margin-top: 8px; letter-spacing: .04em; }
+
+  /* ---------- data model mini-visuals ---------- */
+  .model-box { background: var(--code-bg); color: var(--code-fg); border-radius: 10px;
+    font-family: var(--mono); font-size: .76rem; padding: 12px; overflow-x: auto; line-height: 1.55; }
+  .model-box .k { color: #7f9bff; } .model-box .s { color: #a5d6a7; } .model-box .c { color: #ffcc80; }
+  table.mini { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: .74rem; color: var(--code-fg); }
+  table.mini th, table.mini td { border: 1px solid #2a3344; padding: 4px 8px; text-align: left; }
+  table.mini th { color: #7f9bff; background: #10151f; }
+
+  /* ---------- big comparison matrix ---------- */
+  .matrix-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+  table.matrix { border-collapse: collapse; width: 100%; font-size: .82rem; min-width: 760px; background: var(--surface); }
+  table.matrix th, table.matrix td { padding: 6px 11px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.matrix thead th { position: sticky; top: 0; background: var(--surface-2); font-family: var(--mono);
+    font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); z-index: 1; }
+  table.matrix tbody tr:hover { background: var(--surface-2); }
+  table.matrix td.name { font-weight: 600; font-family: var(--display); }
+  .m-eng-btree { color: var(--accent); } .m-eng-lsm { color: var(--warm); } .m-eng-mem { color: var(--good); }
+
+  /* ---------- LSM animation ---------- */
+  .lsm { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  .lsm-stage { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+  .lsm-flow { display: grid; grid-template-columns: 1.1fr 1.1fr 2fr; gap: 12px; align-items: stretch; }
+  @media (max-width: 760px){ .lsm-flow { grid-template-columns: 1fr; } }
+  .zone { border: 1.5px dashed var(--border-strong); border-radius: 12px; padding: 10px; min-height: 92px; position: relative; transition: border-color .3s, background .3s; }
+  .zone.ram { background: var(--accent-soft); }
+  .zone.disk { background: var(--surface-2); }
+  .zone-label { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .zone.hl { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .zone.hl-warm { border-color: var(--warm); box-shadow: 0 0 0 3px var(--warm-soft); }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { font-family: var(--mono); font-size: .72rem; padding: 3px 7px; border-radius: 6px;
+    background: var(--surface); border: 1px solid var(--border-strong); transition: all .35s ease; }
+  @media (prefers-reduced-motion: reduce){ .chip, .zone { transition: none; } }
+  .chip.k { border-color: var(--accent); color: var(--accent); }
+  .chip.tomb { border-color: var(--warm); color: var(--warm); text-decoration: line-through; }
+  .chip.new { animation: pop .4s ease; }
+  @keyframes pop { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .sst { border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px; background: var(--surface); margin-bottom: 7px; }
+  .sst-lv { font-family: var(--mono); font-size: .6rem; color: var(--faint); letter-spacing: .1em; margin-bottom: 4px; }
+  .lsm-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .lsm-controls button { font-family: var(--body); font-weight: 600; font-size: .85rem; cursor: pointer;
+    border-radius: 9px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--fg); padding: 8px 13px; }
+  .lsm-controls button:hover { border-color: var(--accent); color: var(--accent); }
+  .lsm-controls button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .lsm-controls button.warm { background: var(--warm); color: var(--on-accent); border-color: var(--warm); }
+  .lsm-log { font-family: var(--mono); font-size: .82rem; color: var(--muted); background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; min-height: 42px; }
+  .lsm-log b { color: var(--fg); }
+  .wal { font-family: var(--mono); font-size: .68rem; color: var(--good); }
+
+  .arrow { color: var(--faint); font-family: var(--mono); align-self: center; text-align: center; }
+  .foot { position: absolute; left: clamp(28px,5vw,72px); bottom: 26px; font-family: var(--mono);
+    font-size: .68rem; color: var(--faint); letter-spacing: .08em; }
+  .split { display: grid; grid-template-columns: 1.05fr 1fr; gap: 28px; align-items: center; }
+  @media (max-width: 820px){ .split { grid-template-columns: 1fr; } }
+  .note { border-left: 3px solid var(--warm); background: var(--warm-soft); color: var(--fg);
+    padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: .9rem; }
+  .note b { color: var(--warm); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: .9rem; }
+  .kv dt { font-family: var(--mono); font-size: .76rem; color: var(--faint); }
+  .kv dd { margin: 0; color: var(--muted); }
+
+  /* ---------- inline SVG diagrams (always on the light panel; no font-measurement clipping) ---------- */
+  .dgm { display: block; width: 100%; height: auto; margin: 0 auto; }
+  .dgm text { font-family: var(--mono); font-size: 12.5px; fill: #14171d; }
+  .dgm .sub { fill: #5a6473; font-size: 10.5px; }
+  .dgm .lbl { fill: #5a6473; font-size: 10.5px; }
+  .dgm .halo { paint-order: stroke; stroke: #f8fafc; stroke-width: 4px; stroke-linejoin: round; }
+  .dgm .n-b { fill: #e7ecff; stroke: #2f54eb; stroke-width: 1.6; }
+  .dgm .n-w { fill: #ffece0; stroke: #d9480f; stroke-width: 1.6; }
+  .dgm .n-g { fill: #eef2f7; stroke: #8b94a3; stroke-width: 1.4; }
+  .dgm .ln  { stroke: #8b94a3; stroke-width: 1.5; fill: none; }
+  .dgm .lnd { stroke: #8b94a3; stroke-width: 1.4; fill: none; stroke-dasharray: 4 4; }
+  .dgm .cl  { fill: none; stroke: #c6ccd6; stroke-width: 1.4; stroke-dasharray: 5 4; }
+
+  /* ---------- Bigtable row-key demo ---------- */
+  .bt-controls { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: center; }
+  .bt-ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .bt-lab { font-family: var(--mono); font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; background: var(--surface); }
+  .seg button { font-family: var(--mono); font-size: .78rem; padding: 8px 13px; border: 0; background: transparent; color: var(--fg); cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--border-strong); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+  .seg button:hover:not([aria-pressed="true"]) { color: var(--accent); }
+  .bt-tablets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 760px) { .bt-tablets { grid-template-columns: 1fr; } }
+  .bt-tab { border: 1.5px dashed var(--border-strong); border-radius: 12px; padding: 10px; background: var(--surface-2); transition: border-color .25s, background .25s; }
+  .bt-tab.touch { border: 1.5px solid var(--accent); background: var(--accent-soft); }
+  .bt-tab h4 { margin: 0 0 6px; font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; font-weight: 600; }
+  .bt-key { font-family: var(--mono); font-size: .74rem; line-height: 1.4; padding: 2px 7px; margin: 1px 0; border-radius: 5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bt-key.hit { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { .bt-tab { transition: none; } }
+  /* footer label is absolutely positioned; don't let the generic .slide > * width:100% push it past the edge */
+  .slide > .foot { width: auto; max-width: none; margin-inline: 0; }
+</style>
+
+<style>
+  :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  .slide { min-height: 100%; }
+  .slide > .foot { width: auto; max-width: none; margin-inline: 0; }
+  .dgm .lbl.dark { fill: #14171d; font-size: 11px; }
+  .dgm .lbl.warm { fill: #d9480f; font-size: 11px; font-weight: 600; }
+  .dgm .hn-band { fill: #eef2f7; stroke: #dfe3ea; }
+  .dgm .hn-e { stroke: #c6ccd6; stroke-width: 1.2; }
+  .dgm .hn-v { stroke: #c6ccd6; stroke-width: 1; stroke-dasharray: 3 3; }
+  .dgm .hn-n { fill: #8b94a3; }
+  .dgm .hn-on { fill: #2f54eb; }
+  .dgm .hn-p { stroke: #2f54eb; stroke-width: 2.2; fill: none; }
+
+  table.dense { border-collapse: collapse; width: 100%; font-size: .82rem; min-width: 680px; background: var(--surface); }
+  table.dense th, table.dense td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.dense thead th { background: var(--surface-2); font-family: var(--mono); font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  table.dense tbody tr:last-child td { border-bottom: 0; }
+  table.dense tbody tr:hover { background: var(--surface-2); }
+  table.dense td:first-child { font-weight: 600; font-family: var(--display); white-space: nowrap; }
+  code { font-size: .88em; }
+  .card code, table.dense code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
+  /* row vs column widget */
+  .rc-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .rc-page { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px; border: 1.5px dashed var(--border-strong); border-radius: 7px; background: var(--surface-2); }
+  .rc-page.touched { border: 1.5px solid var(--accent); background: var(--accent-soft); }
+  .rc-cell { width: 24px; height: 24px; display: grid; place-items: center; font-family: var(--mono); font-size: .62rem; color: var(--faint); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
+  .rc-cell.hit { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+  .rc-out { font-family: var(--mono); font-size: .82rem; margin-top: 10px; color: var(--muted); }
+  .rc-out b { color: var(--accent); }
+
+  /* lakehouse layer comparison */
+  .lh-grid { display: grid; grid-template-columns: minmax(110px, auto) 1fr 1.4fr; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+  .lh-grid > div { padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: .88rem; color: var(--muted); }
+  .lh-grid > div:nth-last-child(-n+2) { border-bottom: 0; }
+  .lh-grid .hd { background: var(--surface-2); font-family: var(--mono); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .lh-grid .lab { font-family: var(--mono); font-size: .72rem; color: var(--faint); }
+  .lh-grid .same { background: var(--accent-soft); color: var(--accent); font-family: var(--mono); font-size: .78rem; font-weight: 600; }
+  @media (max-width: 640px) { .lh-grid { grid-template-columns: 1fr; } .lh-grid .hd:first-child { display: none; } }
+
+  .knobs { display: flex; flex-wrap: wrap; gap: 8px 22px; font-family: var(--mono); font-size: .78rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow); }
+  .knobs code { color: var(--accent); background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; }
+  #mx td, #mx th { padding-top: 5px; padding-bottom: 5px; }
+  /* HNSW live */
+  .hn-ef { display: inline-flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: .8rem; color: var(--muted); }
+  .hn-ef input { width: 160px; accent-color: var(--accent); }
+  .hn-ef b { color: var(--accent); min-width: 2ch; }
+  .hn-panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 760px) { .hn-panels { grid-template-columns: 1fr; } }
+  .hn-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px; box-shadow: var(--shadow); min-width: 0; }
+  .hn-panel h4 { margin: 0 0 6px; display: flex; justify-content: space-between; font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .hn-svg { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; cursor: crosshair; border-radius: 8px; background: var(--surface-2); max-height: 270px; margin: 0 auto; }
+  .hn-svg .e { stroke: var(--border-strong); stroke-width: .25; }
+  .hn-svg .gh { fill: var(--border-strong); }
+  .hn-svg .n { fill: var(--faint); }
+  .hn-svg .vis { fill: var(--accent); }
+  .hn-svg .hop { stroke: var(--accent); stroke-width: .9; fill: none; }
+  .hn-svg .mk { fill: var(--accent); }
+  .hn-svg .ent { fill: none; stroke: var(--accent); stroke-width: .7; }
+  .hn-svg .res { fill: none; stroke: var(--warm); stroke-width: .8; }
+  .hn-svg .tru { fill: none; stroke: var(--good); stroke-width: .5; stroke-dasharray: 1 .8; }
+  .hn-svg .q { stroke: var(--warm); stroke-width: 1; }
+  .hn-svg .t { font-family: var(--mono); font-size: 3.2px; fill: var(--accent); }
+  .hn-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--mono); font-size: .72rem; color: var(--muted); }
+  .hn-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .hn-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+  .lg-hop { height: 3px !important; border-radius: 2px !important; width: 16px !important; background: var(--accent); }
+  .lg-vis { background: var(--accent); width: 8px !important; height: 8px !important; }
+  .lg-res { border: 2px solid var(--warm); }
+  .lg-tru { border: 2px dashed var(--good); }
+  .lg-q { background: var(--warm); width: 10px !important; height: 10px !important; clip-path: polygon(40% 0,60% 0,60% 40%,100% 40%,100% 60%,60% 60%,60% 100%,40% 100%,40% 60%,0 60%,0 40%,40% 40%); border-radius: 0 !important; }
+</style>
+
+</head>
+<body>
+<div id="progress"></div>
+<button id="theme-toggle" aria-label="Toggle light / dark theme" title="Toggle theme">◐</button>
+
+<main id="deck">
+
+  <!-- 1 — TITLE -->
+  <section class="slide" id="s1" style="justify-content:center;">
+    <div>
+      <p class="eyebrow">Database Anatomy · Part 2 of 2</p>
+      <h1>The <span class="accent">analytical</span> &amp;<br><span class="accent">specialized</span> side.</h1>
+      <p class="lead" style="margin-top:18px;">The workloads that flip the OLTP defaults: scanning billions of rows, searching by meaning, and storing data indexed by time.</p>
+      <div class="tag-row" style="margin-top:22px;">
+        <span class="pill">OLAP &amp; columnar</span><span class="pill">warehouse &amp; lakehouse</span><span class="pill">vectors &amp; HNSW</span><span class="pill">time-series</span><span class="pill">graph &amp; search</span>
+      </div>
+      <p class="muted" style="margin-top:26px; font-size:.85rem;">Navigate with <span class="kbd">↓</span> <span class="kbd">↑</span> <span class="kbd">Space</span> · or the arrows, bottom-right.</p>
+    </div>
+    <div class="foot">DATABASES / 01</div>
+  </section>
+  <!-- 2 — OLTP VS OLAP -->
+  <section class="slide" id="s2">
+    <div>
+      <p class="eyebrow">Recap · the two workloads</p>
+      <h2>OLTP and OLAP want opposite things</h2>
+    </div>
+    <div class="matrix-wrap"><table class="dense">
+      <thead><tr><th>Property</th><th>OLTP</th><th>OLAP</th></tr></thead>
+      <tbody>
+        <tr><td>Access pattern</td><td>Point lookups, small range scans, single-row writes</td><td>Large scans, aggregates, joins over many rows</td></tr>
+        <tr><td>Rows touched / query</td><td>1 to ~100</td><td>Millions to billions</td></tr>
+        <tr><td>Columns touched / query</td><td>Most of the row</td><td>A handful of a wide table's columns</td></tr>
+        <tr><td>Latency target</td><td>Single-digit ms</td><td>100 ms (dashboards) to minutes (batch)</td></tr>
+        <tr><td>Concurrency</td><td>Thousands of short transactions</td><td>Tens to hundreds of heavy queries</td></tr>
+        <tr><td>Write pattern</td><td>Random updates in place, ACID</td><td>Bulk or streaming appends, rare updates</td></tr>
+        <tr><td>Bottleneck</td><td>Random I/O, lock contention</td><td>Bytes scanned, CPU per value, network shuffle</td></tr>
+        <tr><td>Typical shape</td><td>Normalized, many small tables</td><td>Denormalized fact tables + dimensions</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted" style="font-size:.88rem;">The right-hand column is why the storage layout has to change, not just the query planner.</p>
+    <div class="foot">OLTP vs OLAP / 02</div>
+  </section>
+  <!-- 3 — ROW VS COLUMNAR -->
+  <section class="slide" id="s3">
+    <div>
+      <p class="eyebrow">Layout · interactive</p>
+      <h2>Same 8 rows, two layouts</h2>
+      <p class="lead" style="margin-top:10px;">Each box is a storage page; each square one value (<code>i</code>d, <code>u</code>ser, <code>c</code>ountry, <code>a</code>mount, <code>t</code>s). Pick a query and see which pages must be read.</p>
+    </div>
+    <div class="seg" id="q-seg" role="group" aria-label="Query">
+      <button data-q="A" aria-pressed="true">SELECT * WHERE id = 5</button><button data-q="B" aria-pressed="false">SELECT avg(amount)</button><button data-q="C" aria-pressed="false">SELECT country, avg(amount) GROUP BY country</button>
+    </div>
+    <div class="grid cols-2">
+      <div class="card"><h3>Row store <span class="muted mono" style="font-weight:400; font-size:.8rem">· 2 rows / page</span></h3><div class="rc-row" id="lay-row"></div><p class="rc-out" id="ro-row"></p></div>
+      <div class="card"><h3>Column store <span class="muted mono" style="font-weight:400; font-size:.8rem">· 1 column / page</span></h3><div class="rc-row" id="lay-col"></div><p class="rc-out" id="ro-col"></p></div>
+    </div>
+    <p class="note" id="q-note"></p>
+    <div class="foot">ROW vs COLUMNAR / 03</div>
+  </section>
+  <!-- 4 — WHY COLUMNAR WINS -->
+  <section class="slide" id="s4">
+    <div>
+      <p class="eyebrow">Why columnar wins</p>
+      <h2>Three techniques that compound</h2>
+    </div>
+    <div class="grid cols-3">
+      <div class="card"><h3 class="accent">1 · Compression</h3><p>One column holds one type in a narrow range, so it compresses far better than mixed rows. <strong>Dictionary</strong> (strings → small ints), <strong>RLE</strong> (value, count), <strong>delta / frame-of-reference</strong>, <strong>bit-packing</strong>.</p></div>
+      <div class="card"><h3 class="accent">2 · Vectorized execution</h3><p>Operators process batches (often 1k–4k values) instead of one row at a time: fewer calls per value, <strong>SIMD</strong>-friendly loops, data that stays in CPU cache. Some engines compile the pipeline to machine code instead.</p></div>
+      <div class="card"><h3 class="accent">3 · Data skipping</h3><p>Each file or block keeps <strong>min/max</strong> stats (zone maps). <code>WHERE ts &gt;= '2026-09-01'</code> skips whole blocks unread. A good <strong>sort / clustering key</strong> makes pruning far more effective.</p></div>
+    </div>
+    <div class="grid cols-2">
+      <div class="card" style="border-color:var(--warm);"><h3 style="color:var(--warm)">What you pay</h3><p><strong>Point updates are expensive</strong> (one row touches every column file), <strong>row reconstruction</strong> costs extra when you select many columns, and single-row inserts are inefficient, so writes are batched.</p></div>
+      <div class="card"><h3>How engines cope</h3><p>Buffer writes, flush to <strong>immutable columnar files</strong>, merge in the background: LSM thinking applied to columns. ClickHouse MergeTree parts, Snowflake micro-partitions, Parquet files in a lakehouse.</p></div>
+    </div>
+    <div class="foot">COLUMNAR / 04</div>
+  </section>
+  <!-- 5 — WAREHOUSE ARCHITECTURE -->
+  <section class="slide" id="s5">
+    <div>
+      <p class="eyebrow">Architecture · warehouse</p>
+      <h2>Warehouses keep state in object storage and rent compute</h2>
+    </div>
+    <div class="split">
+      <div>
+        <ul class="ticks">
+          <li><strong>One copy of data</strong> as immutable columnar files on object storage: cheap, durable, effectively unlimited.</li>
+          <li><strong>Many compute clusters</strong>, stateless and elastic, one per workload, so BI and ELT never fight over the same CPUs. Pause compute and you stop paying for it.</li>
+          <li><strong>A metadata layer</strong> tracks which files make up each table, per-file stats for pruning, and the transaction log that gives snapshots and time travel.</li>
+          <li><strong>The cost</strong>: cold reads cross the network, so engines lean on local SSD caches, result caches and aggressive pruning.</li>
+        </ul>
+        <p class="muted" style="margin-top:12px; font-size:.88rem;">This is Part 1's Axis 03 (compute ⟂ storage) pushed to its limit.</p>
+      </div>
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 420 300" role="img" aria-label="Warehouse: several compute clusters share one metadata layer and one copy of columnar files in object storage" style="max-width:460px"><defs><marker id="w1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="w1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker></defs><rect class="cl" x="8" y="6" width="404" height="92" rx="12"/><text class="lbl" x="22" y="26">compute — stateless, elastic, per workload</text><rect class="n-b" x="22" y="40" width="116" height="44" rx="8"/><text x="80.0" y="59.0" text-anchor="middle">cluster A</text><text class="sub" x="80.0" y="74.0" text-anchor="middle">BI dashboards</text><rect class="n-b" x="152" y="40" width="116" height="44" rx="8"/><text x="210.0" y="59.0" text-anchor="middle">cluster B</text><text class="sub" x="210.0" y="74.0" text-anchor="middle">ELT jobs</text><rect class="n-b" x="282" y="40" width="116" height="44" rx="8"/><text x="340.0" y="59.0" text-anchor="middle">cluster C</text><text class="sub" x="340.0" y="74.0" text-anchor="middle">ad hoc</text><path class="ln" d="M80 84 L120 124" marker-end="url(#w1)"/><path class="ln" d="M210 84 L210 124" marker-end="url(#w1)"/><path class="ln" d="M340 84 L300 124" marker-end="url(#w1)"/><rect class="n-g" x="22" y="124" width="376" height="48" rx="8"/><text x="210.0" y="145.0" text-anchor="middle">metadata · catalog · transactions</text><text class="sub" x="210.0" y="160.0" text-anchor="middle">per-file min/max stats → prune before reading</text><path class="ln" d="M120 172 L120 210" marker-end="url(#w1)"/><path class="ln" d="M210 172 L210 210" marker-end="url(#w1)"/><path class="ln" d="M300 172 L300 210" marker-end="url(#w1)"/><rect class="cl" x="8" y="200" width="404" height="92" rx="12"/><text class="lbl" x="22" y="220">object storage — durable, cheap, shared</text><rect class="n-w" x="22" y="232" width="84" height="46" rx="8"/><text x="64.0" y="252.0" text-anchor="middle">file 1</text><text class="sub" x="64.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="118" y="232" width="84" height="46" rx="8"/><text x="160.0" y="252.0" text-anchor="middle">file 2</text><text class="sub" x="160.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="214" y="232" width="84" height="46" rx="8"/><text x="256.0" y="252.0" text-anchor="middle">file 3</text><text class="sub" x="256.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="310" y="232" width="84" height="46" rx="8"/><text x="352.0" y="252.0" text-anchor="middle">file 4</text><text class="sub" x="352.0" y="267.0" text-anchor="middle">columnar</text></svg>
+        <p class="cap">compute ⟂ metadata ⟂ storage</p>
+      </div>
+    </div>
+    <div class="foot">WAREHOUSE / 05</div>
+  </section>
+  <!-- 6 — LAKEHOUSE -->
+  <section class="slide" id="s6">
+    <div>
+      <p class="eyebrow">Architecture · lakehouse</p>
+      <h2>A lakehouse is still a warehouse</h2>
+      <p class="lead" style="margin-top:10px;">Same recipe: columnar files, a metadata layer, elastic compute. Only the files and table format are <strong>open</strong>, and you own them.</p>
+    </div>
+    <div class="lh-grid" role="table" aria-label="Warehouse and lakehouse compared layer by layer">
+      <div class="hd" role="columnheader">Layer</div><div class="hd" role="columnheader">Warehouse</div><div class="hd" role="columnheader">Lakehouse</div>
+      <div class="lab">compute</div><div>The vendor's engine</div><div>Any engine on the same tables: Spark, Trino, Flink, DuckDB, Databricks; Snowflake and BigQuery can read Iceberg too</div>
+      <div class="lab">metadata · transactions</div><div>Internal catalog and transaction log</div><div><strong>Open table format</strong>: Apache Iceberg, Delta Lake, Apache Hudi. ACID commits, schema evolution, time travel, file-level stats</div>
+      <div class="lab">file format</div><div>Proprietary columnar files</div><div>Open columnar files: Parquet (or ORC)</div>
+      <div class="lab">storage</div><div>Object storage managed by the vendor</div><div>Your own bucket: S3, GCS, ADLS</div>
+      <div class="lab same">same idea</div><div class="same" style="grid-column: span 2;">columnar + immutable files · compute ⟂ storage · metadata-driven pruning · snapshots</div>
+    </div>
+    <div class="grid cols-2">
+      <div class="card"><h3>Where it came from</h3><p>A <strong>data lake</strong> was just files in a bucket: cheap and open, but no transactions, no schema enforcement, no reliable concurrent writes. Table formats added the warehouse features on top of those files; the name “lakehouse” was popularized by Databricks.</p></div>
+      <div class="card" style="border-color:var(--warm);"><h3 style="color:var(--warm)">What you take on</h3><p>Picking and running a <strong>catalog</strong>, compacting <strong>small files</strong>, expiring old snapshots, and accepting that performance features (caching, clustering, indexes) differ per engine.</p></div>
+    </div>
+    <div class="foot">LAKEHOUSE / 06</div>
+  </section>
+  <!-- 7 — OLAP ENGINES -->
+  <section class="slide" id="s7">
+    <div>
+      <p class="eyebrow">OLAP systems</p>
+      <h2>Seven engines, seven trade-off points</h2>
+    </div>
+    <div class="matrix-wrap"><table class="dense">
+      <thead><tr><th>System</th><th>Deployment</th><th>Storage</th><th>Compute ⁄ storage</th><th>Sweet spot</th></tr></thead>
+      <tbody>
+        <tr><td>Snowflake</td><td>Managed SaaS</td><td>Immutable columnar micro-partitions on object storage</td><td>Separated (virtual warehouses)</td><td>Enterprise warehousing, BI, elastic concurrency</td></tr>
+        <tr><td>BigQuery</td><td>Serverless</td><td>Capacitor columnar format on Google's distributed file system</td><td>Separated (slot-based)</td><td>Ad hoc scans over huge datasets, no cluster to run</td></tr>
+        <tr><td>Redshift</td><td>Managed cluster or serverless</td><td>Columnar, sort and distribution keys</td><td>Separated on RA3 / serverless</td><td>AWS-centric warehousing</td></tr>
+        <tr><td>Databricks SQL</td><td>Managed, on your cloud account</td><td>Delta Lake (Parquet + transaction log) in your bucket</td><td>Separated</td><td>Lakehouse: BI, data engineering and ML on one copy of open files</td></tr>
+        <tr><td>ClickHouse</td><td>Self-managed or cloud</td><td>MergeTree parts, sparse primary index</td><td>Coupled by default; separated in ClickHouse Cloud</td><td>Real-time analytics, very high ingest, sub-second aggregates</td></tr>
+        <tr><td>Druid / Pinot</td><td>Self-managed or cloud</td><td>Time-partitioned segments, pre-aggregation, rich indexes</td><td>Separated tiers</td><td>User-facing analytics at high QPS, low latency</td></tr>
+        <tr><td>DuckDB</td><td>Embedded, in-process</td><td>Columnar file; reads Parquet / Iceberg directly</td><td>Single node</td><td>Local analytics, notebooks, small data apps</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted" style="font-size:.82rem;">Details vary by version and edition. Treat this as orientation and confirm in each vendor's docs.</p>
+    <div class="foot">OLAP ENGINES / 07</div>
+  </section>
+  <!-- 8 — VECTOR INTRO -->
+  <section class="slide" id="s8">
+    <div>
+      <p class="eyebrow">Vector databases · 1 of 5</p>
+      <h2>Searching by meaning, not by value</h2>
+    </div>
+    <div class="split">
+      <div>
+        <ul class="ticks">
+          <li><strong>Embeddings</strong>: a model turns text, images or audio into a vector of a few hundred to a few thousand floats (commonly 384–3072). Similar meaning → nearby vectors.</li>
+          <li><strong>The query is “nearest neighbours”</strong>: embed the question, return the k closest stored vectors. No exact match, no <code>WHERE</code>; results are ranked by distance.</li>
+          <li><strong>Distance metric</strong>: cosine (angle), dot product (equals cosine on normalized vectors) or Euclidean L2. Use the one your embedding model was trained for.</li>
+          <li><strong>Why B-Trees don't help</strong>: they order data along one key; “closest in 768 dimensions” has no sort order. Space-partitioning trees (k-d trees) degrade toward brute force as dimensions grow.</li>
+          <li><strong>Brute force is O(N·d)</strong>: 10M vectors × 768 dims ≈ 7.7 billion multiply-adds per query. Hence <mark>approximate</mark> nearest-neighbour (ANN) indexes.</li>
+        </ul>
+        <div class="tag-row" style="margin-top:12px;"><span class="pill on">semantic search</span><span class="pill on">RAG for LLMs</span><span class="pill on">recommendations</span><span class="pill on">near-duplicate detection</span><span class="pill on">image search</span></div>
+      </div>
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 420 300" role="img" aria-label="Toy two-dimensional embedding space: similar concepts cluster together; a query finds its nearest neighbours" style="max-width:460px"><defs><marker id="v1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="v1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker></defs><rect x="2" y="2" width="416" height="296" rx="10" fill="none" stroke="#dfe3ea"/><text class="lbl" x="410" y="290" text-anchor="end">dimension 1 →</text><text class="lbl" x="12" y="18">↑ dimension 2</text><circle cx="88" cy="96" r="44" fill="#ffece0" fill-opacity=".55" stroke="#d9480f" stroke-dasharray="4 4"/><circle cx="70" cy="82" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="79" y="86" text-anchor="start">kitten</text><circle cx="112" cy="64" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="121" y="68" text-anchor="start">cat</text><circle cx="96" cy="132" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="105" y="136" text-anchor="start">puppy</text><circle cx="150" cy="120" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="159" y="124" text-anchor="start">dog</text><circle cx="292" cy="214" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="301" y="218" text-anchor="start">car</text><circle cx="344" cy="236" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="353" y="240" text-anchor="start">truck</text><circle cx="300" cy="262" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="309" y="266" text-anchor="start">bus</text><circle cx="300" cy="66" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="309" y="70" text-anchor="start">invoice</text><circle cx="352" cy="98" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="361" y="102" text-anchor="start">receipt</text><circle cx="88" cy="96" r="6.5" fill="#d9480f"/><text class="lbl warm halo" x="88" y="158" text-anchor="middle">query: “small cat photo”</text><text class="lbl warm halo" x="150" y="34" text-anchor="middle">k = 3 nearest</text><text class="lbl halo" x="330" y="40" text-anchor="middle">documents</text><text class="lbl halo" x="320" y="190" text-anchor="middle">vehicles</text><text class="lbl halo" x="110" y="182" text-anchor="middle">animals</text></svg>
+        <p class="cap">2-D for intuition · real embeddings have hundreds of dimensions</p>
+      </div>
+    </div>
+    <div class="foot">VECTORS · INTRO / 08</div>
+  </section>
+  <!-- 9 — ANN INDEX FAMILIES -->
+  <section class="slide" id="s9">
+    <div>
+      <p class="eyebrow">Vector databases · 2 of 5</p>
+      <h2>ANN indexes: buy speed with a little recall</h2>
+      <p class="lead" style="margin-top:10px;">Every index below has a knob that trades recall (did we find the true nearest neighbours?) against latency and memory.</p>
+    </div>
+    <div class="matrix-wrap"><table class="dense">
+      <thead><tr><th>Index</th><th>Idea</th><th>Knobs</th><th>Trade-off</th></tr></thead>
+      <tbody>
+        <tr><td>Flat</td><td>Compare the query with every vector</td><td>—</td><td>Exact (100% recall), but O(N) per query. Fine up to roughly hundreds of thousands of vectors.</td></tr>
+        <tr><td>IVF</td><td>k-means clusters the vectors into cells; search only the cells nearest the query</td><td><code>nlist</code>, <code>nprobe</code></td><td>Fast to build; misses neighbours that sit in a cell you didn't probe.</td></tr>
+        <tr><td>HNSW</td><td>Multi-layer proximity graph; greedy hops from coarse to fine</td><td><code>M</code>, <code>efConstruction</code>, <code>efSearch</code></td><td>Best recall/latency for in-memory search; memory-heavy and slower to build. <span class="accent">Next two slides.</span></td></tr>
+        <tr><td>PQ</td><td>Product quantization: split each vector into sub-vectors and store a codebook id per piece</td><td>sub-vectors, bits per code</td><td>Much smaller index, approximate distances; often combined with IVF (IVF-PQ).</td></tr>
+        <tr><td>DiskANN</td><td>A proximity graph (Vamana) laid out for SSD; only compressed vectors stay in RAM</td><td><code>R</code> (degree), <code>L</code> (search list)</td><td>Very large collections on one machine, at SSD latency.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note"><b>Measure, don't assume:</b> compute recall@k against brute force on a sample of your own queries before picking settings.</p>
+    <div class="foot">VECTORS · INDEXES / 09</div>
+  </section>
+  <!-- 10 — HNSW CONCEPT -->
+  <section class="slide" id="s10">
+    <div>
+      <p class="eyebrow">Vector databases · 3 of 5</p>
+      <h2>HNSW: a skip list made of graphs</h2>
+      <p class="lead" style="margin-top:10px;">Hierarchical Navigable Small World: the default index in pgvector, Qdrant, Weaviate and Milvus.</p>
+    </div>
+    <div class="split">
+      <div>
+        <ul class="ticks">
+          <li><strong>Small-world graph</strong>: each vector links to its nearest neighbours; greedy routing (hop to the neighbour closest to the query) reaches the right region in few hops.</li>
+          <li><strong>Layers</strong>: every vector is on L0; each also appears higher up with exponentially falling probability, like a skip list. Upper layers are sparse express lanes.</li>
+          <li><strong>Search</strong>: from the top entry point, hop greedily until no neighbour is closer, drop a layer, repeat. On L0, beam-search keeping the <code>efSearch</code> best candidates; return the top k.</li>
+          <li><strong>Insert</strong>: draw the vector's top layer at random, find neighbours with the same search (<code>efConstruction</code>), link to <code>M</code> per layer, prune over-full neighbours.</li>
+          <li><strong>Costs</strong>: graph and vectors usually live in RAM; deletes leave tombstones; heavy filters can cut the graph into unreachable pieces.</li>
+        </ul>
+      </div>
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 420 322" role="img" aria-label="HNSW: three layers of proximity graphs; search starts at the top entry point, hops greedily, and drops a layer at each local minimum" style="max-width:470px"><defs><marker id="h1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="h1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker></defs><rect class="hn-band" x="6" y="14" width="408" height="66" rx="10"/><rect class="hn-band" x="6" y="112" width="408" height="72" rx="10"/><rect class="hn-band" x="6" y="220" width="408" height="96" rx="10"/><text class="lbl" x="16" y="30">L2 · few nodes, long links</text><text class="lbl" x="16" y="128">L1</text><text class="lbl" x="16" y="236">L0 · every vector, short links</text><line class="hn-v" x1="88" y1="142" x2="88" y2="280"/><line class="hn-v" x1="180" y1="160" x2="180" y2="284"/><line class="hn-v" x1="272" y1="140" x2="272" y2="282"/><line class="hn-v" x1="318" y1="160" x2="318" y2="250"/><line class="hn-v" x1="398" y1="148" x2="398" y2="258"/><line class="hn-v" x1="88" y1="44" x2="88" y2="142"/><line class="hn-v" x1="272" y1="52" x2="272" y2="140"/><line class="hn-e" x1="88" y1="44" x2="272" y2="52"/><line class="hn-e" x1="88" y1="142" x2="180" y2="160"/><line class="hn-e" x1="180" y1="160" x2="272" y2="140"/><line class="hn-e" x1="272" y1="140" x2="318" y2="160"/><line class="hn-e" x1="318" y1="160" x2="398" y2="148"/><line class="hn-e" x1="88" y1="142" x2="272" y2="140"/><line class="hn-e" x1="40" y1="252" x2="88" y2="280"/><line class="hn-e" x1="88" y1="280" x2="134" y2="246"/><line class="hn-e" x1="134" y1="246" x2="180" y2="284"/><line class="hn-e" x1="180" y1="284" x2="226" y2="252"/><line class="hn-e" x1="226" y1="252" x2="272" y2="282"/><line class="hn-e" x1="272" y1="282" x2="318" y2="250"/><line class="hn-e" x1="318" y1="250" x2="360" y2="286"/><line class="hn-e" x1="360" y1="286" x2="398" y2="258"/><line class="hn-e" x1="40" y1="252" x2="134" y2="246"/><line class="hn-e" x1="134" y1="246" x2="226" y2="252"/><line class="hn-e" x1="272" y1="282" x2="360" y2="286"/><line class="hn-e" x1="318" y1="250" x2="398" y2="258"/><path class="hn-p" d="M88 44 L272 52" marker-end="url(#h1a)"/><path class="hn-p" d="M272 59 L272 133" marker-end="url(#h1a)"/><path class="hn-p" d="M272 140 L318 160" marker-end="url(#h1a)"/><path class="hn-p" d="M318 167 L318 243" marker-end="url(#h1a)"/><path class="hn-p" d="M318 250 L360 286" marker-end="url(#h1a)"/><circle cx="88" cy="44" r="6" class="hn-on"/><circle cx="272" cy="52" r="6" class="hn-on"/><circle cx="88" cy="142" r="5.5" class="hn-n"/><circle cx="180" cy="160" r="5.5" class="hn-n"/><circle cx="272" cy="140" r="5.5" class="hn-on"/><circle cx="318" cy="160" r="5.5" class="hn-on"/><circle cx="398" cy="148" r="5.5" class="hn-n"/><circle cx="40" cy="252" r="5" class="hn-n"/><circle cx="88" cy="280" r="5" class="hn-n"/><circle cx="134" cy="246" r="5" class="hn-n"/><circle cx="180" cy="284" r="5" class="hn-n"/><circle cx="226" cy="252" r="5" class="hn-n"/><circle cx="272" cy="282" r="5" class="hn-n"/><circle cx="318" cy="250" r="5" class="hn-on"/><circle cx="360" cy="286" r="5" class="hn-on"/><circle cx="398" cy="258" r="5" class="hn-n"/><circle cx="338" cy="303" r="5.5" fill="#d9480f"/><text class="lbl warm halo" x="328" y="307" text-anchor="end">query</text><text class="lbl dark halo" x="88" y="70" text-anchor="middle">entry point</text><text class="lbl dark halo" x="369" y="296" text-anchor="start">nearest</text></svg>
+        <p class="cap">greedy hop · drop a layer · repeat · beam search on L0</p>
+      </div>
+    </div>
+    <div class="knobs"><span><code>M</code> links per node → recall ↑ memory ↑</span><span><code>efConstruction</code> build beam → graph quality ↑ build time ↑</span><span><code>efSearch</code> query beam (≥ k) → recall ↑ latency ↑</span></div>
+    <div class="foot">HNSW / 10</div>
+  </section>
+  <!-- 11 — HNSW LIVE -->
+  <section class="slide" id="s11">
+    <div>
+      <p class="eyebrow">Vector databases · 4 of 5 · interactive</p>
+      <h2>Watch an HNSW search</h2>
+      <p class="lead" style="margin-top:10px;">A real HNSW graph of 150 2-D vectors, built in your browser. <strong>Click any panel</strong> to place a query.</p>
+    </div>
+    <div class="lsm-controls">
+      <button class="primary" id="hn-new">New random query</button>
+      <button id="hn-replay">↺ Replay</button>
+      <label class="hn-ef"><span>efSearch</span><input type="range" id="hn-ef" min="3" max="40" value="4" aria-label="efSearch"><b id="hn-efv">4</b></label>
+    </div>
+    <div class="hn-panels" id="hn">
+      <div class="hn-panel"><h4><span>Layer 2</span><span id="hn-c2"></span></h4><svg class="hn-svg" id="hn-l2" viewBox="0 0 100 100" role="img" aria-label="HNSW layer 2"></svg></div>
+      <div class="hn-panel"><h4><span>Layer 1</span><span id="hn-c1"></span></h4><svg class="hn-svg" id="hn-l1" viewBox="0 0 100 100" role="img" aria-label="HNSW layer 1"></svg></div>
+      <div class="hn-panel"><h4><span>Layer 0</span><span id="hn-c0"></span></h4><svg class="hn-svg" id="hn-l0" viewBox="0 0 100 100" role="img" aria-label="HNSW layer 0"></svg></div>
+    </div>
+    <div class="hn-legend"><span><i class="lg-hop"></i>hops</span><span><i class="lg-vis"></i>distance computed</span><span><i class="lg-res"></i>returned top-3</span><span><i class="lg-tru"></i>true top-3 (brute force)</span><span><i class="lg-q"></i>query</span></div>
+    <div class="lsm-log" id="hn-log"></div>
+    <div class="foot">HNSW · LIVE / 11</div>
+  </section>
+  <!-- 12 — VECTOR LANDSCAPE -->
+  <section class="slide" id="s12">
+    <div>
+      <p class="eyebrow">Vector databases · 5 of 5</p>
+      <h2>Extension or dedicated engine?</h2>
+    </div>
+    <div class="matrix-wrap"><table class="dense">
+      <thead><tr><th>System</th><th>Form</th><th>Indexes</th><th>Notable trait</th></tr></thead>
+      <tbody>
+        <tr><td>pgvector</td><td>PostgreSQL extension</td><td>HNSW, IVFFlat</td><td>Vectors next to relational data: joins, transactions, existing backups and tooling</td></tr>
+        <tr><td>Pinecone</td><td>Managed service</td><td>Proprietary</td><td>Fully managed, serverless-style scaling</td></tr>
+        <tr><td>Milvus</td><td>Distributed, open source</td><td>HNSW, IVF, PQ variants, DiskANN, more</td><td>Separated storage, query and index nodes; built for very large collections</td></tr>
+        <tr><td>Qdrant</td><td>Open source (Rust), managed option</td><td>HNSW + quantization</td><td>Strong payload filtering alongside vector search</td></tr>
+        <tr><td>Weaviate</td><td>Open source, managed option</td><td>HNSW</td><td>Hybrid keyword + vector search built in</td></tr>
+      </tbody>
+    </table></div>
+    <div class="grid cols-2">
+      <div class="card" style="border-color:var(--warm);"><h3 style="color:var(--warm)">The hard part is filtering</h3><p><code>WHERE tenant = 7</code> plus nearest-neighbour. <strong>Post-filtering</strong> can return fewer than k results; <strong>pre-filtering</strong> can break HNSW's graph connectivity. Engines differ a lot here, so test with your real filters.</p></div>
+      <div class="card"><h3 class="accent">Rule of thumb</h3><p>Already on Postgres with up to a few million vectors: start with pgvector. Very large collections, heavy filtering or strict latency at high QPS: evaluate a dedicated engine.</p></div>
+    </div>
+    <div class="foot">VECTORS · LANDSCAPE / 12</div>
+  </section>
+  <!-- 13 — TIME-SERIES -->
+  <section class="slide" id="s13">
+    <div>
+      <p class="eyebrow">Time-series · storage tricks</p>
+      <h2>Append-mostly data indexed by time</h2>
+    </div>
+    <div class="grid cols-2">
+      <div class="card"><h3>Workload traits</h3><p>Writes are almost all appends at “now”; reads are recent windows and rollups; old data is rarely edited and usually expires. Model: <code>(metric, labels, timestamp, value)</code>.</p><p style="margin-top:8px;"><strong>Cardinality is the real enemy.</strong> Every unique label combination is a separate series; a label like <code>user_id</code> can multiply series until memory and index size blow up.</p></div>
+      <div class="card"><h3>Standard techniques</h3><p><strong>Time partitioning</strong> into chunks, so expiry is “drop a chunk”. <strong>Downsampling / rollups</strong> for old data (1s → 1m → 1h). <strong>Retention policies</strong> as first-class config. <strong>Specialized compression</strong>, below.</p></div>
+    </div>
+    <div class="model-box" style="white-space:pre; font-size:.78rem;"><span class="c">// delta-of-delta timestamps (the idea behind Facebook's Gorilla paper)</span>
+timestamps     : 1000  1060  1120  1180  1241
+deltas         :        60    60    60    61
+<span class="k">delta-of-delta :              0     0     1</span>   <span class="c">← regular scrapes become mostly zeros → a few bits each</span>
+
+<span class="c">// float values: XOR with the previous value; similar values share leading/trailing zero bits</span>
+v[n] <span class="k">XOR</span> v[n-1]  →  store only the meaningful middle bits</div>
+    <p class="muted" style="font-size:.85rem;">Regular intervals and slowly changing values are what make these encodings effective; noisy, irregular data compresses much worse.</p>
+    <div class="foot">TIME-SERIES / 13</div>
+  </section>
+  <!-- 14 — TSDB LANDSCAPE -->
+  <section class="slide" id="s14">
+    <div>
+      <p class="eyebrow">Time-series · landscape</p>
+      <h2>Five engines, three architectural styles</h2>
+    </div>
+    <div class="matrix-wrap"><table class="dense">
+      <thead><tr><th>System</th><th>Style</th><th>Query language</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Prometheus</td><td>Purpose-built, local TSDB, pull-based scraping</td><td>PromQL</td><td>The standard for infrastructure metrics. Single-node storage; long-term and clustered setups use remote write or companion systems.</td></tr>
+        <tr><td>VictoriaMetrics</td><td>Purpose-built, Prometheus-compatible</td><td>MetricsQL (PromQL superset)</td><td>Often used as long-term, horizontally scalable Prometheus storage.</td></tr>
+        <tr><td>InfluxDB</td><td>Purpose-built</td><td>SQL (v3), InfluxQL, Flux (v2)</td><td>Version 3 is built on Apache Arrow, DataFusion and Parquet; check which major version you run.</td></tr>
+        <tr><td>TimescaleDB</td><td>PostgreSQL extension</td><td>SQL</td><td>Hypertables auto-partitioned into time chunks, with columnar compression and the full Postgres ecosystem.</td></tr>
+        <tr><td>QuestDB</td><td>Columnar, purpose-built</td><td>SQL + time extensions</td><td>Aimed at very high ingest rates and fast time-window queries.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted" style="font-size:.85rem;">ClickHouse and Druid handle time-series well too: the line between “time-series DB” and “real-time OLAP” is blurry by design.</p>
+    <div class="foot">TIME-SERIES · LANDSCAPE / 14</div>
+  </section>
+  <!-- 15 — GRAPH AND SEARCH -->
+  <section class="slide" id="s15">
+    <div>
+      <p class="eyebrow">Also specialized</p>
+      <h2>Graph and search engines</h2>
+    </div>
+    <div class="grid cols-2">
+      <div class="card"><h3 class="accent">Graph · Neo4j, JanusGraph, Amazon Neptune</h3><p><strong>Core idea</strong>: relationships are stored as direct pointers between nodes (index-free adjacency in native graph stores), so a traversal costs roughly what it visits, not the size of the table.</p><p style="margin-top:8px;"><strong>Wins</strong>: multi-hop queries (fraud rings, recommendations, dependency graphs) that become many self-joins in SQL. <strong>Watch out</strong>: supernodes, and sharding a graph without cutting too many edges.</p></div>
+      <div class="card"><h3 class="accent">Search · Elasticsearch, OpenSearch, Solr</h3><p><strong>Core idea</strong>: an <strong>inverted index</strong> maps each term to the documents containing it; ranking uses relevance scoring such as BM25. Segments are immutable and merged in the background, an LSM-like pattern.</p><p style="margin-top:8px;"><strong>Wins</strong>: full-text relevance, faceting, fuzzy matching, log search. <strong>Watch out</strong>: near-real-time visibility, and it is a poor system of record.</p></div>
+    </div>
+    <p class="muted" style="font-size:.9rem; text-align:center;">Pattern: each family reorganizes data around the access path it serves, and pays for it in general-purpose behaviour.</p>
+    <div class="foot">GRAPH & SEARCH / 15</div>
+  </section>
+  <!-- 16 — DECISION MATRIX -->
+  <section class="slide" id="s16">
+    <div>
+      <p class="eyebrow">One-page cheat sheet</p>
+      <h2>From workload to first candidate</h2>
+    </div>
+    <div class="seg" id="flt" role="group" aria-label="Filter">
+      <button data-f="all" aria-pressed="true">All</button><button data-f="olap" aria-pressed="false">Analytics</button><button data-f="vec" aria-pressed="false">Vector</button><button data-f="ts" aria-pressed="false">Time-series</button><button data-f="oth" aria-pressed="false">Graph / search</button>
+    </div>
+    <div class="matrix-wrap"><table class="dense" id="mx">
+      <thead><tr><th>Workload</th><th>First candidates</th><th>Why</th><th>Watch out for</th></tr></thead>
+      <tbody>
+        <tr data-c="olap"><td>Ad hoc analytics on TBs</td><td>BigQuery, Snowflake, Redshift</td><td>Elastic compute over columnar data in object storage</td><td>Cost per byte scanned or per compute-second</td></tr>
+        <tr data-c="olap"><td>One copy of data, many engines</td><td>Lakehouse: Iceberg or Delta Lake + Spark, Trino, Databricks</td><td>Open table format in your bucket, ACID and time travel</td><td>Catalog choice, small-file compaction</td></tr>
+        <tr data-c="olap"><td>Real-time, user-facing dashboards</td><td>ClickHouse, Druid, Pinot</td><td>Fast ingest plus sub-second aggregates at high QPS</td><td>Joins and updates more limited than a warehouse</td></tr>
+        <tr data-c="olap"><td>Local / embedded analytics</td><td>DuckDB</td><td>In-process columnar engine, reads Parquet directly</td><td>Single node</td></tr>
+        <tr data-c="vec"><td>Semantic search / RAG, moderate scale</td><td>pgvector (HNSW)</td><td>Vectors beside relational data, familiar ops</td><td>Index build time and RAM as it grows</td></tr>
+        <tr data-c="vec"><td>Large-scale vector search with filters</td><td>Milvus, Qdrant, Pinecone, Weaviate</td><td>Purpose-built ANN, distributed indexes, filtering</td><td>Filtered recall; keeping embeddings in sync</td></tr>
+        <tr data-c="ts"><td>Infrastructure metrics</td><td>Prometheus (+ VictoriaMetrics long-term)</td><td>Label model, PromQL, exporter ecosystem</td><td>Label cardinality</td></tr>
+        <tr data-c="ts"><td>IoT / sensor data with SQL</td><td>TimescaleDB, QuestDB, InfluxDB 3</td><td>Time chunks, compression, SQL access</td><td>Late or out-of-order data</td></tr>
+        <tr data-c="oth"><td>Multi-hop relationship queries</td><td>Neo4j, Neptune</td><td>Traversal-first storage and query languages</td><td>Supernodes, sharding</td></tr>
+        <tr data-c="oth"><td>Full-text relevance search</td><td>Elasticsearch, OpenSearch</td><td>Inverted index, BM25, faceting</td><td>Not a system of record</td></tr>
+      </tbody>
+    </table></div>
+    <div class="foot">CHEAT SHEET / 16</div>
+  </section>
+  <!-- 17 — SUMMARY -->
+  <section class="slide" id="s17" style="justify-content:center;">
+    <div>
+      <p class="eyebrow">Summary · end of Part 2</p>
+      <h1>What to <span class="accent">remember</span>.</h1>
+      <div class="grid cols-4" style="margin-top:28px;">
+        <div class="card"><h3>Layout follows access</h3><p>Scans over few columns favour columnar storage, compression, vectorization and data skipping.</p></div>
+        <div class="card"><h3>Lakehouse = warehouse</h3><p>Same architecture: columnar files, metadata, elastic compute. Only the format and ownership are open.</p></div>
+        <div class="card"><h3>Vectors need ANN</h3><p>HNSW is a skip list of graphs; <code>efSearch</code> trades recall for latency.</p></div>
+        <div class="card"><h3>Specialize deliberately</h3><p>Start from the dominant query, then check what the specialized engine makes you give up.</p></div>
+      </div>
+      <p class="lead" style="margin-top:28px;">Thank you — questions?</p>
+    </div>
+    <div class="foot">END · PART 2 / 17</div>
+  </section>
+
+</main>
+
+<div id="hud">
+  <button class="hud-btn" id="prev" aria-label="Previous slide" title="Previous (↑)">↑</button>
+  <span id="counter">1 / 17</span>
+  <button class="hud-btn" id="next" aria-label="Next slide" title="Next (↓ / Space)">↓</button>
+</div>
+
+<script src="../../shared/sitenav.js"></script>
+<script>
+(function(){
+  "use strict";
+  /* ---------- deck navigation ---------- */
+  var deck = document.getElementById("deck");
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var counter = document.getElementById("counter");
+  var progress = document.getElementById("progress");
+  var total = slides.length;
+  var current = 0;
+
+  function setCurrent(i){
+    current = Math.max(0, Math.min(total-1, i));
+    counter.textContent = (current+1) + " / " + total;
+    progress.style.width = ((current+1)/total*100) + "%";
+  }
+  function go(i){
+    i = Math.max(0, Math.min(total-1, i));
+    slides[i].scrollIntoView({behavior: "smooth", block: "start"});
+    setCurrent(i);
+  }
+
+  if ("IntersectionObserver" in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting && e.intersectionRatio >= 0.5){
+          setCurrent(slides.indexOf(e.target));
+        }
+      });
+    }, {root: deck, threshold: [0.5]});
+    slides.forEach(function(s){ io.observe(s); });
+  }
+
+  // When a slide is taller than the viewport, step through its overflow
+  // before advancing, so nothing (e.g. the last matrix rows) gets skipped.
+  function vh(){ return deck.clientHeight; }
+  function nextStep(){
+    var r = slides[current].getBoundingClientRect();
+    if (r.bottom > vh() + 8){
+      deck.scrollBy({top: Math.min(r.bottom - vh(), 0.85 * vh()), behavior: "smooth"});
+    } else { go(current + 1); }
+  }
+  function prevStep(){
+    var r = slides[current].getBoundingClientRect();
+    if (r.top < -8){
+      deck.scrollBy({top: -Math.min(-r.top, 0.85 * vh()), behavior: "smooth"});
+    } else { go(current - 1); }
+  }
+
+  document.getElementById("next").addEventListener("click", nextStep);
+  document.getElementById("prev").addEventListener("click", prevStep);
+
+  document.addEventListener("keydown", function(e){
+    var t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+    if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === " "){ e.preventDefault(); nextStep(); }
+    else if (e.key === "ArrowUp" || e.key === "PageUp"){ e.preventDefault(); prevStep(); }
+    else if (e.key === "Home"){ e.preventDefault(); go(0); }
+    else if (e.key === "End"){ e.preventDefault(); go(total-1); }
+  });
+
+  /* ---------- theme toggle ---------- */
+  var tg = document.getElementById("theme-toggle");
+  function prefersDark(){ return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
+  var themed = null; // null = follow system
+  tg.addEventListener("click", function(){
+    var isDark = themed ? themed === "dark" : prefersDark();
+    themed = isDark ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", themed);
+  });
+
+
+  setCurrent(0);
+})();
+</script>
+<script>
+/* ===================== row vs column widget ===================== */
+(function(){
+  "use strict";
+  var rowHost = document.getElementById("lay-row");
+  if (!rowHost) return;
+  var COLS = ["i", "u", "c", "a", "t"], ROWS = 8;
+  var Q = {
+    A: { hit: function(r){ return r === 4; },
+         note: "<b>Point lookup:</b> the row store finds the whole record in one page; the column store visits every column's page and stitches the row back together." },
+    B: { hit: function(r, c){ return c === 3; },
+         note: "<b>Single-column aggregate:</b> the column store reads one page of contiguous amounts; the row store drags every other column along." },
+    C: { hit: function(r, c){ return c === 2 || c === 3; },
+         note: "<b>Two-column aggregate:</b> still a clear columnar win (2 of 5 pages), and the gap widens as tables get wider." }
+  };
+  var q = "A";
+  function pages(layout){
+    var out = [], p, r, c, cells;
+    if (layout === "row"){
+      for (p = 0; p < ROWS / 2; p++){ cells = []; for (r = p * 2; r < p * 2 + 2; r++) for (c = 0; c < COLS.length; c++) cells.push([r, c]); out.push(cells); }
+    } else {
+      for (c = 0; c < COLS.length; c++){ cells = []; for (r = 0; r < ROWS; r++) cells.push([r, c]); out.push(cells); }
+    }
+    return out;
+  }
+  function draw(layout, hostId, outId){
+    var host = document.getElementById(hostId), ps = pages(layout), touched = 0;
+    host.innerHTML = "";
+    ps.forEach(function(cells){
+      var pg = document.createElement("div"); pg.className = "rc-page";
+      var any = false;
+      cells.forEach(function(rc){
+        var d = document.createElement("div"), hit = Q[q].hit(rc[0], rc[1]);
+        d.className = "rc-cell" + (hit ? " hit" : ""); d.textContent = COLS[rc[1]];
+        if (hit) any = true; pg.appendChild(d);
+      });
+      if (any){ pg.classList.add("touched"); touched++; }
+      host.appendChild(pg);
+    });
+    document.getElementById(outId).innerHTML = "pages read: <b>" + touched + " / " + ps.length + "</b>";
+  }
+  function render(){
+    draw("row", "lay-row", "ro-row"); draw("col", "lay-col", "ro-col");
+    document.getElementById("q-note").innerHTML = Q[q].note;
+    Array.prototype.forEach.call(document.querySelectorAll("#q-seg button"), function(b){
+      b.setAttribute("aria-pressed", b.getAttribute("data-q") === q ? "true" : "false");
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("#q-seg button"), function(b){
+    b.addEventListener("click", function(){ q = b.getAttribute("data-q"); render(); });
+  });
+  render();
+})();
+
+/* ===================== HNSW live demo ===================== */
+(function(){
+  "use strict";
+  var root = document.getElementById("hn");
+  if (!root) return;
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // deterministic RNG so the graph is the same for every viewer
+  function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  var R = mulberry32(20261002);
+
+  var N = 150, M = 5, M0 = 2 * M, EFC = 24, MAXL = 2, K = 3, mL = 1 / Math.log(M);
+  var P = [], lev = [], links = [[], [], []];
+  var i, l;
+  for (i = 0; i < N; i++){
+    P.push({ x: 0.05 + 0.9 * R(), y: 0.05 + 0.9 * R() });
+    lev.push(Math.min(MAXL, Math.floor(-Math.log(1 - R()) * mL)));
+  }
+  function d2(a, b){ var dx = a.x - b.x, dy = a.y - b.y; return dx * dx + dy * dy; }
+  function byDist(a, b){ return a[0] - b[0]; }
+
+  // standard HNSW layer search (beam of size ef); stats records every distance computation
+  function searchLayer(q, eps, ef, layer, stats){
+    var vis = {}, cand = [], W = [];
+    eps.forEach(function(e){
+      vis[e] = 1; var de = d2(q, P[e]);
+      cand.push([de, e]); W.push([de, e]);
+      if (stats){ stats.comps++; stats.order.push({ id: e, parent: -1 }); }
+    });
+    cand.sort(byDist); W.sort(byDist);
+    while (cand.length){
+      var c = cand.shift();
+      if (c[0] > W[W.length - 1][0]) break;
+      (links[layer][c[1]] || []).forEach(function(e){
+        if (vis[e]) return; vis[e] = 1;
+        var de = d2(q, P[e]);
+        if (stats){ stats.comps++; stats.order.push({ id: e, parent: c[1] }); }
+        if (W.length < ef || de < W[W.length - 1][0]){
+          cand.push([de, e]); W.push([de, e]); cand.sort(byDist); W.sort(byDist);
+          if (W.length > ef) W.pop();
+        }
+      });
+    }
+    return W.map(function(w){ return w[1]; });
+  }
+
+  // build the index by inserting points one at a time
+  var ep = -1, top = -1;
+  for (i = 0; i < N; i++){
+    for (l = 0; l <= lev[i]; l++) links[l][i] = [];
+    if (ep < 0){ ep = i; top = lev[i]; continue; }
+    var cur = [ep];
+    for (l = top; l > lev[i]; l--) cur = searchLayer(P[i], cur, 1, l).slice(0, 1);
+    for (l = Math.min(top, lev[i]); l >= 0; l--){
+      var W = searchLayer(P[i], cur, EFC, l);
+      var nb = W.slice(0, M), mx = l === 0 ? M0 : M;
+      links[l][i] = nb.slice();
+      for (var j = 0; j < nb.length; j++){
+        var n = nb[j], L = links[l][n];
+        L.push(i);
+        if (L.length > mx){
+          L.sort(function(a, b){ return d2(P[n], P[a]) - d2(P[n], P[b]); });
+          L.length = mx;
+        }
+      }
+      cur = W;
+    }
+    if (lev[i] > top){ ep = i; top = lev[i]; }
+  }
+
+  // run one query and record every step for the animation
+  function trace(q, ef){
+    var ops = [], comps = 1, cur = ep, hops = [0, 0, 0];
+    for (var layer = top; layer > 0; layer--){
+      var moved = true;
+      while (moved){
+        moved = false;
+        var best = cur, bd = d2(q, P[cur]);
+        links[layer][cur].forEach(function(n){ comps++; var dn = d2(q, P[n]); if (dn < bd){ bd = dn; best = n; } });
+        if (best !== cur){ ops.push({ t: "hop", l: layer, a: cur, b: best }); hops[layer]++; cur = best; moved = true; }
+      }
+      ops.push({ t: "drop", l: layer - 1, n: cur });
+    }
+    var st = { comps: 0, order: [] };
+    var W = searchLayer(q, [cur], Math.max(ef, K), 0, st);
+    comps += st.comps - 1;                       // the entry node's distance was already counted
+    var par = {};
+    st.order.forEach(function(o){ ops.push({ t: "visit", id: o.id }); if (!(o.id in par)) par[o.id] = o.parent; });
+    var found = W.slice(0, K);
+    var path = [], x = found[0], guard = 0;
+    while (par[x] !== undefined && par[x] !== -1 && guard++ < N){ path.push([par[x], x]); x = par[x]; }
+    path.reverse();
+    var truth = P.map(function(p, k){ return [d2(q, p), k]; }).sort(byDist).slice(0, K).map(function(a){ return a[1]; });
+    var rec = found.filter(function(f){ return truth.indexOf(f) >= 0; }).length;
+    return { ops: ops, found: found, truth: truth, rec: rec, comps: comps, hops: hops, path: path };
+  }
+
+  // ---------- drawing
+  var svgs = [document.getElementById("hn-l0"), document.getElementById("hn-l1"), document.getElementById("hn-l2")];
+  var dyn = [];
+  function el(tag, attrs, parent){
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function X(k){ return (P[k].x * 100).toFixed(2); }
+  function Y(k){ return (P[k].y * 100).toFixed(2); }
+  svgs.forEach(function(svg, layer){
+    var defs = el("defs", {}, svg);
+    var mk = el("marker", { id: "hnm" + layer, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "4", markerHeight: "4", orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0 0 L10 5 L0 10 z", "class": "mk" }, mk);
+    var seen = {};
+    for (var a = 0; a < N; a++){
+      if (!links[layer][a]) continue;
+      links[layer][a].forEach(function(b){
+        var key = a < b ? a + "-" + b : b + "-" + a;
+        if (seen[key]) return; seen[key] = 1;
+        el("line", { x1: X(a), y1: Y(a), x2: X(b), y2: Y(b), "class": "e" }, svg);
+      });
+    }
+    for (var k = 0; k < N; k++){
+      if (lev[k] >= layer) el("circle", { cx: X(k), cy: Y(k), r: layer === 0 ? 0.9 : 1.5, "class": "n" }, svg);
+      else el("circle", { cx: X(k), cy: Y(k), r: 0.45, "class": "gh" }, svg);
+    }
+    dyn[layer] = el("g", {}, svg);
+    var count = 0; for (k = 0; k < N; k++) if (lev[k] >= layer) count++;
+    var c = document.getElementById("hn-c" + layer);
+    if (c) c.textContent = count + " nodes";
+  });
+
+  var q = null, ef = 4, res = null, upto = 0, timer = null;
+  var efIn = document.getElementById("hn-ef"), efV = document.getElementById("hn-efv"), log = document.getElementById("hn-log");
+
+  function render(){
+    dyn.forEach(function(g){ while (g.firstChild) g.removeChild(g.firstChild); });
+    if (!q || !res) return;
+    // entry point on the top layer
+    el("circle", { cx: X(ep), cy: Y(ep), r: 2.8, "class": "ent" }, dyn[top]);
+    el("text", { x: (P[ep].x * 100 + 3.2).toFixed(2), y: (P[ep].y * 100 - 2.5).toFixed(2), "class": "t" }, dyn[top]).textContent = "entry";
+    var layerNow = top;
+    for (var s = 0; s < upto && s < res.ops.length; s++){
+      var o = res.ops[s];
+      if (o.t === "hop"){
+        el("line", { x1: X(o.a), y1: Y(o.a), x2: X(o.b), y2: Y(o.b), "class": "hop", "marker-end": "url(#hnm" + o.l + ")" }, dyn[o.l]);
+        el("circle", { cx: X(o.b), cy: Y(o.b), r: 1.5, "class": "vis" }, dyn[o.l]);
+        layerNow = o.l;
+      } else if (o.t === "drop"){
+        el("circle", { cx: X(o.n), cy: Y(o.n), r: 2.8, "class": "ent" }, dyn[o.l]);
+        layerNow = o.l;
+      } else {
+        el("circle", { cx: X(o.id), cy: Y(o.id), r: 1.1, "class": "vis" }, dyn[0]);
+        layerNow = 0;
+      }
+    }
+    var done = upto >= res.ops.length;
+    if (done){
+      res.path.forEach(function(pr){ el("line", { x1: X(pr[0]), y1: Y(pr[0]), x2: X(pr[1]), y2: Y(pr[1]), "class": "hop", "marker-end": "url(#hnm0)" }, dyn[0]); });
+      res.truth.forEach(function(k){ el("circle", { cx: X(k), cy: Y(k), r: 3.6, "class": "tru" }, dyn[0]); });
+      res.found.forEach(function(k){ el("circle", { cx: X(k), cy: Y(k), r: 2.6, "class": "res" }, dyn[0]); });
+    }
+    // query marker on every layer
+    dyn.forEach(function(g){
+      var qx = q.x * 100, qy = q.y * 100;
+      el("line", { x1: qx - 2.2, y1: qy, x2: qx + 2.2, y2: qy, "class": "q" }, g);
+      el("line", { x1: qx, y1: qy - 2.2, x2: qx, y2: qy + 2.2, "class": "q" }, g);
+    });
+    if (!done){
+      log.innerHTML = "Searching… <b>layer " + layerNow + "</b>" + (layerNow > 0 ? ": greedy hops toward the query" : ": beam search, keeping the " + Math.max(ef, K) + " best candidates");
+    } else {
+      var miss = res.rec < K;
+      log.innerHTML =
+        "<b>Upper layers:</b> " + res.hops[2] + " hop(s) on L2, " + res.hops[1] + " on L1, then drop to L0. " +
+        "<b>Layer 0:</b> beam search with efSearch = " + ef + ".<br>" +
+        "<b>" + res.comps + "</b> distance computations vs <b>" + N + "</b> for brute force · <b>recall@3 = " + res.rec + "/3</b>" +
+        (miss ? " — a true neighbour was missed; raise efSearch." : ".");
+    }
+  }
+  function play(animate){
+    if (timer){ clearTimeout(timer); timer = null; }
+    res = trace(q, ef);
+    if (!animate || reduce){ upto = res.ops.length; render(); return; }
+    upto = 0; render();
+    (function step(){
+      upto++; render();
+      if (upto < res.ops.length){
+        timer = setTimeout(step, res.ops[upto - 1].t === "visit" ? 45 : 420);
+      }
+    })();
+  }
+  function randomQuery(){ q = { x: 0.08 + 0.84 * Math.random(), y: 0.08 + 0.84 * Math.random() }; play(true); }
+
+  svgs.forEach(function(svg){
+    svg.addEventListener("click", function(ev){
+      var r = svg.getBoundingClientRect();
+      var x = (ev.clientX - r.left) / r.width, y = (ev.clientY - r.top) / r.height;
+      q = { x: Math.max(0.02, Math.min(0.98, x)), y: Math.max(0.02, Math.min(0.98, y)) };
+      play(true);
+    });
+  });
+  document.getElementById("hn-new").addEventListener("click", randomQuery);
+  document.getElementById("hn-replay").addEventListener("click", function(){ if (q) play(true); });
+  efIn.addEventListener("input", function(){ ef = +efIn.value; efV.textContent = ef; if (q) play(false); });
+
+  // start with a fixed query so the first view is the same for everyone
+  q = { x: 0.71, y: 0.33 };
+  play(false);
+
+  // test hook (harmless): lets automated checks inspect the built graph
+  root.__hnsw = { N: N, top: top, levels: lev, trace: trace, links: links };
+})();
+
+/* ===================== decision-matrix filter ===================== */
+(function(){
+  "use strict";
+  var seg = document.getElementById("flt");
+  if (!seg) return;
+  var btns = Array.prototype.slice.call(seg.querySelectorAll("button"));
+  btns.forEach(function(b){
+    b.addEventListener("click", function(){
+      var f = b.getAttribute("data-f");
+      btns.forEach(function(x){ x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+      Array.prototype.forEach.call(document.querySelectorAll("#mx tbody tr"), function(tr){
+        tr.style.display = (f === "all" || tr.getAttribute("data-c") === f) ? "" : "none";
+      });
+    });
+  });
+})();
+
+</script>
+</body>
+</html>
