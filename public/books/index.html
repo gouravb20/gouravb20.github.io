@@ -271,7 +271,7 @@
       </a>
     </div>
 
-    <h2 class="section-title">Read the books &middot; <span data-count="books" data-src=".">11</span> PDFs</h2>
+    <h2 class="section-title">Read the books &middot; <span data-count="books" data-src=".">18</span> PDFs</h2>
     <div id="grid"></div>
 
     <footer>
@@ -325,10 +325,32 @@
           file: "interview/system-design-interview-volume-2.pdf",
           notes: "../high-level-design/notes/core-concepts/index.html", notesLabel: "Core concepts",
           blurb: "More worked designs: proximity service, nearby friends, Google Maps, distributed message queue, metrics monitoring, ad click aggregation, hotel reservation, email, S3-like storage, gaming leaderboard, payments and a digital wallet." },
+        { id: "grokking", mono: "GK", accent: "#fbbf24", title: "Grokking the System Design Interview", by: "Design Gurus",
+          file: "interview/grokking-the-system-design-interview.pdf",
+          notes: "../high-level-design/notes/problem-breakdowns/index.html", notesLabel: "Problem breakdowns",
+          blurb: "A seven-step interview method, then fifteen worked designs (TinyURL, Pastebin, Instagram, Dropbox, Messenger, Twitter, YouTube, typeahead, rate limiter, Twitter search, web crawler, news feed, Yelp, Uber, Ticketmaster) and a glossary of the basics: load balancing, caching, sharding, indexes, proxies, replication, SQL vs NoSQL, CAP, consistent hashing and real-time connections." },
+        { id: "distributed-systems", mono: "DS", accent: "#60a5fa", title: "Distributed Systems, 4th edition", by: "Maarten van Steen & Andrew S. Tanenbaum",
+          file: "distributed-systems/distributed-systems-4th-edition.pdf",
+          blurb: "The textbook on how distributed systems are built: architectures, processes, communication, coordination and clocks, naming, consistency and replication, fault tolerance and security." },
         { id: "mastering-go", group: "lld", mono: "Go", accent: "#00add8", title: "Mastering Go, 4th edition", by: "Mihalis Tsoukalos",
           file: "go/mastering-go.pdf",
           notes: "notes/mastering-go/index.html",
           blurb: "Go from the basics to production: data types, slices and maps, generics, reflection and interfaces, packages, systems programming, concurrency, web services, REST, testing, profiling, fuzzing, performance and the garbage collector." },
+        { id: "database-systems", group: "cs", mono: "DB", accent: "#34d399", title: "Fundamentals of Database Systems, 6th edition", by: "Ramez Elmasri & Shamkant B. Navathe",
+          file: "databases/fundamentals-of-database-systems-6th-edition.pdf",
+          blurb: "The classic database textbook: the relational model and SQL, ER modelling, normalization, file organisation and indexing, query processing and optimization, transactions, concurrency control and recovery." },
+        { id: "dbms-sql-notes", group: "cs", mono: "SQL", accent: "#2dd4bf", title: "DBMS & SQL Notes", by: "Revision notes",
+          file: "databases/dbms-and-sql-notes.pdf",
+          blurb: "Short revision notes on database basics: why a DBMS, ER diagrams, entity sets and relationships, cardinality, keys, normalization and SQL." },
+        { id: "os-concepts", group: "cs", mono: "OS", accent: "#c084fc", title: "Operating System Concepts, 9th edition", by: "Silberschatz, Galvin & Gagne",
+          file: "operating-systems/operating-system-concepts-9th-edition.pdf",
+          blurb: "The standard operating systems textbook: processes and threads, CPU scheduling, synchronization and deadlocks, memory and virtual memory, file systems, I/O, protection and security." },
+        { id: "os-questions", group: "cs", mono: "OSQ", accent: "#fb7185", title: "Operating System: Important Questions", by: "Interview questions",
+          file: "operating-systems/operating-system-important-questions.pdf",
+          blurb: "Interview-style questions with short answers on operating systems: OS types and functions, kernels and booting, processes and threads, CPU scheduling, synchronization, memory management and virtual memory (paging, page replacement, thrashing)." },
+        { id: "cn-notes", group: "cs", mono: "CN", accent: "#22d3ee", title: "Computer Networks Notes", by: "Revision notes (scanned)",
+          file: "networking/computer-networks-notes.pdf",
+          blurb: "A compact set of scanned revision notes on computer networks, 33 pages." },
         { id: "architecture-hard-parts", group: "more", mono: "SA", accent: "#e879f9", title: "Software Architecture: The Hard Parts", by: "Ford, Richards, Sadalage & Dehghani",
           file: "architecture/Software Architecture The Hard Parts - Neal Ford, Mark Richards, Pramod Sadalage, Zhamak Dehghani.pdf",
           notes: "notes/architecture-hard-parts/index.html",
@@ -343,6 +365,7 @@
       const GROUPS = [
         { key: "hld", title: "High-level design" },
         { key: "lld", title: "Low-level design" },
+        { key: "cs", title: "CS fundamentals" },
         { key: "more", title: "Architecture & leadership" }
       ];
       const $ = id => document.getElementById(id);
