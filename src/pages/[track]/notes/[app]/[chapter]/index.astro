@@ -44,7 +44,8 @@ const solutionHtml = article(ch.solution, "solution", "The solution");
 const levelsHtml = article(ch.levels, "levels", "By level");
 const hasLab = (sections: { blocks: { type: string }[] }[] = []) => sections.some(s => s.blocks.some(b => b.type === "lab"));
 const embeddedLabs = hasLab(ch.main) || hasLab(deep?.sections) || hasLab(ch.problem) || hasLab(ch.solution) || hasLab(ch.levels);
-const firstTab = isProblem ? "problem" : ch.main ? "main" : deep ? "learn" : "concepts";
+// Chapters with a Main tab open on it; the rest (the books) open on Core Concepts, with the Deep Dive after it.
+const firstTab = isProblem ? "problem" : ch.main ? "main" : "concepts";
 const tabClass = (tab: string, extra = "") => ["tab", extra, tab === firstTab && "active"].filter(Boolean).join(" ");
 
 const refs = [...(ch.source ? [ch.source] : []), ...(ch.references ?? [])];
@@ -109,8 +110,9 @@ const structuredData = [
   ) : (
     <nav class="tabs" aria-label="Chapter sections" data-first-tab={firstTab}>
       {ch.main && <a class={tabClass("main")} href="#main" data-tab="main">Main</a>}
+      {!ch.main && <a class={tabClass("concepts")} href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>}
       {deep && <a class={tabClass("learn", "learn-tab")} href="#learn" data-tab="learn">Deep Dive <span class="tab-count" data-tab-count="learn">0/{deep.sections.length}</span></a>}
-      <a class={tabClass("concepts")} href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>
+      {ch.main && <a class={tabClass("concepts")} href="#concepts" data-tab="concepts">Core Concepts <span class="tab-count" data-tab-count="concepts">0/{ch.concepts.length}</span></a>}
       <a class="tab labs-tab" href="#labs" data-tab="labs">&#9654; Interactive Labs <span class="tab-count">{ch.labs.length}</span></a>
       <a class="tab" href="#interview" data-tab="interview">Interview Q&amp;A <span class="tab-count" data-tab-count="interview">0/{ch.interview.length}</span></a>
       <a class="tab" href="#cheatsheet" data-tab="cheatsheet">Cheatsheet <span class="tab-count">{ch.cheatsheet.length}</span></a>

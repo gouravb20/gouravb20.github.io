@@ -2,7 +2,7 @@
 
 Interactive system design study notes in four sections, published at [gouravb20.github.io/learn](https://gouravb20.github.io/learn/). This repository is [gouravb20/gouravb20.github.io](https://github.com/gouravb20/gouravb20.github.io). It also publishes the portfolio at the domain root from [`home/`](home/) (homepage, résumé, and `robots.txt`). A hamburger menu at the top left of every hub page opens a panel with all four:
 
-- [`high-level-design/`](public/high-level-design/index.html): chapter-wise notes for the system design core concepts, the advanced topics and worked problem breakdowns.
+- [`high-level-design/`](public/high-level-design/index.html): chapter-wise notes for the system design core concepts, the recurring patterns, the advanced topics and worked problem breakdowns.
 - [`low-level-design/`](public/low-level-design/index.html): notes for the low-level design interview (delivery framework, design principles, OOP, design patterns) and concurrency, with Java examples.
 - [`books/`](public/books/index.html): chapter-wise notes for the books behind modern data, AI and Go programs, plus a library that opens every source PDF in the browser.
 - [`slides/`](public/slides/index.html): slide decks and visual guides.
@@ -14,6 +14,7 @@ The site is built with [Astro](https://astro.build) as plain static HTML. The hu
 | Book | Notes | Chapters | Concepts | Labs | Q&A |
 |---|---|---|---|---|---|
 | System Design Core Concepts (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/core-concepts/networking-essentials)) | [`notes/core-concepts`](public/high-level-design/notes/core-concepts/) | 18 | 228 | 31 | 116 |
+| System Design Patterns: real-time updates, contention, multi-step processes, scaling reads and writes (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/patterns/realtime-updates)) | [`notes/patterns`](public/high-level-design/notes/patterns/) | 5 | 88 | 19 | 60 |
 | System Design Advanced Topics (based on [Hello Interview](https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search) and [Arpit Bhayani](https://arpitbhayani.me/blogs/morris-counter/)) | [`notes/advanced-topics`](public/high-level-design/notes/advanced-topics/) | 10 | 125 | 20 | 54 |
 | System Design Problem Breakdowns: ordered by difficulty, Flash Sale (medium), Uber and YouTube Top K (hard) (inspired by [Hello Interview](https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k)) | [`notes/problem-breakdowns`](public/high-level-design/notes/problem-breakdowns/) | 3 | 54 | 15 | 52 |
 
@@ -90,11 +91,12 @@ public/                        served as-is under /learn/
     labkit.js                  helpers for labs (controls, sliders, SVG charts, formatting)
     notes.d.ts                 types for DATA and DEMOS
   high-level-design/
-    index.html                 hub page linking core concepts, advanced topics and problem breakdowns
+    index.html                 hub page linking core concepts, patterns, advanced topics and problem breakdowns
     notes/<app>/
       index.html               single-page apps only: page markup and script tags
       data.js, data-part2.js   the app's content (core-concepts also has data-part3.js)
       demos.js, demos-part2.js the app's labs (core-concepts also has demos-part3.js)
+    notes/patterns/            one pattern per file: chapters/<id>.js, main/<id>.js, deep/<id>.js, demos-part1..5.js
   low-level-design/
     index.html                 hub page linking LLD in a hurry and concurrency
     notes/<app>/               same layout as above

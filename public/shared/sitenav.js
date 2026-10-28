@@ -20,6 +20,7 @@
     slides: svg(`<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/>`),
     concepts: svg(`<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>`),
     advanced: svg(`<path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/><path d="m19 15 .7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/>`),
+    patterns: svg(`<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>`),
     problems: svg(`<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8" fill="currentColor"/>`),
     book: svg(`<path d="M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3z"/><path d="M21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z"/>`),
     pdf: svg(`<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/>`),
@@ -36,6 +37,7 @@
     { group: "Learn" },
     { id: "hld", path: "high-level-design/", icon: "hld", title: "High-Level Design", kids: [
       { path: `${HLD}core-concepts/`, icon: "concepts", title: "Core Concepts" },
+      { path: `${HLD}patterns/`, icon: "patterns", title: "Patterns" },
       { path: `${HLD}advanced-topics/`, icon: "advanced", title: "Advanced Topics" },
       { path: `${HLD}problem-breakdowns/`, icon: "problems", title: "Problem Breakdowns" }
     ] },
