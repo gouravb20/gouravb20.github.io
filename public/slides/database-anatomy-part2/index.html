@@ -313,6 +313,9 @@
   @media (prefers-reduced-motion: reduce) { .bt-tab { transition: none; } }
   /* footer label is absolutely positioned; don't let the generic .slide > * width:100% push it past the edge */
   .slide > .foot { width: auto; max-width: none; margin-inline: 0; }
+  /* in-deck links */
+  .go { font-family: var(--mono); font-size: .8rem; color: var(--accent); text-decoration: none; }
+  a.go:hover { text-decoration: underline; }
 </style>
 
 <style>
@@ -399,13 +402,13 @@
   <!-- 1 — TITLE -->
   <section class="slide" id="s1" style="justify-content:center;">
     <div>
-      <p class="eyebrow">Database Anatomy · Part 2 of 2</p>
+      <p class="eyebrow">Database Anatomy · Part 2 of 3</p>
       <h1>The <span class="accent">analytical</span> &amp;<br><span class="accent">specialized</span> side.</h1>
       <p class="lead" style="margin-top:18px;">The workloads that flip the OLTP defaults: scanning billions of rows, searching by meaning, and storing data indexed by time.</p>
       <div class="tag-row" style="margin-top:22px;">
         <span class="pill">OLAP &amp; columnar</span><span class="pill">warehouse &amp; lakehouse</span><span class="pill">vectors &amp; HNSW</span><span class="pill">time-series</span><span class="pill">graph &amp; search</span>
       </div>
-      <p class="muted" style="margin-top:26px; font-size:.85rem;">Navigate with <span class="kbd">↓</span> <span class="kbd">↑</span> <span class="kbd">Space</span> · or the arrows, bottom-right.</p>
+      <p class="muted" style="margin-top:26px; font-size:.85rem;">Navigate with <span class="kbd">↓</span> <span class="kbd">↑</span> <span class="kbd">Space</span> or the arrows, bottom-right. Press <span class="kbd">G</span> or tap the slide counter to see every slide and jump to one.</p>
     </div>
     <div class="foot">DATABASES / 01</div>
   </section>
@@ -732,6 +735,7 @@ v[n] <span class="k">XOR</span> v[n-1]  →  store only the meaningful middle bi
         <div class="card"><h3>Specialize deliberately</h3><p>Start from the dominant query, then check what the specialized engine makes you give up.</p></div>
       </div>
       <p class="lead" style="margin-top:28px;">Thank you — questions?</p>
+      <p style="margin-top:14px;"><a class="go" href="../database-guide/index.html">← Part 1: how databases are classified</a> &nbsp;·&nbsp; <a class="go" href="../distributed-databases/index.html">Part 3: distributed OLTP databases →</a></p>
     </div>
     <div class="foot">END · PART 2 / 17</div>
   </section>
@@ -740,7 +744,7 @@ v[n] <span class="k">XOR</span> v[n-1]  →  store only the meaningful middle bi
 
 <div id="hud">
   <button class="hud-btn" id="prev" aria-label="Previous slide" title="Previous (↑)">↑</button>
-  <span id="counter">1 / 17</span>
+  <button type="button" id="counter" title="All slides (G)">1 / 17</button>
   <button class="hud-btn" id="next" aria-label="Next slide" title="Next (↓ / Space)">↓</button>
 </div>
 
@@ -767,16 +771,26 @@ v[n] <span class="k">XOR</span> v[n-1]  →  store only the meaningful middle bi
     setCurrent(i);
   }
 
-  if ("IntersectionObserver" in window){
-    var io = new IntersectionObserver(function(entries){
-      entries.forEach(function(e){
-        if (e.isIntersecting && e.intersectionRatio >= 0.5){
-          setCurrent(slides.indexOf(e.target));
-        }
-      });
-    }, {root: deck, threshold: [0.5]});
-    slides.forEach(function(s){ io.observe(s); });
+  // The counter follows the slide that fills most of the screen. Measuring the
+  // screen (not the slide) also works for slides taller than two screens, which
+  // are common on phones. Only a change updates the counter, so go() can show its
+  // target at once without the scroll animation walking it back.
+  var shown = 0, ticking = false;
+  function syncCounter(){
+    var top = deck.getBoundingClientRect().top, h = deck.clientHeight, best = 0, most = -1;
+    for (var k = 0; k < total; k++){
+      var r = slides[k].getBoundingClientRect();
+      var visible = Math.min(r.bottom, top + h) - Math.max(r.top, top);
+      if (visible > most){ most = visible; best = k; }
+    }
+    if (best !== shown){ shown = best; setCurrent(best); }
   }
+  deck.addEventListener("scroll", function(){
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function(){ ticking = false; syncCounter(); });
+  }, {passive: true});
+  window.addEventListener("resize", syncCounter);
 
   // When a slide is taller than the viewport, step through its overflow
   // before advancing, so nothing (e.g. the last matrix rows) gets skipped.
@@ -1105,5 +1119,6 @@ v[n] <span class="k">XOR</span> v[n-1]  →  store only the meaningful middle bi
 })();
 
 </script>
+<script src="../../shared/deck-index.js"></script>
 </body>
 </html>
