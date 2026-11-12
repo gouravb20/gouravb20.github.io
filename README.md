@@ -48,6 +48,7 @@ Paths in the table are relative to `public/books/`. The [Books page](public/book
 
 - [`slides/database-guide`](public/slides/database-guide/index.html): *A Field Guide to Databases*, a 20-slide deck on OLTP vs OLAP, data models, B-Tree vs LSM-Tree, compute/storage separation and distributed SQL.
 - [`slides/database-anatomy-part2`](public/slides/database-anatomy-part2/index.html): *Database Anatomy, Part 2: Analytics, Lakehouses & Vectors*, a 17-slide deck on columnar storage and OLAP, warehouses and lakehouses, vector search with an interactive HNSW demo, and time-series, graph and search engines.
+- [`slides/distributed-databases`](public/slides/distributed-databases/index.html): *Distributed OLTP Databases, Classified*, a 24-slide deck on single-leader, multi-leader and leaderless replication (with an interactive quorum lab), partitioning, request routing and partition metadata, consensus, transaction isolation and clocks.
 ## Features of the notes sites
 
 Every book gets the same app:
@@ -89,6 +90,7 @@ public/                        served as-is under /learn/
     app.js                     single-page app shell: routing, tabs, search, progress, export/import
     styles.css                 styles, including every book's lab visuals
     labkit.js                  helpers for labs (controls, sliders, SVG charts, formatting)
+    deck-index.js              slide decks: an "All slides" list (press G or click the counter) and #sN deep links
     notes.d.ts                 types for DATA and DEMOS
   high-level-design/
     index.html                 hub page linking core concepts, patterns, advanced topics and problem breakdowns
@@ -110,6 +112,7 @@ public/                        served as-is under /learn/
     index.html                 list of decks
     database-guide/            slide deck
     database-anatomy-part2/    slide deck
+    distributed-databases/     slide deck (uses database-guide/icons.js)
 src/
   content.config.ts            loads every Astro-rendered app's data*.js and demos*.js, validates them with Zod
   lib/notes-source.mjs         finds notes apps and runs their scripts; shared with scripts/check-site.mjs
