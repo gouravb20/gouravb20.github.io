@@ -1,0 +1,1573 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Part 3 · Transactions: ACID, Isolation &amp; Concurrency Control</title>
+<meta name="description" content="Part 3 of A Field Guide to Databases: a 20-slide deck on transactions: how much one transaction can cover, the write-ahead log and durability settings, six anomalies and the isolation levels that prevent them (with a lab), MVCC, locking and SSI, NoSQL transactions, and default vs. strongest isolation per database.">
+<link rel="canonical" href="https://gouravb20.github.io/learn/slides/database-transactions/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="System Design Notes">
+<meta property="og:title" content="Part 3 · Transactions: ACID, Isolation &amp; Concurrency Control">
+<meta property="og:description" content="Part 3 of A Field Guide to Databases: a 20-slide deck on what a commit promises: transaction scope, the write-ahead log, durability settings, anomalies and isolation levels, MVCC, locks and SSI, across PostgreSQL, MySQL, SQL Server, Oracle, SQLite, Spanner, CockroachDB, MongoDB, DynamoDB and more.">
+<meta property="og:url" content="https://gouravb20.github.io/learn/slides/database-transactions/">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* ============================================================
+     LAYOUT CONCEPT: vertical scroll-snap keynote. Each <section.slide>
+     is one full-viewport frame. Fixed progress rail + counter + arrows.
+     Mermaid + logo tiles always sit on a light panel so brand marks and
+     diagrams read in either page theme.
+     ============================================================ */
+  :root {
+    /* color — cool blueprint neutrals, indigo accent, amber highlight (light) */
+    --bg: #eef0f4;
+    --surface: #ffffff;
+    --surface-2: #f5f7fa;
+    --fg: #14171d;
+    --muted: #5a6473;
+    --faint: #666f80;
+    --accent: #2f54eb;
+    --accent-soft: #e7ecff;
+    --on-accent: #ffffff;
+    --warm: #c2410c;
+    --warm-soft: #ffece0;
+    --good: #237a35;
+    --border: #dfe3ea;
+    --border-strong: #c6ccd6;
+    --shadow: 0 1px 2px rgba(20,23,29,.06), 0 8px 24px rgba(20,23,29,.07);
+    --code-bg: #0f1420;
+    --code-fg: #e6e9f2;
+    /* type */
+    --display: "Sora", "Segoe UI", system-ui, sans-serif;
+    --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b0e14;
+      --surface: #141923;
+      --surface-2: #1b212d;
+      --fg: #e7eaf1;
+      --muted: #9aa4b4;
+      --faint: #8a93a5;
+      --accent: #7f9bff;
+      --accent-soft: #1d2640;
+      --on-accent: #0b0e14;
+      --warm: #ff9e5e;
+      --warm-soft: #3a2415;
+      --good: #69db7c;
+      --border: #242b38;
+      --border-strong: #333c4d;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.45);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e14;
+    --surface: #141923;
+    --surface-2: #1b212d;
+    --fg: #e7eaf1;
+    --muted: #9aa4b4;
+    --faint: #8a93a5;
+    --accent: #7f9bff;
+    --accent-soft: #1d2640;
+    --on-accent: #0b0e14;
+    --warm: #ff9e5e;
+    --warm-soft: #3a2415;
+    --good: #69db7c;
+    --border: #242b38;
+    --border-strong: #333c4d;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.45);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- deck scroller ---------- */
+  #deck {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-snap-type: y proximity;
+    scroll-behavior: smooth;
+    scroll-padding-top: 0;
+  }
+  @media (prefers-reduced-motion: reduce) { #deck { scroll-behavior: auto; } }
+  /* --- removed stray placeholder face --- */
+
+  .slide {
+    min-height: 100dvh;
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 22px;
+    padding: clamp(28px, 5vw, 72px);
+    padding-block: clamp(64px, 8vh, 96px);
+    position: relative;
+    border-bottom: 1px solid var(--border);
+  }
+  .slide > * { width: 100%; max-width: 1120px; margin-inline: auto; }
+
+  /* ---------- typography ---------- */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  h1 { font-family: var(--display); font-weight: 700; line-height: 1.02;
+       font-size: clamp(2.3rem, 6.5vw, 4.6rem); letter-spacing: -.02em;
+       margin: 0; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 650; line-height: 1.05;
+       font-size: clamp(1.7rem, 3.8vw, 2.8rem); letter-spacing: -.015em;
+       margin: 0; text-wrap: balance; }
+  h3 { font-family: var(--display); font-weight: 600; font-size: 1.05rem; margin: 0; letter-spacing: -.01em; }
+  p { margin: 0; }
+  .lead { font-size: clamp(1.05rem, 1.7vw, 1.35rem); color: var(--muted); max-width: 46ch; }
+  .lead, .ask { text-wrap: pretty; }
+  .muted { color: var(--muted); }
+  strong { font-weight: 650; }
+  code, .mono { font-family: var(--mono); }
+  mark { background: var(--warm-soft); color: var(--warm); padding: 0 .25em; border-radius: 3px; font-weight: 600; }
+  .accent { color: var(--accent); }
+
+  /* ---------- fixed chrome ---------- */
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--warm));
+    z-index: 50; transition: width .25s ease; }
+  #hud { position: fixed; z-index: 50; right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    display: flex; align-items: center; gap: 8px; }
+  .hud-btn, #theme-toggle, #home-link {
+    width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border-strong);
+    background: var(--surface); color: var(--fg); cursor: pointer; font-size: 16px;
+    display: grid; place-items: center; box-shadow: var(--shadow); font-family: var(--body);
+  }
+  .hud-btn:hover, #theme-toggle:hover, #home-link:hover { border-color: var(--accent); color: var(--accent); }
+  #home-link { position: fixed; top: calc(14px + env(safe-area-inset-top,0px)); right: 62px; z-index: 50; text-decoration: none; font-size: 19px; }
+  #home-link .site-mark {
+    width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center;
+    background: #dc2626; color: #fff; font-weight: 800; font-size: 14px; line-height: 1;
+  }
+  #home-link:hover .site-mark { color: #fff; }
+  #counter { font-family: var(--mono); font-size: .8rem; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0 10px; height: 38px; display: grid; place-items: center; min-width: 58px; box-shadow: var(--shadow);}
+  #theme-toggle { position: fixed; top: calc(14px + env(safe-area-inset-top,0px)); right: 16px; z-index: 50; }
+  button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .kbd { font-family: var(--mono); font-size: .7rem; border: 1px solid var(--border-strong);
+    border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--muted); background: var(--surface-2); }
+
+  /* ---------- cards / grids ---------- */
+  .grid { display: grid; gap: 16px; }
+  .cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .cols-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 860px){ .cols-3, .cols-4 { grid-template-columns: repeat(2,1fr);} }
+  @media (max-width: 560px){ .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr;} }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px; box-shadow: var(--shadow); min-width: 0; }
+  .card h3 { margin-bottom: 6px; }
+  .card p { font-size: .92rem; color: var(--muted); }
+  .card .num { font-family: var(--mono); font-size: .72rem; color: var(--faint); letter-spacing: .1em; }
+  .card.axis { display: flex; flex-direction: column; gap: 4px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono);
+    font-size: .72rem; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border-strong);
+    color: var(--muted); background: var(--surface-2); white-space: nowrap; }
+  .pill.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  .pill.warm { color: var(--warm); border-color: var(--warm); background: var(--warm-soft); }
+  .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+  ul.ticks { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 9px; }
+  ul.ticks li { position: relative; padding-left: 22px; color: var(--muted); font-size: .96rem; }
+  ul.ticks li::before { content: "▸"; position: absolute; left: 0; color: var(--accent); font-size: .85em; top: 2px; }
+  ul.ticks li strong { color: var(--fg); }
+
+  /* ---------- db logo chips ---------- */
+  .db-row { display: flex; flex-wrap: wrap; gap: 12px; }
+  .db { display: flex; align-items: center; gap: 11px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px 10px 10px; box-shadow: var(--shadow); }
+  .db-lg { padding: 14px 18px 14px 12px; }
+  .logo-tile { width: 38px; height: 38px; border-radius: 9px; background: #fff;
+    border: 1px solid #e7e9ef; display: grid; place-items: center; flex: none; overflow: hidden; }
+  .db-lg .logo-tile { width: 48px; height: 48px; }
+  .logo-tile svg { width: 64%; height: 64%; display: block; }
+  .logo-tile .mono-mark { font-family: var(--mono); font-weight: 700; font-size: .8rem; color: var(--brand, #333); }
+  .db-name { font-family: var(--display); font-weight: 600; font-size: 1rem; line-height: 1.1; }
+  .db-sub { display: block; font-family: var(--mono); font-size: .68rem; color: var(--faint); font-weight: 400; margin-top: 2px; letter-spacing: .03em; }
+
+  /* ---------- diagram / mermaid panel (always light) ---------- */
+  .panel-light { background: #f8fafc; border: 1px solid #dfe3ea; border-radius: 14px;
+    padding: 16px; box-shadow: var(--shadow); overflow-x: auto; }
+  .mermaid { display: flex; justify-content: center; min-height: 40px; }
+  .mermaid svg { max-width: 100%; height: auto; }
+  .cap { font-family: var(--mono); font-size: .72rem; color: var(--faint); text-align: center; margin-top: 8px; letter-spacing: .04em; }
+
+  /* ---------- data model mini-visuals ---------- */
+  .model-box { background: var(--code-bg); color: var(--code-fg); border-radius: 10px;
+    font-family: var(--mono); font-size: .76rem; padding: 12px; overflow-x: auto; line-height: 1.55; }
+  .model-box .k { color: #7f9bff; } .model-box .s { color: #a5d6a7; } .model-box .c { color: #ffcc80; }
+  table.mini { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: .74rem; color: var(--code-fg); }
+  table.mini th, table.mini td { border: 1px solid #2a3344; padding: 4px 8px; text-align: left; }
+  table.mini th { color: #7f9bff; background: #10151f; }
+
+  /* ---------- big comparison matrix ---------- */
+  .matrix-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+  table.matrix { border-collapse: collapse; width: 100%; font-size: .82rem; min-width: 760px; background: var(--surface); }
+  table.matrix th, table.matrix td { padding: 6px 11px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.matrix thead th { position: sticky; top: 0; background: var(--surface-2); font-family: var(--mono);
+    font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); z-index: 1; }
+  table.matrix tbody tr:hover { background: var(--surface-2); }
+  table.matrix td.name { font-weight: 600; font-family: var(--display); }
+  .m-eng-btree { color: var(--accent); } .m-eng-lsm { color: var(--warm); } .m-eng-mem { color: var(--good); }
+
+  /* ---------- LSM animation ---------- */
+  .lsm { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  .lsm-stage { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+  .lsm-flow { display: grid; grid-template-columns: 1.1fr 1.1fr 2fr; gap: 12px; align-items: stretch; }
+  @media (max-width: 760px){ .lsm-flow { grid-template-columns: 1fr; } }
+  .zone { border: 1.5px dashed var(--border-strong); border-radius: 12px; padding: 10px; min-height: 92px; position: relative; transition: border-color .3s, background .3s; }
+  .zone.ram { background: var(--accent-soft); }
+  .zone.disk { background: var(--surface-2); }
+  .zone-label { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .zone.hl { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .zone.hl-warm { border-color: var(--warm); box-shadow: 0 0 0 3px var(--warm-soft); }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { font-family: var(--mono); font-size: .72rem; padding: 3px 7px; border-radius: 6px;
+    background: var(--surface); border: 1px solid var(--border-strong); transition: all .35s ease; }
+  @media (prefers-reduced-motion: reduce){ .chip, .zone { transition: none; } }
+  .chip.k { border-color: var(--accent); color: var(--accent); }
+  .chip.tomb { border-color: var(--warm); color: var(--warm); text-decoration: line-through; }
+  .chip.new { animation: pop .4s ease; }
+  @keyframes pop { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .sst { border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px; background: var(--surface); margin-bottom: 7px; }
+  .sst-lv { font-family: var(--mono); font-size: .6rem; color: var(--faint); letter-spacing: .1em; margin-bottom: 4px; }
+  .lsm-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .lsm-controls button { font-family: var(--body); font-weight: 600; font-size: .85rem; cursor: pointer;
+    border-radius: 9px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--fg); padding: 8px 13px; }
+  .lsm-controls button:hover { border-color: var(--accent); color: var(--accent); }
+  .lsm-controls button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .lsm-controls button.warm { background: var(--warm); color: var(--on-accent); border-color: var(--warm); }
+  .lsm-log { font-family: var(--mono); font-size: .82rem; color: var(--muted); background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; min-height: 42px; }
+  .lsm-log b { color: var(--fg); }
+  .wal { font-family: var(--mono); font-size: .68rem; color: var(--good); }
+
+  .arrow { color: var(--faint); font-family: var(--mono); align-self: center; text-align: center; }
+  .foot { position: absolute; left: clamp(28px,5vw,72px); bottom: 26px; font-family: var(--mono);
+    font-size: .68rem; color: var(--faint); letter-spacing: .08em; }
+  .split { display: grid; grid-template-columns: 1.05fr 1fr; gap: 28px; align-items: center; }
+  @media (max-width: 820px){ .split { grid-template-columns: 1fr; } }
+  .note { border-left: 3px solid var(--warm); background: var(--warm-soft); color: var(--fg);
+    padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: .9rem; }
+  .note b { color: var(--warm); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: .9rem; }
+  .kv dt { font-family: var(--mono); font-size: .76rem; color: var(--faint); }
+  .kv dd { margin: 0; color: var(--muted); }
+
+  /* ---------- inline SVG diagrams (always on the light panel; no font-measurement clipping) ---------- */
+  .dgm { display: block; width: 100%; height: auto; margin: 0 auto; }
+  .dgm text { font-family: var(--mono); font-size: 12.5px; fill: #14171d; }
+  .dgm .sub { fill: #5a6473; font-size: 10.5px; }
+  .dgm .lbl { fill: #5a6473; font-size: 10.5px; }
+  .dgm .halo { paint-order: stroke; stroke: #f8fafc; stroke-width: 4px; stroke-linejoin: round; }
+  .dgm .n-b { fill: #e7ecff; stroke: #2f54eb; stroke-width: 1.6; }
+  .dgm .n-w { fill: #ffece0; stroke: #d9480f; stroke-width: 1.6; }
+  .dgm .n-g { fill: #eef2f7; stroke: #8b94a3; stroke-width: 1.4; }
+  .dgm .ln  { stroke: #8b94a3; stroke-width: 1.5; fill: none; }
+  .dgm .lnd { stroke: #8b94a3; stroke-width: 1.4; fill: none; stroke-dasharray: 4 4; }
+  .dgm .cl  { fill: none; stroke: #c6ccd6; stroke-width: 1.4; stroke-dasharray: 5 4; }
+
+  /* ============================================================
+     PART 3 ADDITIONS — same tokens as Part 1; only new components below.
+     ============================================================ */
+  .slide a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a.pill { text-decoration: none; }
+  a.pill:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* titled light panels for the diagram trios */
+  .panel-light .ptitle { font-family: var(--display); font-weight: 600; font-size: .95rem; color: #14171d; margin: 0; }
+  .panel-light .psub { font-family: var(--mono); font-size: .68rem; color: #5a6473; margin: 2px 0 10px; letter-spacing: .03em; }
+  .panel-light .pdbs { font-size: .82rem; color: #5a6473; margin-top: 8px; line-height: 1.45; }
+  .panel-light .pdbs b { color: #14171d; font-weight: 600; }
+  .dgm .lnw { stroke: #d9480f; stroke-width: 1.7; fill: none; }
+  .dgm .ok  { fill: #2b8a3e; }
+  .dgm .bad { fill: #d9480f; }
+
+  /* compact card lists */
+  .card ul.ticks li { font-size: .88rem; }
+  .card .who { font-family: var(--mono); font-size: .72rem; color: var(--faint); margin-top: 10px; line-height: 1.5; }
+  .card .who b { color: var(--accent); font-weight: 600; }
+  .card.hl { border-color: var(--accent); background: var(--accent-soft); }
+  .card.warm-hl { border-color: var(--warm); }
+  .card h3 .pill { margin-left: 6px; vertical-align: middle; }
+  .cols-6 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 860px){ .cols-6 { grid-template-columns: repeat(2,1fr);} }
+  @media (max-width: 560px){ .cols-6 { grid-template-columns: 1fr;} }
+
+  /* wrapping matrices (long cells) */
+  table.matrix.wrap td { white-space: normal; vertical-align: top; line-height: 1.4; }
+  table.matrix.wrap td.name { white-space: nowrap; }
+  table.matrix td .s { display: block; color: var(--faint); font-size: .74rem; }
+  table.matrix td.y { color: var(--good); font-weight: 600; text-align: center; }
+  table.matrix td.n { color: var(--warm); font-weight: 600; text-align: center; }
+  table.matrix th.c { text-align: center; }
+  .m-lead { color: var(--accent); } .m-less { color: var(--warm); } .m-multi { color: var(--good); }
+
+  /* transaction-scope ladder */
+  .ladder { display: flex; flex-direction: column; gap: 10px; }
+  .rung { display: grid; grid-template-columns: 210px 1fr; gap: 16px; align-items: center;
+    background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border-strong);
+    border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow); }
+  .rung h3 { font-size: .98rem; }
+  .rung .lvl { font-family: var(--mono); font-size: .66rem; color: var(--faint); letter-spacing: .12em; display: block; margin-bottom: 2px; }
+  .rung p { font-size: .88rem; color: var(--muted); }
+  .rung .tag-row { margin-top: 6px; }
+  .rung.r1 { border-left-color: #8b94a3; } .rung.r2 { border-left-color: var(--good); }
+  .rung.r3 { border-left-color: var(--good); } .rung.r4 { border-left-color: var(--accent); }
+  @media (max-width: 720px){ .rung { grid-template-columns: 1fr; gap: 6px; } }
+
+  /* quorum lab */
+  .q-top { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 14px; }
+  .q-field { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: .82rem; color: var(--muted); }
+  .q-field select { font-family: var(--mono); font-size: .85rem; padding: 5px 8px; border-radius: 8px;
+    border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--fg); }
+  .q-rule { font-family: var(--mono); font-size: .8rem; padding: 6px 10px; border-radius: 8px; }
+  .q-rule.ok { color: var(--good); border: 1px solid var(--good); }
+  .q-rule.bad { color: var(--warm); border: 1px solid var(--warm); background: var(--warm-soft); }
+  .q-reps { display: flex; flex-wrap: wrap; gap: 10px; }
+  .rep { width: 92px; height: 92px; border-radius: 12px; border: 1.5px solid var(--border-strong); background: var(--surface-2);
+    color: var(--fg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    cursor: pointer; font-family: var(--mono); transition: border-color .25s, background .25s, box-shadow .25s, opacity .25s; }
+  .rep .id { font-size: .66rem; color: var(--faint); letter-spacing: .08em; }
+  .rep .v { font-size: 1.25rem; font-weight: 600; }
+  .rep .st { font-size: .64rem; color: var(--faint); min-height: 1em; }
+  .rep.latest { border-color: var(--accent); background: var(--accent-soft); }
+  .rep.latest .v { color: var(--accent); }
+  .rep.hit { box-shadow: 0 0 0 3px var(--warm); }
+  .rep.down { opacity: .38; border-style: dashed; }
+  .rep:hover { border-color: var(--accent); }
+  @media (prefers-reduced-motion: reduce){ .rep { transition: none; } }
+  .lsm-log .good { color: var(--good); font-weight: 600; }
+  .lsm-log .bad { color: var(--warm); font-weight: 600; }
+
+  /* numbered checklist */
+  ol.qs { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: .92rem; }
+  ol.qs li::marker { color: var(--accent); font-family: var(--mono); font-weight: 600; }
+  ol.qs li strong { color: var(--fg); }
+
+  /* ============================================================
+     PART 3 (TRANSACTIONS) ADDITIONS — same tokens; ported and new components below.
+     ============================================================ */
+  /* in-deck links (as in Part 1) */
+  .go { display: inline-block; font-family: var(--mono); font-size: .74rem; color: var(--accent); text-decoration: none; }
+  a.go:hover { text-decoration: underline; }
+  .card.axis .go { margin-top: auto; padding-top: 8px; }
+  .go.inline { display: inline; font-family: inherit; font-size: inherit; }
+
+  /* ported from Part 1: the question, what it decides, how to tell */
+  .ask { display: flex; gap: 12px; align-items: baseline; margin-top: 12px; max-width: 96ch;
+    font-size: clamp(1rem, 1.5vw, 1.2rem); color: var(--fg); }
+  .ask::before { content: "ASK"; flex: none; font-family: var(--mono); font-size: .64rem; font-weight: 600;
+    letter-spacing: .16em; color: var(--on-accent); background: var(--accent); border-radius: 5px; padding: 2px 7px;
+    transform: translateY(-2px); }
+  .facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .facts.three { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 860px){ .facts.three { grid-template-columns: 1fr; } }
+  @media (max-width: 720px){ .facts { grid-template-columns: 1fr; } }
+  .fact { border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; background: var(--surface-2);
+    font-size: .88rem; color: var(--muted); }
+  .fact > b { display: block; font-family: var(--mono); font-size: .64rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 3px; font-weight: 600; }
+  .fact strong { color: var(--fg); }
+  .read { font-family: var(--mono); font-size: .74rem; color: var(--faint); }
+  .read a { color: var(--accent); text-decoration: none; }
+  .read a:hover { text-decoration: underline; }
+  .lead strong { color: var(--fg); }
+  .an { font-family: var(--mono); font-size: .62rem; font-weight: 600; color: var(--accent); border: 1px solid var(--accent);
+    border-radius: 5px; padding: 0 4px; margin-left: 6px; vertical-align: 2px; }
+
+  /* dense slides: a tighter rhythm so each fits one screen (as in Parts 1 and 2) */
+  @media (min-width: 861px){ .slide.dense { gap: 14px; padding-block: clamp(52px, 6.5vh, 88px); } }
+  .slide.dense .lead { font-size: clamp(1rem, 1.35vw, 1.15rem); max-width: 82ch; }
+
+  /* scope ladder: five rungs */
+  .rung.r5 { border-left-color: var(--accent); background: var(--accent-soft); }
+
+  /* ACID letters, concurrency-control families */
+  .card .big { font-family: var(--display); font-weight: 700; font-size: 2rem; line-height: 1; color: var(--accent); display: block; margin-bottom: 6px; }
+  .card .really { font-family: var(--mono); font-size: .7rem; letter-spacing: .06em; color: var(--warm); display: block; margin-bottom: 6px; }
+  .card .cost { margin-top: 8px; font-size: .8rem; color: var(--muted); }
+  .card .cost b { color: var(--warm); font-weight: 600; }
+
+  /* anomaly schedules: two transactions, time runs left to right */
+  .card.anom .model-box { margin-top: 8px; font-size: .74rem; line-height: 1.5; white-space: nowrap; }
+  .model-box .x { color: #ff9e8a; }
+
+  /* lock compatibility */
+  table.compat { border-collapse: collapse; font-family: var(--mono); font-size: .76rem; margin-top: 8px; }
+  table.compat th, table.compat td { border: 1px solid var(--border-strong); padding: 3px 12px; text-align: center; }
+  table.compat th { color: var(--muted); background: var(--surface-2); font-weight: 600; }
+  table.compat td.y { color: var(--good); font-weight: 600; }
+  table.compat td.n { color: var(--warm); font-weight: 600; }
+
+  /* inline-SVG extras */
+  .dgm .lnwd { stroke: #d9480f; stroke-width: 1.6; fill: none; stroke-dasharray: 4 3; }
+  .dgm text.ok { fill: #2b8a3e; }
+  .dgm text.bad { fill: #d9480f; }
+
+  /* anomaly lab (slide 10): reuses .lsm, .lsm-stage, .q-top, .q-field, .lsm-log and .lsm-controls from the quorum lab */
+  .al.lsm { gap: 10px; }
+  .al .lsm-stage { padding: 12px 14px; }
+  .al .q-top { margin-bottom: 10px; gap: 8px 18px; }
+  .al .q-field select { font-family: var(--body); min-width: 0; max-width: 100%; }
+  .al-main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  table.al-sched, table.al-data { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: .74rem; }
+  table.al-sched th, table.al-data th { text-align: left; font-weight: 600; font-size: .64rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); padding: 3px 8px 5px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
+  table.al-sched th.al-t1 { color: var(--accent); } table.al-sched th.al-t2 { color: var(--warm); }
+  table.al-sched th .role { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  table.al-sched td, table.al-data td { padding: 3px 8px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.4; }
+  table.al-sched td { width: 48%; color: var(--fg); }
+  table.al-sched td.n { width: 2.4em; color: var(--faint); text-align: right; padding-right: 4px; }
+  table.al-sched tbody tr { height: 2.15em; }
+  table.al-sched tr.fut td.n { opacity: .5; }
+  table.al-sched tr.now td { background: var(--accent-soft); }
+  table.al-sched td.t1 { box-shadow: inset 2px 0 0 var(--accent); } table.al-sched td.t2 { box-shadow: inset 2px 0 0 var(--warm); }
+  .al-op i { font-style: normal; color: var(--accent); }
+  .al-res { font-weight: 600; }
+  .al-k-wait, .al-blk { color: var(--warm); font-style: italic; }
+  .al-k-wait { font-weight: 400; }
+  .al-blk { opacity: .75; }
+  .al-k-ok { color: var(--good); }
+  .al-k-ab, .al-x { color: var(--warm); }
+  .al-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  table.al-data { table-layout: fixed; }
+  table.al-data th, table.al-data td { padding-left: 6px; padding-right: 6px; }
+  table.al-data th { letter-spacing: .04em; }
+  table.al-data th:nth-child(1) { width: 17%; } table.al-data th:nth-child(2) { width: 21%; }
+  table.al-data th:nth-child(3) { width: 24%; } table.al-data th:nth-child(4) { width: 38%; }
+  table.al-data td { color: var(--muted); }
+  table.al-data td:last-child { font-size: .7rem; }
+  table.al-data td.k, table.al-data td.c { color: var(--fg); font-weight: 600; }
+  table.al-data td.chg { background: var(--accent-soft); }
+  table.al-data tbody tr { height: 2.6em; }
+  .al-lk { display: inline-block; white-space: nowrap; }
+  .al-lk + .al-lk { margin-left: 5px; }
+  .al-t1 { color: var(--accent); } .al-t2 { color: var(--warm); }
+  .al-inv { font-family: var(--mono); font-size: .74rem; color: var(--muted); }
+  .al-inv.ok { color: var(--good); } .al-inv.bad { color: var(--warm); font-weight: 600; }
+  .al-out { border: 1px solid var(--border-strong); border-radius: 10px; padding: 8px 12px; background: var(--surface-2);
+    font-size: .84rem; line-height: 1.45; color: var(--muted); min-height: 7.4em; }
+  .al-out b { display: block; font-family: var(--mono); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin-bottom: 2px; }
+  .al-out.ok { border-color: var(--good); color: var(--fg); } .al-out.ok b { color: var(--good); }
+  .al-out.bad { border-color: var(--warm); background: var(--warm-soft); color: var(--fg); } .al-out.bad b { color: var(--warm); }
+  .al-take { font-size: .8rem; line-height: 1.45; color: var(--muted); }
+  .al-take b { color: var(--fg); font-weight: 600; }
+  .al-take code { white-space: nowrap; font-size: .92em; }
+  .al-take a { white-space: nowrap; }
+  .al .lsm-log { font-size: .8rem; line-height: 1.5; min-height: calc(3em + 22px); padding: 8px 12px; }
+  .al .lsm-log code { color: var(--warm); }
+  .al .lsm-controls button { padding: 7px 14px; }
+  .al .lsm-controls button:disabled { opacity: .45; cursor: default; }
+  .al .lsm-controls button:disabled:hover { border-color: var(--border-strong); color: var(--fg); }
+  .al .lsm-controls button.primary:disabled:hover { border-color: var(--accent); color: var(--on-accent); }
+  .al-pos { margin-left: auto; font-family: var(--mono); font-size: .74rem; color: var(--muted); }
+  @media (max-width: 860px){ .al-main { grid-template-columns: 1fr; } }
+  /* same height for every scenario and level, so the vertically centred slide doesn't jump */
+  @media (min-width: 861px) and (min-height: 740px){ .al-main { min-height: 19em; } }
+  @media (max-width: 560px){
+    .al .q-field { flex-wrap: wrap; width: 100%; }
+    .al .q-field select { width: 100%; }
+    table.al-sched th .role { display: block; margin-left: 0; white-space: normal; }
+    table.al-data th, table.al-data td { padding-left: 4px; padding-right: 4px; }
+    table.al-data th { letter-spacing: 0; font-size: .56rem; }
+    table.al-data th:nth-child(1) { width: 18%; } table.al-data th:nth-child(2) { width: 21%; }
+    table.al-data th:nth-child(3) { width: 27%; } table.al-data th:nth-child(4) { width: 34%; }
+  }
+
+  /* isolation-level table: narrow header cells may wrap */
+  table.matrix.iso { min-width: 640px; }
+  table.matrix.iso thead th { white-space: normal; vertical-align: bottom; }
+  table.matrix.iso td .s { font-weight: 400; font-family: var(--body); }
+
+  /* keep the last line of a slide clear of the counter, bottom right */
+  .hud-clear { padding-right: min(170px, 30%); }
+
+  /* short laptop screens (768–900px tall): tighten the dense slides rather than scroll */
+  @media (max-height: 900px) and (min-width: 861px){
+    .slide.dense { gap: 10px; padding-block: 26px 44px; }
+    .slide.dense h2 { font-size: clamp(1.6rem, 2.9vw, 2.15rem); }
+    .slide.dense .lead { margin-top: 6px !important; font-size: 1rem; }
+    .slide.dense .ask { margin-top: 7px; font-size: 1rem; }
+    .slide.dense .grid { gap: 10px; }
+    .slide.dense .card { padding: 11px 14px; }
+    .slide.dense .card p, .slide.dense .ticks li { font-size: .84rem; }
+    .slide.dense .ticks { gap: 6px; }
+    .slide.dense .fact { padding: 8px 12px; font-size: .84rem; }
+    .slide.dense .note { padding: 7px 12px; font-size: .84rem; }
+    .slide.dense .kv { font-size: .84rem; }
+    .slide.dense .model-box { padding: 7px 10px; }
+    .slide.dense .rung { padding: 7px 14px; }
+    .slide.dense .ladder { gap: 7px; }
+    .slide.dense .panel-light { padding: 12px; }
+    .slide.dense table.matrix.wrap { font-size: .74rem; }
+    .slide.dense table.matrix.wrap th, .slide.dense table.matrix.wrap td { padding: 3px 9px; line-height: 1.3; }
+    .slide.dense table.matrix th, .slide.dense table.matrix td { padding-top: 4px; padding-bottom: 4px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+<a id="home-link" href="../../index.html" aria-label="Home" title="Home"><span class="site-mark">L</span></a>
+<button id="theme-toggle" aria-label="Toggle light / dark theme" title="Toggle theme">◐</button>
+
+<main id="deck">
+
+  <!-- 1 — TITLE -->
+  <section class="slide" id="s1" style="justify-content:center;">
+    <div>
+      <p class="eyebrow">A field guide · Part 3 of 4 · transactions</p>
+      <h1>Transactions:<br>what a commit <span class="accent">promises</span>.</h1>
+      <p class="lead" style="margin-top:18px; max-width:58ch;">A transaction groups reads and writes so they succeed or fail together, and so concurrent transactions don't trip over each other. Four questions sort every database: how much one transaction covers, when a commit is safe, what concurrent transactions see, and how the database enforces it.</p>
+      <div class="tag-row" style="margin-top:22px;">
+        <span class="pill">one key → any rows</span>
+        <span class="pill">fsync → majority of replicas</span>
+        <span class="pill">read committed → serializable</span>
+        <span class="pill">locks ↔ MVCC ↔ optimistic</span>
+      </div>
+      <p class="muted" style="margin-top:26px; font-size:.85rem;">Builds on <a href="../database-guide/index.html">Part 1</a> and pairs with Part 2's <a href="../distributed-databases/index.html#s15">distributed transactions</a>; analytical databases are <a href="../database-anatomy-part2/index.html">Part 4</a>. Navigate with <span class="kbd">↓</span> <span class="kbd">↑</span> <span class="kbd">Space</span> or the arrows, bottom-right. Press <span class="kbd">G</span> or tap the slide counter to see every slide and jump to one.</p>
+    </div>
+    <div class="foot">TRANSACTIONS / 01</div>
+  </section>
+
+  <!-- 2 — THE PROBLEM -->
+  <section class="slide dense" id="s2">
+    <div>
+      <p class="eyebrow">The problem</p>
+      <h2>Two things go wrong: crashes and concurrency</h2>
+      <p class="lead" style="margin-top:10px;">Without transactions, the application has to handle every half-finished write and every race by itself.</p>
+    </div>
+    <div class="grid cols-2">
+      <div class="card">
+        <span class="num">PROBLEM 1 · FAILURE</span>
+        <h3>A crash halfway through</h3>
+        <p>A transfer is two writes. The power fails between them: the money has left Alice and never reached Bob.</p>
+        <div class="model-box"><span class="k">UPDATE</span> alice SET balance = balance − 100 <span class="s">✓</span><br><span class="x">⚡ power fails</span><br><span class="k">UPDATE</span> bob &nbsp;&nbsp;SET balance = balance + 100 <span class="x">never runs</span><br><span class="c">→ $100 has vanished</span></div>
+      </div>
+      <div class="card">
+        <span class="num">PROBLEM 2 · CONCURRENCY</span>
+        <h3>Two clerks, one seat</h3>
+        <p>Both check the last seat at the same moment, both see it free, both sell it. Each step was correct on its own.</p>
+        <div class="model-box"><span class="k">clerk A</span> seats left? → 1 ········ sell <span class="s">✓</span><br><span class="c">clerk B</span> ··· seats left? → 1 ··· sell <span class="s">✓</span><br><br><span class="x">→ two tickets for one seat</span></div>
+      </div>
+    </div>
+    <div class="facts">
+      <p class="fact"><b>A transaction gives you · all or nothing</b>If anything fails before the commit, the database discards every write of the transaction. After a crash you find all of it or none of it.</p>
+      <p class="fact"><b>A transaction gives you · isolation</b>At the strictest <strong>isolation level</strong> (serializable), concurrent transactions behave as if they ran one after another. Weaker levels let some races through, and most databases default to one of them.</p>
+    </div>
+    <p class="read">Read more: <a href="../../books/notes/ddia/ch7/">DDIA (1st ed.) ch. 7, Transactions</a></p>
+    <div class="foot">THE PROBLEM / 02</div>
+  </section>
+
+  <!-- 3 — ACID, UNPACKED -->
+  <section class="slide dense" id="s3">
+    <div>
+      <p class="eyebrow">ACID, unpacked</p>
+      <h2>Four letters, four different promises</h2>
+      <p class="lead" style="margin-top:10px;">The acronym (Härder and Reuter, 1983) bundles guarantees that come from different parts of the database, and one that doesn't come from the database at all.</p>
+    </div>
+    <div class="grid cols-4">
+      <div class="card">
+        <span class="big">A</span><h3>Atomicity</h3><span class="really">really: abortability</span>
+        <p>If a transaction fails partway (a crash, an error, a broken constraint, a deadlock), all of its writes are undone. It is about <strong>failure</strong>, not about concurrency.</p>
+      </div>
+      <div class="card">
+        <span class="big">C</span><h3>Consistency</h3><span class="really">really: your invariants</span>
+        <p>Balances add up; every order has a customer. The <strong>application</strong> defines these rules. The database checks the ones you declare (UNIQUE, FOREIGN KEY, CHECK); serializable isolation protects the rest.</p>
+      </div>
+      <div class="card">
+        <span class="big">I</span><h3>Isolation</h3><span class="really">really: a level you pick</span>
+        <p>Concurrent transactions shouldn't see each other's half-done work. How strong that is depends on the <strong>isolation level</strong>, from read committed to serializable.</p>
+      </div>
+      <div class="card">
+        <span class="big">D</span><h3>Durability</h3><span class="really">really: fsync and replicas</span>
+        <p>A committed write survives a crash, as far as the <strong>log flush</strong> and the number of <strong>replicas</strong> allow. Some defaults acknowledge before anything is on disk.</p>
+      </div>
+    </div>
+    <p class="note"><b>"ACID" on the box doesn't name the isolation level.</b> PostgreSQL, Oracle and SQL Server default to read committed; MySQL InnoDB to repeatable read; SQLite and CockroachDB to serializable. Check the default, not the strongest level on offer.</p>
+    <div class="foot">ACID / 03</div>
+  </section>
+
+  <!-- 4 — THE MAP -->
+  <section class="slide dense" id="s4">
+    <div>
+      <p class="eyebrow">The map</p>
+      <h2>Four questions for any transaction</h2>
+      <p class="lead" style="margin-top:10px;">Each question is its own axis. A database answers all four, and the answers are mostly independent.</p>
+    </div>
+    <div class="grid cols-4">
+      <div class="card axis"><span class="num">01</span><h3>Scope</h3><p>How much can one transaction cover: one key, one row or document, one partition, any rows on one server, or any rows anywhere?</p><a class="go" href="#s5">Slide 05 →</a></div>
+      <div class="card axis"><span class="num">02</span><h3>Atomicity &amp; durability</h3><p>When is a commit safe? The <strong>log</strong> makes it all-or-nothing; the <strong>settings</strong> decide what "OK" waits for.</p><a class="go" href="#s6">Slide 06 →</a></div>
+      <div class="card axis"><span class="num">03</span><h3>Isolation</h3><p>What may concurrent transactions see of each other? Six <strong>anomalies</strong>, and the levels that prevent them.</p><a class="go" href="#s8">Slide 08 →</a></div>
+      <div class="card axis"><span class="num">04</span><h3>Concurrency control</h3><p>How is the level enforced: <strong>serial</strong> execution, <strong>locks</strong>, <strong>snapshots</strong> (MVCC) or <strong>optimistic</strong> checks?</p><a class="go" href="#s12">Slide 12 →</a></div>
+    </div>
+    <p class="muted" style="font-size:.88rem;">Then: <a class="go inline" href="#s16">transactions in NoSQL databases</a>, a <a class="go inline" href="#s17">cheat sheet</a> of default and strongest isolation per database, and <a class="go inline" href="#s18">what the application must still do</a>.</p>
+    <p class="note"><b>Mostly independent of Part 1's axes.</b> Isolation doesn't follow from the data model, the storage structure or the architecture (<a href="../database-guide/index.html#s3">Part 1</a>): SQLite is serializable inside one file; Spanner is strictly serializable across continents.</p>
+    <div class="foot">THE MAP / 04</div>
+  </section>
+
+  <!-- 5 — AXIS 01: SCOPE -->
+  <section class="slide dense" id="s5">
+    <div>
+      <p class="eyebrow">Axis 01 · scope</p>
+      <h2>How much can one transaction cover?</h2>
+      <p class="ask">Which writes can be grouped so that all of them happen or none do?</p>
+    </div>
+    <div class="ladder">
+      <div class="rung r1">
+        <div><span class="lvl">RUNG 1</span><h3>One key</h3></div>
+        <div><p>One value is replaced atomically. Nothing spans two keys.</p>
+          <div class="tag-row"><span class="pill">Memcached</span><span class="pill">every database, at least</span></div></div>
+      </div>
+      <div class="rung r2">
+        <div><span class="lvl">RUNG 2</span><h3>One document or row</h3></div>
+        <div><p>All fields of one record change together, nested ones included.</p>
+          <div class="tag-row"><span class="pill">MongoDB single document</span><span class="pill">DynamoDB single item</span><span class="pill">Aerospike single record</span></div></div>
+      </div>
+      <div class="rung r3">
+        <div><span class="lvl">RUNG 3</span><h3>One partition</h3></div>
+        <div><p>Several records, as long as they share a partition key.</p>
+          <div class="tag-row"><span class="pill">Cassandra batch in one partition</span><span class="pill">Cosmos DB batch, one partition key</span></div></div>
+      </div>
+      <div class="rung r4">
+        <div><span class="lvl">RUNG 4</span><h3>Any rows on one server</h3></div>
+        <div><p>Classic ACID: any rows in any tables, as long as one server holds them all.</p>
+          <div class="tag-row"><span class="pill on">PostgreSQL</span><span class="pill on">MySQL</span><span class="pill on">SQLite</span><span class="pill on">SQL Server</span><span class="pill on">Oracle</span></div></div>
+      </div>
+      <div class="rung r5">
+        <div><span class="lvl">RUNG 5</span><h3>Any rows on any node</h3></div>
+        <div><p>Atomic and isolated across partitions and machines.</p>
+          <div class="tag-row"><span class="pill on">Spanner</span><span class="pill on">CockroachDB</span><span class="pill on">TiDB</span><span class="pill on">MongoDB 4.2+</span><span class="pill on">DynamoDB ≤ 100 items, one request, one Region</span></div></div>
+      </div>
+    </div>
+    <p class="read">How the last rung works across machines: <a href="../distributed-databases/index.html#s15">Part 2 · transaction scope</a> (its ladder adds a cross-shard, atomic-only step: Vitess and Citus 2PC) · <a href="../distributed-databases/index.html#s16">Part 2 · committing across partitions</a></p>
+    <div class="foot">SCOPE / 05</div>
+  </section>
+
+  <!-- 6 — AXIS 02: THE LOG -->
+  <section class="slide dense" id="s6">
+    <div>
+      <p class="eyebrow">Axis 02 · atomicity &amp; durability</p>
+      <h2>The log makes a commit atomic and durable</h2>
+      <p class="lead" style="margin-top:10px;">Write-ahead logging: describe every change in an append-only log. A change's log record reaches disk before its data page does, and the commit record before "committed". The pages can follow later.</p>
+    </div>
+    <div class="split" style="align-items:start;">
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 460 232" role="img" aria-label="Write-ahead log: transaction T7 appends its changes and a commit record to the log buffer, the log is fsynced to disk, then the client is told the transaction committed. The changed pages stay in memory and reach the data files later, at a checkpoint." style="max-width:500px"><defs><marker id="dd6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="dd6w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#d9480f"/></marker></defs><rect class="n-b" x="10" y="8" width="250" height="32" rx="8"/><text x="135" y="28.5" text-anchor="middle">T7: a = 6 · b = 4 · COMMIT</text><path class="ln" d="M135 40 L135 62" marker-end="url(#dd6)"/><text class="lbl halo" x="143" y="55">1 · append</text><rect class="n-g" x="10" y="64" width="78" height="30" rx="6"/><text x="49" y="83.5" text-anchor="middle">a 5→6</text><rect class="n-g" x="96" y="64" width="78" height="30" rx="6"/><text x="135" y="83.5" text-anchor="middle">b 3→4</text><rect class="n-w" x="182" y="64" width="78" height="30" rx="6"/><text x="221" y="83.5" text-anchor="middle">commit</text><text class="sub" x="10" y="108">log buffer (memory)</text><path class="lnw" d="M135 112 L135 134" marker-end="url(#dd6w)"/><text class="lbl halo" x="143" y="127">2 · fsync</text><rect class="n-w" x="10" y="136" width="250" height="32" rx="8"/><text x="135" y="156.5" text-anchor="middle">log on disk: a · b · commit</text><path class="ln" d="M135 168 L135 190" marker-end="url(#dd6)"/><rect class="n-b" x="10" y="192" width="250" height="32" rx="8"/><text x="135" y="212.5" text-anchor="middle">3 · client hears "committed"</text><path class="lnd" d="M262 24 Q 375 24 375 60" marker-end="url(#dd6)"/><rect class="n-b" x="300" y="64" width="70" height="30" rx="6"/><text x="335" y="83.5" text-anchor="middle">page a</text><rect class="n-b" x="380" y="64" width="70" height="30" rx="6"/><text x="415" y="83.5" text-anchor="middle">page b</text><text class="sub" x="300" y="108">dirty pages (memory)</text><path class="lnd" d="M375 112 L375 190" marker-end="url(#dd6)"/><text class="lbl halo" x="375" y="152" text-anchor="middle">later: checkpoint</text><rect class="n-g" x="300" y="192" width="150" height="32" rx="8"/><text x="375" y="212.5" text-anchor="middle">data files</text></svg>
+        <p class="cap">durable after step 2 · the pages can wait</p>
+      </div>
+      <dl class="kv">
+        <dt>recovery</dt><dd><strong>ARIES</strong> (1992): find the unfinished transactions, <strong>redo</strong> every logged change missing from disk (theirs too), then <strong>undo</strong> theirs, since their pages may already be on disk, logging each undo step so a second crash can't repeat work.</dd>
+        <dt>group commit</dt><dd>commits that arrive during a flush share the next one, so one fsync covers many transactions. PostgreSQL and InnoDB do it automatically.</dd>
+        <dt>PostgreSQL</dt><dd><strong>redo only.</strong> An abort just marks the transaction aborted; its row versions stay in the table, invisible, until VACUUM removes them.</dd>
+        <dt>InnoDB</dt><dd>a <strong>redo log</strong> for crashes, plus <strong>undo logs</strong> that roll changes back and rebuild older row versions for readers.</dd>
+        <dt>LSM engines</dt><dd>the same log in front of the memtable, though by default not fsynced per write: RocksDB's WAL (unless <code>sync=true</code>), Cassandra's commit log (every 10 s, <a class="go inline" href="#s7">slide 07</a>). <a href="../database-guide/index.html#s7">Part 1 · how an LSM-tree works</a></dd>
+      </dl>
+    </div>
+    <p class="read">Read more: <a href="../../books/notes/database-internals/ch5/">Database Internals ch. 5, Transaction Processing and Recovery</a></p>
+    <div class="foot">THE LOG / 06</div>
+  </section>
+
+  <!-- 7 — AXIS 02: DURABILITY SETTINGS -->
+  <section class="slide dense" id="s7">
+    <div>
+      <p class="eyebrow">Axis 02 · durability settings</p>
+      <h2>When is "OK" actually safe?</h2>
+      <p class="ask">When the database acknowledges a commit, what has already happened: a write to memory, an fsync, a copy on another machine?</p>
+    </div>
+    <div class="matrix-wrap">
+      <table class="matrix wrap">
+        <thead><tr><th>Database</th><th>Default: commit waits for</th><th>Faster, riskier</th><th>Stronger</th></tr></thead>
+        <tbody>
+          <tr><td class="name">PostgreSQL</td><td>WAL flushed to local disk <span class="s">synchronous_commit = on</span></td><td><code>synchronous_commit = off</code>: a crash can lose up to ~600 ms of commits, but never corrupts. Can be set per transaction.</td><td>synchronous standbys: <code>remote_write</code>, <code>on</code> (flushed there), <code>remote_apply</code> (visible there)</td></tr>
+          <tr><td class="name">MySQL InnoDB</td><td>redo log flushed at every commit, binlog synced <span class="s">innodb_flush_log_at_trx_commit = 1, sync_binlog = 1</span></td><td>flush setting <code>0</code> or <code>2</code>: flushed about once a second; a crash can lose ~1 s</td><td>a replica acknowledges too (semi-synchronous replication)</td></tr>
+          <tr><td class="name">SQLite</td><td>an fsync at every commit <span class="s">synchronous = FULL, journal_mode = DELETE</span></td><td><code>NORMAL</code> in WAL mode: never corrupts, but the last commits can roll back after a power cut</td><td><code>EXTRA</code> or WAL mode: FULL with the default DELETE journal is "maybe not durable" across a power loss</td></tr>
+          <tr><td class="name">MongoDB</td><td>a majority of replicas, journaled on disk <span class="s">w: "majority", the default since 5.0</span></td><td><code>w: 1</code>: the primary's memory only; lost if it fails before replicating</td><td>already the strong end, but a set with an arbiter (P-S-A) defaults to <code>w: 1</code>: set majority explicitly</td></tr>
+          <tr><td class="name">Redis</td><td><span class="m-less">nothing on disk</span>: AOF is off; RDB snapshots every 1–60 min, so a crash can lose minutes</td><td>—</td><td><code>appendonly yes</code>: fsync every second (~1 s at risk) or <code>always</code> (every write, group-committed)</td></tr>
+          <tr><td class="name">Cassandra</td><td>commit log written, <span class="m-less">fsynced every 10 s</span>; replicas cover the gap <span class="s">commitlog_sync: periodic</span></td><td>a lower consistency level: fewer replicas must answer</td><td><code>batch</code> or <code>group</code> sync: acknowledge only after the fsync</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note hud-clear"><b>A commit is only as safe as its copies.</b> An fsync survives a power cut but not a dead disk or machine. Synchronous standbys (PostgreSQL), semi-sync replicas (MySQL) or a majority write concern (MongoDB) survive losing a machine.</p>
+    <div class="foot">DURABILITY / 07</div>
+  </section>
+
+  <!-- 8 — AXIS 03: ANOMALIES -->
+  <section class="slide dense" id="s8">
+    <div>
+      <p class="eyebrow">Axis 03 · anomalies</p>
+      <h2>Six things concurrency can break</h2>
+      <p class="lead" style="margin-top:10px;">Two transactions, <span class="accent">T1</span> and <span style="color:var(--warm)">T2</span>, run at the same time; time flows left to right. Each schedule below is a bug. Every level forbids the first; each of the other five slips through at some level.</p>
+    </div>
+    <div class="grid cols-6">
+      <div class="card anom">
+        <h3>Dirty write <span class="an">P0</span></h3>
+        <p>T2 overwrites a value T1 hasn't committed. The rows end up half T1's, half T2's.</p>
+        <div class="model-box"><span class="k">T1</span> x=1 ············ y=1 <span class="s">✓</span><br><span class="c">T2</span> ···· x=2 y=2 <span class="s">✓</span><br><span class="x">→ x=2, y=1: the rule x = y breaks</span></div>
+      </div>
+      <div class="card anom">
+        <h3>Dirty read <span class="an">P1</span></h3>
+        <p>T2 reads T1's uncommitted write, and T1 then rolls back.</p>
+        <div class="model-box"><span class="k">T1</span> x=50 ············ abort<br><span class="c">T2</span> ····· read x → 50<br><span class="x">→ T2 used a value that never existed</span></div>
+      </div>
+      <div class="card anom">
+        <h3>Read skew <span class="an">A5A</span></h3>
+        <p>T1 sees x before and y after T2's transfer. A non-repeatable read is the special case where x and y are one row.</p>
+        <div class="model-box"><span class="k">T1</span> read x → 50 ······ read y → 10<br><span class="c">T2</span> ······· x=90 y=10 <span class="s">✓</span><br><span class="x">→ T1 counts 60, not 100</span></div>
+      </div>
+      <div class="card anom">
+        <h3>Lost update <span class="an">P4</span></h3>
+        <p>Two read-modify-write cycles race; the later write erases the earlier one.</p>
+        <div class="model-box"><span class="k">T1</span> read x → 100 ········ x=130 <span class="s">✓</span><br><span class="c">T2</span> ··· read x → 100 x=120 <span class="s">✓</span><br><span class="x">→ T2's +20 is gone</span></div>
+      </div>
+      <div class="card anom">
+        <h3>Write skew <span class="an">A5B</span></h3>
+        <p>Both check the same rule, then write <em>different</em> rows. Alice and Bob are the only doctors on call.</p>
+        <div class="model-box"><span class="k">T1</span> on call? → 2 ····· Alice off <span class="s">✓</span><br><span class="c">T2</span> ··· on call? → 2 ··· Bob off <span class="s">✓</span><br><span class="x">→ nobody is on call</span></div>
+      </div>
+      <div class="card anom">
+        <h3>Phantom <span class="an">P3</span></h3>
+        <p>T2 inserts a row that matches T1's search. Locking the rows T1 saw can't stop it: the row didn't exist.</p>
+        <div class="model-box"><span class="k">T1</span> count(active) → 10 ··· → 11<br><span class="c">T2</span> ······ insert active <span class="s">✓</span><br><span class="x">→ T1's search changed under it</span></div>
+      </div>
+    </div>
+    <p class="read hud-clear">Codes from Berenson et al., <em>A Critique of ANSI SQL Isolation Levels</em> (1995). The doctors example is from Cahill et al. (2008), popularized by DDIA (1st ed.) ch. 7.</p>
+    <div class="foot">ANOMALIES / 08</div>
+  </section>
+
+  <!-- 9 — AXIS 03: ISOLATION LEVELS -->
+  <section class="slide dense" id="s9">
+    <div>
+      <p class="eyebrow">Axis 03 · isolation levels</p>
+      <h2>Isolation levels, by what they prevent</h2>
+    </div>
+    <div class="matrix-wrap">
+      <table class="matrix iso">
+        <thead><tr><th>Anomaly</th><th class="c">Read uncommitted</th><th class="c">Read committed</th><th class="c">Snapshot (PostgreSQL "RR")</th><th class="c">Serializable</th><th class="c">Strict serializable</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Dirty write</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
+          <tr><td class="name">Dirty read</td><td class="n">✗</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
+          <tr><td class="name">Read skew <span class="s">incl. non-repeatable read</span></td><td class="n">✗</td><td class="n">✗</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
+          <tr><td class="name">Lost update</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓*</td><td class="y">✓</td><td class="y">✓</td></tr>
+          <tr><td class="name">Write skew</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓</td><td class="y">✓</td></tr>
+          <tr><td class="name">Phantom</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓†</td><td class="y">✓</td><td class="y">✓</td></tr>
+          <tr><td class="name">Stale read after a commit <span class="s">real-time order</span></td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Single-node baselines</h3>
+        <ul class="ticks" style="margin-top:8px;">
+          <li><strong>PostgreSQL</strong>: default <strong>Read Committed</strong>; Read Uncommitted behaves the same. Repeatable Read is snapshot isolation; Serializable is SSI (<a class="go inline" href="#s15">slide&nbsp;15</a>).</li>
+          <li><strong>MySQL InnoDB</strong>: default <strong>Repeatable Read</strong>. Plain SELECTs read a snapshot; UPDATE, DELETE and locking reads act on the latest rows, with next-key locks.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="muted" style="font-size:.82rem;">✓ prevented · ✗ possible. * except MySQL InnoDB's Repeatable Read, and TiDB's in its default pessimistic mode, which don't detect lost updates. Lock-based REPEATABLE READ (SQL Server) is a different level: phantoms possible, write skew on rows already read blocked (<a class="go inline" href="#s11">slide 11</a>). † a snapshot hides rows inserted later, but two transactions can each see no matching row, both insert, and both commit: write skew through a phantom. Last row: on one server every level sees commits that finished before it started; stale reads come from replicas and clocks.</p>
+        <p class="note hud-clear" style="margin-top:10px;"><b>Three words, often confused.</b> <em>Serializability</em> is about transactions over many objects; <em>linearizability</em> is about one object acting like a single up-to-date copy; <em>strict serializability</em> is both. <a href="../distributed-databases/index.html#s17">Part 2 · serializable ≠ strict</a></p>
+      </div>
+    </div>
+    <div class="foot">ISOLATION / 09</div>
+  </section>
+
+  <!-- 10 — AXIS 03: ANOMALY LAB -->
+  <section class="slide dense" id="s10">
+    <div>
+      <p class="eyebrow">Axis 03 · interactive</p>
+      <h2>Run two transactions against each other</h2>
+      <p class="lead" style="margin-top:10px;">Pick an anomaly and an isolation level, then step through two transactions, T1 and T2, one operation at a time. See what each read returns, who waits and who gets aborted.</p>
+    </div>
+    <div id="anomaly-lab" class="lsm al">
+      <div class="lsm-stage">
+        <div class="q-top">
+          <label class="q-field">Scenario <select id="al-sc">
+            <option value="rs">Read skew: A + B during a transfer</option>
+            <option value="lu">Lost update: two increments</option>
+            <option value="ws">Write skew: two doctors on call</option>
+          </select></label>
+          <label class="q-field">Level <select id="al-lv">
+            <option value="rc">Read Committed (PostgreSQL, Oracle, SQL Server default)</option>
+            <option value="si">Snapshot isolation (PostgreSQL REPEATABLE READ)</option>
+            <option value="my">MySQL InnoDB REPEATABLE READ</option>
+            <option value="ssi">Serializable via SSI (PostgreSQL SERIALIZABLE)</option>
+            <option value="2pl">Serializable via 2PL (MySQL SERIALIZABLE)</option>
+          </select></label>
+        </div>
+        <div class="al-main">
+          <table class="al-sched">
+            <thead><tr><th scope="col">#</th><th scope="col" class="al-t1">T1<span class="role" id="al-r1"></span></th><th scope="col" class="al-t2">T2<span class="role" id="al-r2"></span></th></tr></thead>
+            <tbody id="al-steps"></tbody>
+          </table>
+          <div class="al-side">
+            <table class="al-data">
+              <thead><tr><th scope="col" id="al-key">row</th><th scope="col">committed</th><th scope="col">uncommitted</th><th scope="col">locks</th></tr></thead>
+              <tbody id="al-rows"></tbody>
+            </table>
+            <p class="al-inv" id="al-inv"></p>
+            <div class="al-out" id="al-out" role="status"></div>
+            <p class="al-take" data-sc="rs"><b>In practice:</b> Read Committed is the default in PostgreSQL, Oracle and SQL Server, so a report that reads in several queries and must add up needs a snapshot level or stronger (<a class="go inline" href="#s9">slide 09</a>).</p>
+            <p class="al-take" data-sc="lu" hidden><b>In practice:</b> PostgreSQL's REPEATABLE READ stops this and MySQL's doesn't (<a class="go inline" href="#s11">slide 11</a>); at any level, <code>SET n = n + 1</code> or <code>SELECT … FOR UPDATE</code> avoids it (<a class="go inline" href="#s18">slide 18</a>).</p>
+            <p class="al-take" data-sc="ws" hidden><b>In practice:</b> snapshot levels (PostgreSQL and MySQL REPEATABLE READ) let this through. Use SERIALIZABLE or <code>SELECT … FOR UPDATE</code> on the rows you check; if none exist yet, add a constraint or a row to lock (<a class="go inline" href="#s18">slide 18</a>).</p>
+          </div>
+        </div>
+      </div>
+      <div class="lsm-log" id="al-log" aria-live="polite"></div>
+      <div class="lsm-controls hud-clear">
+        <button type="button" class="primary" id="al-step">Step</button>
+        <button type="button" id="al-run">Run all</button>
+        <button type="button" id="al-reset">↺ Reset</button>
+        <span class="al-pos" id="al-pos"></span>
+      </div>
+    </div>
+    <div class="foot">ANOMALY · LIVE / 10</div>
+  </section>
+
+  <!-- 11 — RR MYTH -->
+  <section class="slide dense" id="s11">
+    <div>
+      <p class="eyebrow">Myth-buster</p>
+      <h2>"REPEATABLE READ" means different things</h2>
+      <p class="lead" style="margin-top:10px;">Same keyword, different guarantees. Ask which anomalies a level prevents, not what it's called.</p>
+    </div>
+    <div class="matrix-wrap">
+      <table class="matrix wrap">
+        <thead><tr><th>Engine</th><th>What "repeatable read" actually is</th><th class="c">Write skew prevented?</th></tr></thead>
+        <tbody>
+          <tr><td class="name">ANSI SQL-92</td><td>Defined by what it forbids: no dirty or non-repeatable reads, but phantoms (new rows matching a search) may appear. Lock-based engines get there by holding read locks until commit.</td><td class="y">✓ for rows read</td></tr>
+          <tr><td class="name">MySQL InnoDB</td><td>Snapshot for plain SELECTs; UPDATE, DELETE and locking reads act on the latest committed rows. Lost updates are not detected. <span class="s">the default level</span></td><td class="n">✗</td></tr>
+          <tr><td class="name">MariaDB 11.6.2+</td><td>Like MySQL, but <code>innodb_snapshot_isolation</code> is on by default: changing a row that was modified since your snapshot fails with error 1020. <span class="s">the default level</span></td><td class="n">✗</td></tr>
+          <tr><td class="name">PostgreSQL</td><td>True snapshot isolation: no phantoms either. Updating a row that a concurrent transaction changed and committed fails with 40001.</td><td class="n">✗</td></tr>
+          <tr><td class="name">TiDB</td><td>Snapshot reads, named RR for MySQL compatibility. In the default pessimistic mode, UPDATE and DELETE act on the latest rows as in MySQL, so lost updates go undetected. <span class="s">the default; SERIALIZABLE is rejected</span></td><td class="n">✗</td></tr>
+          <tr><td class="name">CockroachDB</td><td>Snapshot isolation. <span class="s">available behind a cluster setting, off by default; the default is SERIALIZABLE</span></td><td class="n">✗</td></tr>
+          <tr><td class="name">Spanner</td><td>Snapshot isolation; lock rows with <code>SELECT … FOR UPDATE</code> where correctness depends on them. <span class="s">opt-in, generally available since April 2026; the default is serializable with external consistency (strict)</span></td><td class="n">✗</td></tr>
+          <tr><td class="name">Aurora DSQL</td><td>Fixed at PostgreSQL's Repeatable Read (snapshot isolation), with conflicts checked at commit. <span class="s">the only level</span></td><td class="n">✗</td></tr>
+          <tr><td class="name">Oracle (bonus)</td><td>No REPEATABLE READ at all, and its "SERIALIZABLE" is snapshot isolation too.</td><td class="n">✗</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="foot">RR ≠ RR / 11</div>
+  </section>
+
+  <!-- 12 — AXIS 04: CONCURRENCY CONTROL -->
+  <section class="slide dense" id="s12">
+    <div>
+      <p class="eyebrow">Axis 04 · concurrency control</p>
+      <h2>Four ways to keep transactions apart</h2>
+      <p class="lead" style="margin-top:10px;">The isolation level says what must not happen. Concurrency control is how the engine stops it, and each way has its own price.</p>
+    </div>
+    <div class="grid cols-4">
+      <div class="card">
+        <span class="num">01 · SERIAL</span><h3>Run one at a time</h3>
+        <p>One thread per partition executes whole transactions, usually stored procedures, back to back. No locks, no conflicts.</p>
+        <p class="who"><b>VoltDB</b> · <b>Redis</b></p>
+        <p class="cost"><b>Cost:</b> one core per partition; one slow transaction stalls the rest.</p>
+      </div>
+      <div class="card">
+        <span class="num">02 · LOCKING</span><h3>Two-phase locking</h3>
+        <p>Shared locks to read, exclusive locks to write, all held until commit. Conflicting transactions wait.</p>
+        <p class="who"><b>MySQL</b> and <b>SQL Server</b> SERIALIZABLE · <b>Spanner</b> serializable read-write transactions (default mode)</p>
+        <p class="cost"><b>Cost:</b> waits and deadlocks; readers and writers block each other.</p>
+      </div>
+      <div class="card">
+        <span class="num">03 · SNAPSHOTS</span><h3>MVCC</h3>
+        <p>Writers add new row versions; each reader sees a consistent snapshot. Readers don't block writers, and writers don't block readers.</p>
+        <p class="who"><b>PostgreSQL</b> · <b>InnoDB</b> · <b>Oracle</b> · <b>WiredTiger</b> (MongoDB)</p>
+        <p class="cost"><b>Cost:</b> old versions to clean up; on its own it allows write skew.</p>
+      </div>
+      <div class="card">
+        <span class="num">04 · OPTIMISTIC</span><h3>Check at commit</h3>
+        <p>Run without blocking read locks (SSI, OCC), track what each transaction touches, and abort one whose commit would conflict.</p>
+        <p class="who"><b>PostgreSQL</b> SERIALIZABLE · <b>FoundationDB</b> · <b>CockroachDB</b> (plus write locks) · <b>Aurora DSQL</b> (write conflicts only)</p>
+        <p class="cost"><b>Cost:</b> aborts and retries, which grow with contention.</p>
+      </div>
+    </div>
+    <p class="note"><b>Real engines combine them.</b> PostgreSQL and InnoDB read through MVCC but still lock the rows they write; SSI is MVCC plus conflict tracking; Spanner's serializable read-write transactions lock by default, and its snapshot reads take no locks.</p>
+    <p class="read">Read more: <a href="../../books/notes/ddia/ch7/">DDIA (1st ed.) ch. 7, serializability</a> · <a href="../../books/notes/database-internals/ch5/">Database Internals ch. 5, concurrency control</a></p>
+    <div class="foot">CONCURRENCY CONTROL / 12</div>
+  </section>
+
+  <!-- 13 — AXIS 04: MVCC -->
+  <section class="slide dense" id="s13">
+    <div>
+      <p class="eyebrow">Axis 04 · MVCC</p>
+      <h2>MVCC: readers see a snapshot, writers add versions</h2>
+    </div>
+    <div class="split" style="align-items:start;">
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 440 194" role="img" aria-label="Multi-version row: version 1 (balance 50, created by transaction 100, deleted by 105) and version 2 (balance 90, created by 105). A reader whose snapshot was taken before 105 committed sees version 1; a later snapshot sees version 2." style="max-width:460px"><defs><marker id="dd13" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><text class="lbl" x="10" y="14">one row, two versions</text><rect class="n-g" x="10" y="24" width="190" height="52" rx="8"/><text x="105" y="45" text-anchor="middle">v1 · balance 50</text><text class="sub" x="105" y="64" text-anchor="middle">xmin 100 · xmax 105</text><rect class="n-b" x="240" y="24" width="190" height="52" rx="8"/><text x="335" y="45" text-anchor="middle">v2 · balance 90</text><text class="sub" x="335" y="64" text-anchor="middle">xmin 105 · xmax –</text><path class="ln" d="M201 50 L238 50" marker-end="url(#dd13)"/><text class="lbl halo" x="220" y="42" text-anchor="middle">T105</text><rect class="n-b" x="10" y="132" width="190" height="52" rx="8"/><text x="105" y="153" text-anchor="middle">older snapshot</text><text class="sub" x="105" y="172" text-anchor="middle">taken before 105 committed</text><rect class="n-b" x="240" y="132" width="190" height="52" rx="8"/><text x="335" y="153" text-anchor="middle">newer snapshot</text><text class="sub" x="335" y="172" text-anchor="middle">taken after 105 committed</text><path class="lnd" d="M105 130 L105 79" marker-end="url(#dd13)"/><text class="lbl halo ok" x="105" y="108" text-anchor="middle">sees v1</text><path class="lnd" d="M335 130 L335 79" marker-end="url(#dd13)"/><text class="lbl halo ok" x="335" y="108" text-anchor="middle">sees v2</text></svg>
+        <p class="cap">PostgreSQL: xmin = created by · xmax = deleted by</p>
+      </div>
+      <ul class="ticks">
+        <li><strong>Visibility rule</strong>: I see a version if the transaction that created it had committed when my snapshot was taken, and the one that deleted it had not.</li>
+        <li><strong>No read locks</strong>: a reader never waits for a writer, and a long report never blocks updates.</li>
+        <li><strong>Writers still lock</strong>: two transactions updating the same row still queue, or one aborts.</li>
+        <li><strong>When the snapshot is taken</strong>: per statement under read committed; per transaction under snapshot isolation.</li>
+      </ul>
+    </div>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>New version in the table</h3>
+        <p>An UPDATE writes a whole new row version next to the old one. <strong>VACUUM</strong> removes dead versions later.</p>
+        <p class="who"><b>PostgreSQL</b></p>
+      </div>
+      <div class="card">
+        <h3>Update in place + undo</h3>
+        <p>The row changes in place; older versions are rebuilt from the <strong>undo log</strong>. InnoDB does this in the clustered index only: secondary-index entries are delete-marked, then <strong>purged</strong>.</p>
+        <p class="who"><b>InnoDB</b> · <b>Oracle</b></p>
+      </div>
+      <div class="card">
+        <h3>A separate version store</h3>
+        <p>Row versions for RCSI and SNAPSHOT go to tempdb, or into the database itself with Accelerated Database Recovery.</p>
+        <p class="who"><b>SQL Server</b></p>
+      </div>
+    </div>
+    <p class="note hud-clear"><b>The cost: long transactions hold back cleanup.</b> An open transaction, even an idle one, keeps every version it might read: PostgreSQL tables bloat and InnoDB's history list grows. Oracle reuses old undo instead, so a long query can fail with ORA-01555 "snapshot too old".</p>
+    <div class="foot">MVCC / 13</div>
+  </section>
+
+  <!-- 14 — AXIS 04: LOCKING -->
+  <section class="slide dense" id="s14">
+    <div>
+      <p class="eyebrow">Axis 04 · locking</p>
+      <h2>Locks: wait for the other transaction</h2>
+      <p class="lead" style="margin-top:10px;">Even MVCC engines lock rows they write. Lock-based SERIALIZABLE also locks what it reads, key ranges included.</p>
+    </div>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Shared and exclusive</h3>
+        <p>S to read, X to write. Many readers may share a row; a writer needs it alone.</p>
+        <table class="compat" aria-label="Lock compatibility: S with S is compatible; any pair involving X conflicts">
+          <tr><th>held → asked ↓</th><th>S</th><th>X</th></tr>
+          <tr><th>S</th><td class="y">✓</td><td class="n">wait</td></tr>
+          <tr><th>X</th><td class="n">wait</td><td class="n">wait</td></tr>
+        </table>
+        <p style="margin-top:8px;"><strong>Two-phase locking</strong>: never take a lock after releasing one. Databases use the strict form: release none until commit or abort.</p>
+      </div>
+      <div class="card">
+        <h3>Locking ranges, not just rows</h3>
+        <p>To stop phantoms, lock the <strong>gaps</strong> between index entries too: InnoDB's next-key locks, SQL Server's key-range locks.</p>
+        <div class="model-box">index &nbsp;&nbsp;10 ···· 20 ···· 30<br>scan 15–25 <span class="c">[10 ···· 20 ···· 30]</span><br>INSERT 17 <span class="x">→ waits until commit</span></div>
+        <p style="margin-top:8px;">A lookup of one row by a unique key locks only that row.</p>
+      </div>
+      <div class="card">
+        <h3>Deadlocks</h3>
+        <div class="panel-light" style="padding:8px;">
+<svg class="dgm" viewBox="0 0 260 148" role="img" aria-label="Deadlock: T1 holds row A and waits for row B; T2 holds row B and waits for row A" style="max-width:240px"><defs><marker id="dd14" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#d9480f"/></marker></defs><rect class="n-b" x="6" y="56" width="64" height="36" rx="8"/><text x="38" y="78.5" text-anchor="middle">T1</text><rect class="n-b" x="190" y="56" width="64" height="36" rx="8"/><text x="222" y="78.5" text-anchor="middle">T2</text><rect class="n-g" x="95" y="6" width="70" height="30" rx="8"/><text x="130" y="25.5" text-anchor="middle">row A</text><rect class="n-g" x="95" y="112" width="70" height="30" rx="8"/><text x="130" y="131.5" text-anchor="middle">row B</text><path class="ln" d="M50 56 L95 28"/><text class="lbl halo" x="64" y="36" text-anchor="end">holds</text><path class="ln" d="M210 92 L165 120"/><text class="lbl halo" x="196" y="122" text-anchor="start">holds</text><path class="lnwd" d="M50 92 L93 119" marker-end="url(#dd14)"/><text class="lbl halo bad" x="64" y="122" text-anchor="end">waits</text><path class="lnwd" d="M210 56 L167 29" marker-end="url(#dd14)"/><text class="lbl halo bad" x="196" y="36" text-anchor="start">waits</text></svg>
+        </div>
+        <p style="margin-top:8px;">The engine aborts one. <strong>InnoDB</strong> checks when a transaction must wait and rolls back the smaller one (error 1213). <strong>PostgreSQL</strong> first waits <code>deadlock_timeout</code> (1 s), then checks (40P01).</p>
+      </div>
+    </div>
+    <div class="facts">
+      <p class="fact"><b>Ask for a lock in SQL</b><code>SELECT … FOR UPDATE</code> locks rows as if updating them; <code>FOR SHARE</code> lets others read but not change them. <code>NOWAIT</code> fails at once; <code>SKIP LOCKED</code> skips locked rows (job queues).</p>
+      <p class="fact hud-clear"><b>Escalation</b>SQL Server turns row locks into a table lock once one statement holds about 5,000 on a table; its deadlock victim gets error 1205. InnoDB and PostgreSQL never escalate row locks.</p>
+    </div>
+    <div class="foot">LOCKING / 14</div>
+  </section>
+
+  <!-- 15 — AXIS 04: SSI -->
+  <section class="slide dense" id="s15">
+    <div>
+      <p class="eyebrow">Axis 04 · serializable snapshot isolation</p>
+      <h2>SSI: run optimistically, abort the dangerous ones</h2>
+      <p class="lead" style="margin-top:10px;">Snapshot isolation plus bookkeeping. Nobody waits for a read; instead, the engine watches for the one pattern that every snapshot anomaly contains.</p>
+    </div>
+    <div class="split" style="align-items:start;">
+      <div>
+        <ol class="qs">
+          <li><strong>Read a snapshot</strong>, exactly as under snapshot isolation.</li>
+          <li><strong>Remember what each transaction read</strong>: PostgreSQL's SIRead locks, which never block anyone.</li>
+          <li><strong>Record an rw-dependency</strong> when a transaction writes something a concurrent one read: an edge from the reader to the writer.</li>
+          <li><strong>Abort on a dangerous structure</strong>: a transaction with an rw edge in and an rw edge out. The victim fails with <code>40001</code>; the application retries it.</li>
+        </ol>
+      </div>
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 400 176" role="img" aria-label="Write skew under SSI: T1 (Alice) reads both doctors and takes Alice off call; T2 (Bob) reads both and takes Bob off call. T1 read Bob's row, which T2 wrote, and T2 read Alice's row, which T1 wrote: two rw edges forming a cycle." style="max-width:440px"><defs><marker id="dd15" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#d9480f"/></marker></defs><rect class="n-b" x="6" y="62" width="150" height="50" rx="8"/><text x="81" y="82" text-anchor="middle">T1 · Alice</text><text class="sub" x="81" y="100" text-anchor="middle">sees 2 · Alice off</text><rect class="n-b" x="244" y="62" width="150" height="50" rx="8"/><text x="319" y="82" text-anchor="middle">T2 · Bob</text><text class="sub" x="319" y="100" text-anchor="middle">sees 2 · Bob off</text><path class="lnw" d="M110 62 Q 200 6 286 60" marker-end="url(#dd15)"/><text class="lbl halo" x="200" y="22" text-anchor="middle">rw: T1 read Bob's row, T2 wrote it</text><path class="lnw" d="M290 112 Q 200 168 114 114" marker-end="url(#dd15)"/><text class="lbl halo" x="200" y="160" text-anchor="middle">rw: T2 read Alice's row, T1 wrote it</text></svg>
+        <p class="cap">the doctors from slide 08 · the first to commit wins, the other gets 40001</p>
+      </div>
+    </div>
+    <div class="facts three">
+      <p class="fact"><b>False positives</b>It checks for the pattern, not a full cycle, so some aborts weren't needed. Read tracking coarsens from rows to pages to tables when memory runs short, and a sequential scan marks the whole table.</p>
+      <p class="fact"><b>Read-only, never aborts</b><code>SERIALIZABLE READ ONLY DEFERRABLE</code> waits for a safe snapshot, then runs with no tracking and can't fail: good for long reports and <code>pg_dump</code>.</p>
+      <p class="fact hud-clear"><b>Where it comes from</b>Cahill, Röhm and Fekete (SIGMOD 2008). First shipped in PostgreSQL 9.1 (2011), described by Ports and Grittner (VLDB 2012).</p>
+    </div>
+    <div class="foot">SSI / 15</div>
+  </section>
+
+  <!-- 16 — BEYOND SQL -->
+  <section class="slide dense" id="s16">
+    <div>
+      <p class="eyebrow">Beyond SQL</p>
+      <h2>Transactions in NoSQL databases</h2>
+      <p class="lead" style="margin-top:10px;">"NoSQL" no longer means "no transactions". The questions are the same: which unit is always atomic, how far a transaction reaches, and what it isolates.</p>
+    </div>
+    <div class="matrix-wrap">
+      <table class="matrix wrap">
+        <thead><tr><th>Database</th><th>Always atomic</th><th>Multi-item transactions</th><th>Isolation</th><th>Limits</th></tr></thead>
+        <tbody>
+          <tr><td class="name">MongoDB</td><td>one document</td><td>since 4.0 on replica sets, 4.2 across shards</td><td>snapshot (read concern "snapshot" across shards); write conflicts abort; <span class="m-less">no serializable&nbsp;level</span></td><td>60 s lifetime by default; waits 5&nbsp;ms for a lock, then aborts</td></tr>
+          <tr><td class="name">DynamoDB</td><td>one item, with conditional writes</td><td><code>TransactWriteItems</code> / <code>TransactGetItems</code>: up to 100 items, 4&nbsp;MB</td><td><span class="m-multi">serializable</span> against other transactions and single-item calls; read committed against Query and Scan</td><td>one account and Region; each item at most once; twice the usual write cost</td></tr>
+          <tr><td class="name">Cassandra · ScyllaDB</td><td>one partition: a batch on one partition key is atomic and isolated</td><td><span class="m-less">none.</span> A logged batch across partitions completes eventually, visibly half-done meanwhile</td><td>lightweight transactions (<code>IF&nbsp;…</code>): linearizable compare-and-set in one partition, via Paxos</td><td>LWTs cost extra round trips. Accord (multi-partition ACID) is in Cassandra 6.0, still alpha</td></tr>
+          <tr><td class="name">Redis</td><td>one command</td><td><code>MULTI</code> / <code>EXEC</code>, Lua scripts, functions; <code>WATCH</code> for check-and-set</td><td>runs with no other client in between; <span class="m-less">no rollback</span>: a failed command doesn't undo the rest</td><td>Redis Cluster: all keys in one slot</td></tr>
+          <tr><td class="name">Aerospike</td><td>one record</td><td>multi-record since 8.0 (2025)</td><td><span class="m-multi">strictly serializable</span>; reads re-checked at commit</td><td>strong-consistency namespaces only; expires a set time after its first write</td></tr>
+          <tr><td class="name">Firestore</td><td>one document</td><td>transactions over many documents</td><td><span class="m-multi">serializable</span>; by default Standard edition locks reads, Enterprise is optimistic (set per database)</td><td>mobile and web SDKs always optimistic: retry, then fail on contention</td></tr>
+          <tr><td class="name">Couchbase</td><td>one document</td><td>distributed ACID transactions (SDKs and SQL++)</td><td><span class="m-less">read committed</span>; uncommitted changes never visible</td><td>15 s timeout by default; majority durability</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="foot">NOSQL / 16</div>
+  </section>
+
+  <!-- 17 — ISOLATION BY DATABASE -->
+  <section class="slide dense" id="s17">
+    <div>
+      <p class="eyebrow">The transactions cheat sheet</p>
+      <h2>Default vs. strongest isolation, per database</h2>
+    </div>
+    <div class="matrix-wrap">
+      <table class="matrix wrap">
+        <thead><tr><th>Database</th><th>Default</th><th>Strongest</th><th>Mechanism</th></tr></thead>
+        <tbody>
+          <tr><td class="name">PostgreSQL</td><td class="m-less">READ COMMITTED</td><td class="m-multi">SERIALIZABLE (SSI)</td><td>MVCC, new versions in the table; row locks</td></tr>
+          <tr><td class="name">MySQL InnoDB</td><td class="m-less">REPEATABLE READ</td><td class="m-multi">SERIALIZABLE (locking)</td><td>MVCC from the undo log; next-key locks</td></tr>
+          <tr><td class="name">SQL Server</td><td class="m-less">READ COMMITTED (locking)</td><td class="m-multi">SERIALIZABLE (key-range locks)</td><td>locks; row versions for RCSI and SNAPSHOT</td></tr>
+          <tr><td class="name">Oracle</td><td class="m-less">READ COMMITTED</td><td class="m-less">"SERIALIZABLE" = snapshot</td><td>MVCC from undo; row locks</td></tr>
+          <tr><td class="name">SQLite</td><td class="m-multi">SERIALIZABLE</td><td class="m-multi">same</td><td>one writer at a time; WAL readers keep a snapshot</td></tr>
+          <tr><td class="name">Spanner</td><td class="m-multi">strict serializable</td><td class="m-multi">same</td><td>2PL + wound-wait; lock-free snapshot reads</td></tr>
+          <tr><td class="name">CockroachDB</td><td class="m-multi">SERIALIZABLE</td><td class="m-multi">same</td><td>MVCC, timestamp ordering, read refresh</td></tr>
+          <tr><td class="name">YugabyteDB</td><td class="m-less">snapshot or RC*</td><td class="m-multi">SERIALIZABLE</td><td>MVCC + locks; wait or fail on conflict</td></tr>
+          <tr><td class="name">TiDB</td><td class="m-less">snapshot, named RR</td><td class="m-less">snapshot</td><td>Percolator MVCC; pessimistic by default: DML reads the latest rows</td></tr>
+          <tr><td class="name">MongoDB</td><td>one document</td><td class="m-less">snapshot + write conflicts</td><td>WiredTiger MVCC; optimistic per document</td></tr>
+          <tr><td class="name">Aurora DSQL</td><td class="m-less">snapshot (PG RR)</td><td class="m-less">the only level</td><td>OCC: conflicts at commit → 40001</td></tr>
+          <tr><td class="name">DynamoDB</td><td>one item</td><td class="m-multi">serializable, ≤ 100 items</td><td>transaction coordinators; prepare + commit</td></tr>
+          <tr><td class="name">FoundationDB</td><td class="m-multi">strict serializable</td><td class="m-multi">same</td><td>OCC + MVCC; 5-second transactions</td></tr>
+          <tr><td class="name">Aerospike</td><td>one record</td><td class="m-multi">strict serializable (8.0)</td><td>versions re-checked at commit</td></tr>
+          <tr><td class="name">Cassandra · ScyllaDB</td><td>one partition</td><td>linearizable compare-and-set (LWT)</td><td>Paxos, per partition</td></tr>
+          <tr><td class="name">Redis</td><td>one command</td><td><code>MULTI</code>/<code>EXEC</code>, no rollback</td><td>serial: one command at a time</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted hud-clear" style="font-size:.76rem;">Colours: <span class="m-multi">serializable or stronger</span> · <span class="m-less">snapshot or weaker</span>. *YugabyteDB: new v2025.2+ universes created with yugabyted, YugabyteDB Anywhere or Aeon run READ COMMITTED; elsewhere <code>yb_enable_read_committed_isolation</code> is off and READ COMMITTED falls back to snapshot. Azure SQL Database turns on RCSI by default. Across shards: <a href="../distributed-databases/index.html#s16">Part 2 · atomic commit</a> · timestamps: <a href="../distributed-databases/index.html#s18">Part 2 · clocks</a>.</p>
+    <div class="foot">ISOLATION BY DB / 17</div>
+  </section>
+
+  <!-- 18 — IN THE APPLICATION -->
+  <section class="slide dense" id="s18">
+    <div>
+      <p class="eyebrow">In the application</p>
+      <h2>When the isolation level isn't enough</h2>
+      <p class="lead" style="margin-top:10px;">Most code runs at the default level. These patterns close the gaps it leaves.</p>
+    </div>
+    <div class="grid cols-6">
+      <div class="card">
+        <h3>Let the database add it up</h3>
+        <p><code>UPDATE … SET n = n + 1</code>, MongoDB <code>$inc</code>, Redis <code>INCR</code>. No read-modify-write in the app, so no update to lose.</p>
+      </div>
+      <div class="card">
+        <h3>Lock what you read</h3>
+        <p><code>SELECT … FOR UPDATE</code>, then write. Every writer of that row must lock it the same way: a plain SELECT never waits. The fix for lost updates under MySQL's Repeatable Read.</p>
+      </div>
+      <div class="card">
+        <h3>Check a version on write</h3>
+        <p><code>UPDATE … WHERE id = ? AND version = ?</code>; zero rows means someone won, so re-read and retry. Built in: DynamoDB conditions, Redis <code>WATCH</code>, Cassandra <code>IF</code>.</p>
+      </div>
+      <div class="card">
+        <h3>Retry the whole transaction</h3>
+        <p>On 40001 and 40P01 (PostgreSQL), 1213 (MySQL deadlock), 1020 (MariaDB snapshot conflict), 1205 and 3960 (SQL Server deadlock, snapshot conflict). Re-run the logic, not the failed statement, and make it safe to repeat.</p>
+      </div>
+      <div class="card">
+        <h3>Materialize the conflict</h3>
+        <p>Write skew on rows that don't exist yet, like bookings? Create one row per room and time slot, and lock it. A last resort.</p>
+      </div>
+      <div class="card">
+        <h3>Keep transactions short</h3>
+        <p>No user think-time or remote calls inside. Long ones hold locks, block cleanup and abort more; Aurora DSQL stops them at 5 minutes.</p>
+      </div>
+    </div>
+    <p class="note hud-clear"><b>Last line of defence: constraints.</b> UNIQUE, FOREIGN KEY and PostgreSQL's <code>EXCLUDE USING gist</code> (no two bookings overlap) hold at every isolation level. A CHECK sees one row only, so it can't stop the on-call write skew.</p>
+    <div class="foot">IN THE APP / 18</div>
+  </section>
+
+  <!-- 19 — MYTHS + QUESTIONS -->
+  <section class="slide dense" id="s19">
+    <div>
+      <p class="eyebrow">Payoff</p>
+      <h2>Myths to drop, questions to ask</h2>
+    </div>
+    <div class="grid cols-2">
+      <div class="card" style="border-color:var(--warm);">
+        <h3 style="color:var(--warm)">Myth-busters</h3>
+        <ul class="ticks" style="margin-top:8px;">
+          <li><strong>ACID ≠ serializable</strong>: most defaults are read committed or snapshot.</li>
+          <li><strong>RR ≠ RR</strong>: ANSI, MySQL, MariaDB and PostgreSQL mean different things (<a class="go inline" href="#s11">slide 11</a>).</li>
+          <li><strong>Snapshot isolation ≠ serializable</strong>: write skew gets through, Oracle's "SERIALIZABLE" included.</li>
+          <li><strong>MVCC ≠ no locks</strong>: readers don't block, but writers still lock the rows they change.</li>
+          <li><strong>NoSQL ≠ no transactions</strong>: MongoDB, DynamoDB, Aerospike and Firestore all run multi-item ACID transactions.</li>
+          <li><strong>Commit ≠ durable</strong>: Redis's AOF is off by default; Cassandra fsyncs its commit log every 10 s.</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:var(--accent);">
+        <h3 class="accent">Ask any database</h3>
+        <ol class="qs" style="margin-top:10px;">
+          <li><strong>What is the default isolation level</strong>, not the strongest one?</li>
+          <li><strong>What is the strongest</strong>, and what does it cost: waits, aborts, throughput?</li>
+          <li><strong>What does a commit wait for</strong>: memory, a local fsync, a majority of replicas?</li>
+          <li><strong>What aborts</strong>, with which error, and is it safe to retry?</li>
+          <li><strong>How long and how big</strong> may one transaction be?</li>
+          <li><strong>Which anomalies</strong> must my application prevent by itself?</li>
+        </ol>
+      </div>
+    </div>
+    <div class="foot">PAYOFF / 19</div>
+  </section>
+
+  <!-- 20 — SOURCES + END -->
+  <section class="slide" id="s20" style="justify-content:center;">
+    <div>
+      <p class="eyebrow">Further reading</p>
+      <h1>Thank you.<br><span class="accent">Questions?</span></h1>
+      <div class="grid cols-3" style="margin-top:28px;">
+        <div class="card">
+          <h3>The books</h3>
+          <p>Kleppmann, <em>Designing Data-Intensive Applications</em>, and Petrov, <em>Database Internals</em>.</p>
+          <div class="tag-row">
+            <a class="pill on" href="../../books/notes/ddia/ch7/">DDIA (1st ed.) ch 7 Transactions</a>
+            <a class="pill on" href="../../books/notes/database-internals/ch5/">Database Internals ch 5</a>
+          </div>
+        </div>
+        <div class="card">
+          <h3>The papers</h3>
+          <p>ARIES (Mohan et al., TODS 1992) · A Critique of ANSI SQL Isolation Levels (Berenson et al., SIGMOD 1995) · Weak Consistency (Adya, MIT thesis 1999) · Serializable Isolation for Snapshot Databases (Cahill et al., SIGMOD 2008) · SSI in PostgreSQL (Ports &amp; Grittner, VLDB 2012).</p>
+        </div>
+        <div class="card">
+          <h3>The series</h3>
+          <p><a href="../database-guide/index.html">Part 1</a>: data models, storage and architecture. <a href="../distributed-databases/index.html">Part 2</a>: distributed databases. Part 3: this deck. <a href="../database-anatomy-part2/index.html">Part 4</a>: analytical databases.</p>
+          <p style="margin-top:8px; font-size:.8rem;">Version-specific facts checked November 2026.</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot">END · PART 3 / 20</div>
+  </section>
+
+</main>
+
+<div id="hud">
+  <button class="hud-btn" id="prev" aria-label="Previous slide" title="Previous (↑)">↑</button>
+  <button type="button" id="counter" title="All slides (G)">1 / 20</button>
+  <button class="hud-btn" id="next" aria-label="Next slide" title="Next (↓ / Space)">↓</button>
+</div>
+
+<script src="../../shared/sitenav.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- inject brand logos (shared icon set from Part 1; monogram fallback) ---------- */
+  var PATHS = (typeof ICON_PATHS !== "undefined") ? ICON_PATHS : {};
+  document.querySelectorAll(".logo-tile").forEach(function(el){
+    var slug = el.getAttribute("data-icon");
+    var def = slug && PATHS[slug];
+    var brand = (getComputedStyle(el).getPropertyValue("--brand") || "#333").trim();
+    if (def && def.d){
+      el.innerHTML = '<svg viewBox="'+(def.vb||"0 0 24 24")+'" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'+
+                     '<path fill="'+brand+'" d="'+def.d+'"/></svg>';
+    } else {
+      var mono = el.getAttribute("data-mono") || (el.nextElementSibling ? el.nextElementSibling.textContent.trim().slice(0,2).toUpperCase() : "?");
+      el.innerHTML = '<span class="mono-mark">'+mono+'</span>';
+    }
+  });
+
+  /* ---------- deck navigation (same behaviour as Parts 1 and 2) ---------- */
+  var deck = document.getElementById("deck");
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var counter = document.getElementById("counter");
+  var progress = document.getElementById("progress");
+  var total = slides.length;
+  var current = 0;
+
+  function setCurrent(i){
+    current = Math.max(0, Math.min(total-1, i));
+    counter.textContent = (current+1) + " / " + total;
+    progress.style.width = ((current+1)/total*100) + "%";
+  }
+  function go(i){
+    i = Math.max(0, Math.min(total-1, i));
+    slides[i].scrollIntoView({behavior: "smooth", block: "start"});
+    setCurrent(i);
+  }
+  // The counter follows the slide that fills most of the screen. Measuring the
+  // screen (not the slide) also works for slides taller than two screens, which
+  // are common on phones. Only a change updates the counter, so go() can show its
+  // target at once without the scroll animation walking it back.
+  var shown = 0, ticking = false;
+  function syncCounter(){
+    var top = deck.getBoundingClientRect().top, h = deck.clientHeight, best = 0, most = -1;
+    for (var k = 0; k < total; k++){
+      var r = slides[k].getBoundingClientRect();
+      var visible = Math.min(r.bottom, top + h) - Math.max(r.top, top);
+      if (visible > most){ most = visible; best = k; }
+    }
+    if (best !== shown){ shown = best; setCurrent(best); }
+  }
+  deck.addEventListener("scroll", function(){
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function(){ ticking = false; syncCounter(); });
+  }, {passive: true});
+  window.addEventListener("resize", syncCounter);
+  // Step through a tall slide's overflow before advancing, so wide tables are never skipped.
+  function vh(){ return deck.clientHeight; }
+  function nextStep(){
+    var r = slides[current].getBoundingClientRect();
+    if (r.bottom > vh() + 8){ deck.scrollBy({top: Math.min(r.bottom - vh(), 0.85 * vh()), behavior: "smooth"}); }
+    else { go(current + 1); }
+  }
+  function prevStep(){
+    var r = slides[current].getBoundingClientRect();
+    if (r.top < -8){ deck.scrollBy({top: -Math.min(-r.top, 0.85 * vh()), behavior: "smooth"}); }
+    else { go(current - 1); }
+  }
+  document.getElementById("next").addEventListener("click", nextStep);
+  document.getElementById("prev").addEventListener("click", prevStep);
+  document.addEventListener("keydown", function(e){
+    var t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+    if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === " "){ e.preventDefault(); nextStep(); }
+    else if (e.key === "ArrowUp" || e.key === "PageUp"){ e.preventDefault(); prevStep(); }
+    else if (e.key === "Home"){ e.preventDefault(); go(0); }
+    else if (e.key === "End"){ e.preventDefault(); go(total-1); }
+  });
+
+  /* ---------- theme toggle ---------- */
+  var tg = document.getElementById("theme-toggle");
+  var themed = "dark";
+  tg.addEventListener("click", function(){
+    themed = themed === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", themed);
+  });
+
+  setCurrent(0);
+})();
+</script>
+<script>
+/* ---------- anomaly lab (slide 10) ----------
+   Every scenario × level below is a hand-written list of events; nothing is simulated.
+   Event: t = 1 or 2 (T1 / T2); k = kind (rd read · wr write · wait blocked · go resumed · ok commit · ab abort · rt retry);
+   op / res = what the T1 or T2 column shows; log = the explanation; set = rows that change after this step:
+   c = committed value, u = "value/tx" uncommitted ("" = none), l = locks held ("S1" shared by T1, "X2" exclusive by T2, "R1" SIRead by T1). */
+(function(){
+  "use strict";
+  var root = document.getElementById("anomaly-lab");
+  if (!root) return;
+  function $(id){ return document.getElementById(id); }
+  var scSel = $("al-sc"), lvSel = $("al-lv"), stepsEl = $("al-steps"), rowsEl = $("al-rows"), keyEl = $("al-key"),
+      r1 = $("al-r1"), r2 = $("al-r2"), invEl = $("al-inv"), outEl = $("al-out"), logEl = $("al-log"), posEl = $("al-pos"),
+      bStep = $("al-step"), bRun = $("al-run"), bReset = $("al-reset");
+  if (!scSel || !lvSel || !stepsEl || !rowsEl || !bStep || !bRun || !bReset) return;
+  var takes = root.querySelectorAll(".al-take");
+
+  function E(t, k, op, res, log, set, x){ return {t: t, k: k, op: op, res: res, log: log, set: set || null, x: !!x}; }
+  function fmt(v){ return typeof v === "number" && v >= 1000 ? v.toLocaleString("en-US") : String(v); }
+
+  var SC = {
+    rs: { key: "account", rows: ["A", "B"], init: {A: 500, B: 500}, r1: "reads A, then B", r2: "moves 100 from A to B",
+      intro: "Accounts A and B hold 500 each. <b>T1</b> reads A, then B, and reports the total; meanwhile <b>T2</b> moves 100 from A to B. The total should always be 1,000. Press <b>Step</b>.",
+      inv: function(v){ var s = v.A + v.B; return ["committed A + B = " + fmt(s) + " · T1 should report the same", ""]; } },
+    lu: { key: "row", rows: ["n"], init: {n: 10}, r1: "adds 1 to n", r2: "adds 1 to n",
+      intro: "A counter holds n = 10. <b>T1</b> and <b>T2</b> each read n, add 1 in the application and write the result back. Two increments should leave 12. Press <b>Step</b>.",
+      inv: function(v, done){ return ["committed n = " + v.n + " · two increments should leave 12", done ? (v.n === 12 ? "ok" : "bad") : ""]; } },
+    ws: { key: "doctor", rows: ["Alice", "Bob"], init: {Alice: "on", Bob: "on"}, r1: "Alice goes off call", r2: "Bob goes off call",
+      intro: "Alice and Bob are on call, and at least one doctor must stay on call. Each transaction counts who is on call and, if it sees 2, takes only its own doctor off call. Press <b>Step</b>.",
+      inv: function(v){ var c = (v.Alice === "on" ? 1 : 0) + (v.Bob === "on" ? 1 : 0); return ["committed on call: " + c + " · rule: at least 1", c >= 1 ? "ok" : "bad"]; } }
+  };
+
+  var MYFS = "Inside a transaction (after BEGIN, or with autocommit off), MySQL's SERIALIZABLE turns every plain SELECT into <code>SELECT … FOR SHARE</code>: ";
+  var RUN = {
+    /* ---------- read skew ---------- */
+    rs: {
+      rc: { ev: [
+        E(1, "rd", "SELECT A", "→ 500", "<b>T1</b> reads A = 500. Under Read Committed each <em>statement</em> reads only committed data; there is no snapshot for the whole transaction."),
+        E(2, "wr", "UPDATE A = A − 100", "", "<b>T2</b> takes 100 from A. The new value, 400, is uncommitted: nobody else sees it, and T2 holds a row lock on A until it commits.", {A: {u: "400/2", l: "X2"}}),
+        E(2, "wr", "UPDATE B = B + 100", "", "<b>T2</b> adds 100 to B (600, uncommitted) and locks B too.", {B: {u: "600/2", l: "X2"}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits: A = 400, B = 600, still 1,000 in total. Its locks are released.", {A: {c: 400, u: "", l: ""}, B: {c: 600, u: "", l: ""}}),
+        E(1, "rd", "SELECT B", "→ 600", "<b>T1</b> reads B. This is a new statement, so it sees T2's commit: B = 600."),
+        E(1, "ok", "A + B, COMMIT", "→ 1,100", "<b>T1</b> adds the A it read <em>before</em> the transfer to the B it read <em>after</em> it: 500 + 600 = 1,100.", null, true)
+      ], out: [false, "Anomaly: read skew", "T1 reported 1,100, not 1,000. The committed data was always right; T1 saw A before the transfer and B after it."] },
+      si: { ev: [
+        E(1, "rd", "SELECT A", "→ 500", "<b>T1</b> reads A = 500. Its first statement fixes T1's snapshot: every later read in T1 sees the data as of this moment."),
+        E(2, "wr", "UPDATE A = A − 100", "", "<b>T2</b> takes 100 from A. PostgreSQL writes a new version of the row (400, uncommitted) and keeps the old one, which T1's snapshot may still need.", {A: {u: "400/2", l: "X2"}}),
+        E(2, "wr", "UPDATE B = B + 100", "", "<b>T2</b> adds 100 to B: another new version, 600, uncommitted.", {B: {u: "600/2", l: "X2"}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits: A = 400, B = 600. T1 is still running, so the old versions stay.", {A: {c: 400, u: "", l: ""}, B: {c: 600, u: "", l: ""}}),
+        E(1, "rd", "SELECT B", "→ 500", "<b>T1</b> reads B from its snapshot: 500. T2 committed after the snapshot was taken, so T1 doesn't see it."),
+        E(1, "ok", "A + B, COMMIT", "→ 1,000", "<b>T1</b> reports 500 + 500 = 1,000: both reads come from the same moment, before the transfer.")
+      ], out: [true, "Prevented by the snapshot", "Both of T1's reads came from one snapshot taken before the transfer, so T1 reported 1,000. Nobody waited or was aborted."] },
+      my: { ev: [
+        E(1, "rd", "SELECT A", "→ 500", "<b>T1</b> reads A = 500 with a plain SELECT. InnoDB's first consistent read creates T1's read view: a snapshot reused by every later SELECT in T1."),
+        E(2, "wr", "UPDATE A = A − 100", "", "<b>T2</b> takes 100 from A. InnoDB changes the row in place (400, uncommitted) and keeps the old value in its undo log, so T1's snapshot can still be rebuilt.", {A: {u: "400/2", l: "X2"}}),
+        E(2, "wr", "UPDATE B = B + 100", "", "<b>T2</b> adds 100 to B (600, uncommitted).", {B: {u: "600/2", l: "X2"}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits: A = 400, B = 600. Its locks are released.", {A: {c: 400, u: "", l: ""}, B: {c: 600, u: "", l: ""}}),
+        E(1, "rd", "SELECT B", "→ 500", "<b>T1</b>'s SELECT reads its snapshot: B = 500, rebuilt from the undo log."),
+        E(1, "ok", "A + B, COMMIT", "→ 1,000", "<b>T1</b> reports 500 + 500 = 1,000.")
+      ], out: [true, "Prevented by the snapshot", "Every plain SELECT in T1 reads the snapshot from its first read, so T1 reported 1,000. Writes ignore that snapshot: try the lost update."] },
+      ssi: { ev: [
+        E(1, "rd", "SELECT A", "→ 500", "<b>T1</b> reads A = 500 from its snapshot. PostgreSQL also records an <em>SIRead lock</em>, a note that T1 read A. It never blocks anyone.", {A: {l: "R1"}}),
+        E(2, "wr", "UPDATE A = A − 100", "", "<b>T2</b> writes A, which T1 has read: PostgreSQL records a read/write dependency, T1 must come before T2. One dependency on its own is harmless.", {A: {u: "400/2", l: "R1 X2"}}),
+        E(2, "wr", "UPDATE B = B + 100", "", "<b>T2</b> adds 100 to B (600, uncommitted).", {B: {u: "600/2", l: "X2"}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits: A = 400, B = 600. T1's SIRead lock on A stays, because T1 is still running.", {A: {c: 400, u: "", l: "R1"}, B: {c: 600, u: "", l: ""}}),
+        E(1, "rd", "SELECT B", "→ 500", "<b>T1</b> reads B from its snapshot: 500.", {B: {l: "R1"}}),
+        E(1, "ok", "A + B, COMMIT", "→ 1,000", "<b>T1</b> reports 1,000 and commits. Its only dependency, T1 before T2, is a valid serial order, so nothing is aborted.", {A: {l: ""}, B: {l: ""}})
+      ], out: [true, "Prevented by the snapshot", "T1 read one snapshot and reported 1,000. Its one read/write dependency fits the serial order T1, then T2, so SSI aborted nobody."] },
+      "2pl": { ev: [
+        E(1, "rd", "SELECT A", "→ 500", MYFS + "<b>T1</b> holds a shared lock on A until it commits.", {A: {l: "S1"}}),
+        E(2, "wait", "UPDATE A = A − 100", "waits for T1", "<b>T2</b> needs an exclusive lock on A to change it, but T1's shared lock is in the way. T2 waits."),
+        E(1, "rd", "SELECT B", "→ 500", "<b>T1</b> reads B = 500 and takes a shared lock on it too. T2 hasn't changed anything yet.", {B: {l: "S1"}}),
+        E(1, "ok", "A + B, COMMIT", "→ 1,000", "<b>T1</b> reports 500 + 500 = 1,000 and commits, releasing its locks.", {A: {l: ""}, B: {l: ""}}),
+        E(2, "go", "↳ UPDATE A = A − 100", "", "<b>T2</b> gets its lock at last and takes 100 from A (400, uncommitted).", {A: {u: "400/2", l: "X2"}}),
+        E(2, "wr", "UPDATE B = B + 100", "", "<b>T2</b> adds 100 to B (600, uncommitted).", {B: {u: "600/2", l: "X2"}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits: A = 400, B = 600.", {A: {c: 400, u: "", l: ""}, B: {c: 600, u: "", l: ""}})
+      ], out: [true, "Prevented by waiting", "T1's shared lock held T2 back until T1 finished reading, so they ran as T1, then T2. T1 reported 1,000; the transfer still went through."] }
+    },
+
+    /* ---------- lost update ---------- */
+    lu: {
+      rc: { ev: [
+        E(1, "rd", "SELECT n", "→ 10", "<b>T1</b> reads n = 10. The application will add 1 and write the result back."),
+        E(2, "rd", "SELECT n", "→ 10", "<b>T2</b> reads n = 10 as well. Two reads of the same row don't conflict, so nothing stops it."),
+        E(1, "wr", "UPDATE n = 11", "", "<b>T1</b> writes 10 + 1 = 11 (uncommitted) and holds a row lock on n until it commits.", {n: {u: "11/1", l: "X1"}}),
+        E(2, "wait", "UPDATE n = 11", "waits for T1", "<b>T2</b> writes 11 too, the value it computed from its read. T1's row lock is in the way, so T2 waits."),
+        E(1, "ok", "COMMIT", "✓", "<b>T1</b> commits n = 11 and releases its lock.", {n: {c: 11, u: "", l: ""}}),
+        E(2, "go", "↳ UPDATE n = 11", "", "<b>T2</b> wakes up. Read Committed applies its UPDATE to the newly committed row (PostgreSQL re-checks the WHERE clause first), so 11 overwrites 11.", {n: {u: "11/2", l: "X2"}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits n = 11.", {n: {c: 11, u: "", l: ""}})
+      ], out: [false, "Anomaly: lost update", "Two increments committed, but n went from 10 to 11: T2 wrote a value computed from a stale read, and nothing checked."] },
+      si: { ev: [
+        E(1, "rd", "SELECT n", "→ 10", "<b>T1</b> reads n = 10, and its first statement fixes its snapshot. The application will add 1 and write the result back."),
+        E(2, "rd", "SELECT n", "→ 10", "<b>T2</b> reads n = 10 from its own snapshot. Reads take no locks."),
+        E(1, "wr", "UPDATE n = 11", "", "<b>T1</b> writes 11 (uncommitted) and holds a row lock on n until it commits.", {n: {u: "11/1", l: "X1"}}),
+        E(2, "wait", "UPDATE n = 11", "waits for T1", "<b>T2</b> tries to write 11. T1's row lock is in the way, so T2 waits to see whether T1 commits or rolls back."),
+        E(1, "ok", "COMMIT", "✓", "<b>T1</b> commits n = 11.", {n: {c: 11, u: "", l: ""}}),
+        E(2, "ab", "↳ UPDATE n = 11", "✗ 40001", "T1 committed a change to n after T2's snapshot was taken, so PostgreSQL aborts <b>T2</b>: <code>ERROR: could not serialize access due to concurrent update</code> (SQLSTATE 40001)."),
+        E(2, "rt", "<i>retry</i> SELECT n", "→ 11", "The application retries the <em>whole</em> transaction, not just the failed statement. The new snapshot sees n = 11."),
+        E(2, "wr", "UPDATE n = 12", "", "<b>T2</b> writes 11 + 1 = 12 (uncommitted).", {n: {u: "12/2", l: "X2"}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits n = 12.", {n: {c: 12, u: "", l: ""}})
+      ], out: [true, "Prevented by abort + retry", "PostgreSQL refused to let T2 overwrite a change it never saw. The retried T2 read 11 and wrote 12, so both increments count."] },
+      my: { ev: [
+        E(1, "rd", "SELECT n", "→ 10", "<b>T1</b> reads n = 10 with a plain SELECT, from its snapshot. The application will add 1 and write the result back."),
+        E(2, "rd", "SELECT n", "→ 10", "<b>T2</b> reads n = 10 from its own snapshot. Plain SELECTs take no locks."),
+        E(1, "wr", "UPDATE n = 11", "", "<b>T1</b> writes 11 (uncommitted) and holds an exclusive lock on the row until it commits.", {n: {u: "11/1", l: "X1"}}),
+        E(2, "wait", "UPDATE n = 11", "waits for T1", "<b>T2</b> tries to write 11. T1's lock is in the way, so T2 waits."),
+        E(1, "ok", "COMMIT", "✓", "<b>T1</b> commits n = 11 and releases its lock.", {n: {c: 11, u: "", l: ""}}),
+        E(2, "go", "↳ UPDATE n = 11", "", "<b>T2</b> wakes up. InnoDB's snapshot is only for SELECTs: the UPDATE acts on the latest committed row and doesn't check whether T2 ever saw it. 11 overwrites 11.", {n: {u: "11/2", l: "X2"}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits n = 11.", {n: {c: 11, u: "", l: ""}})
+      ], out: [false, "Anomaly: lost update", "Same name as PostgreSQL's level, different result: n ends at 11 after two increments, because InnoDB doesn't detect the conflict."] },
+      ssi: { ev: [
+        E(1, "rd", "SELECT n", "→ 10", "<b>T1</b> reads n = 10 from its snapshot, and PostgreSQL records an SIRead lock, which never blocks.", {n: {l: "R1"}}),
+        E(2, "rd", "SELECT n", "→ 10", "<b>T2</b> reads n = 10 from its own snapshot.", {n: {l: "R1 R2"}}),
+        E(1, "wr", "UPDATE n = 11", "", "<b>T1</b> writes 11 (uncommitted) and takes a row lock on n.", {n: {u: "11/1", l: "R1 R2 X1"}}),
+        E(2, "wait", "UPDATE n = 11", "waits for T1", "<b>T2</b> tries to write 11. T1's row lock is in the way, so T2 waits."),
+        E(1, "ok", "COMMIT", "✓", "<b>T1</b> commits n = 11. Its SIRead lock stays while T2, which overlapped it, is still running.", {n: {c: 11, u: "", l: "R1 R2"}}),
+        E(2, "ab", "↳ UPDATE n = 11", "✗ 40001", "The same check as Repeatable Read fires first: T1 changed n after T2's snapshot, so <b>T2</b> is aborted with <code>ERROR: could not serialize access due to concurrent update</code> (SQLSTATE 40001).", {n: {l: ""}}),
+        E(2, "rt", "<i>retry</i> SELECT n", "→ 11", "The application retries the whole transaction. The new snapshot sees n = 11.", {n: {l: "R2"}}),
+        E(2, "wr", "UPDATE n = 12", "", "<b>T2</b> writes 12 (uncommitted).", {n: {u: "12/2", l: "R2 X2"}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits n = 12.", {n: {c: 12, u: "", l: ""}})
+      ], out: [true, "Prevented by abort + retry", "As under Repeatable Read: PostgreSQL's SERIALIZABLE is snapshot isolation plus extra checks, so T2 got 40001 and its retry wrote 12."] },
+      "2pl": { ev: [
+        E(1, "rd", "SELECT n", "→ 10", MYFS + "<b>T1</b> holds a shared lock on n until it commits.", {n: {l: "S1"}}),
+        E(2, "rd", "SELECT n", "→ 10", "<b>T2</b> reads n = 10 too. Shared locks are compatible, so T2 gets one as well.", {n: {l: "S1 S2"}}),
+        E(1, "wait", "UPDATE n = 11", "waits for T2", "<b>T1</b> needs an exclusive lock to write, but T2 holds a shared lock. T1 waits for T2."),
+        E(2, "wait", "UPDATE n = 11", "waits for T1", "<b>T2</b> needs an exclusive lock too, but T1 holds a shared lock. Each waits for the other: a deadlock."),
+        E(2, "ab", "↳ UPDATE n = 11", "✗ 1213", "InnoDB checks for a deadlock as soon as a transaction must wait. It finds one and rolls back all of <b>T2</b>: <code>ERROR 1213 (40001): Deadlock found when trying to get lock; try restarting transaction</code>.", {n: {l: "S1"}}),
+        E(1, "go", "↳ UPDATE n = 11", "", "With T2's shared lock gone, <b>T1</b> gets its exclusive lock and writes 11 (uncommitted).", {n: {u: "11/1", l: "X1"}}),
+        E(1, "ok", "COMMIT", "✓", "<b>T1</b> commits n = 11 and releases its locks.", {n: {c: 11, u: "", l: ""}}),
+        E(2, "rt", "<i>retry</i> SELECT n", "→ 11", "The application retries <b>T2</b> from the start. It reads n = 11.", {n: {l: "S2"}}),
+        E(2, "wr", "UPDATE n = 12", "", "<b>T2</b> takes an exclusive lock and writes 12 (uncommitted).", {n: {u: "12/2", l: "X2"}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits n = 12.", {n: {c: 12, u: "", l: ""}})
+      ], out: [true, "Prevented by deadlock + retry", "Both reads took shared locks, so the two writes waited for each other. InnoDB rolled back T2; its retry wrote 12, but did the work twice."] }
+    },
+
+    /* ---------- write skew ---------- */
+    ws: {
+      rc: { ev: [
+        E(1, "rd", "count on call", "→ 2", "<b>T1</b> (Alice) checks the rule: 2 doctors on call, so Alice may leave."),
+        E(2, "rd", "count on call", "→ 2", "<b>T2</b> (Bob) checks at the same moment and also sees 2."),
+        E(1, "wr", "UPDATE Alice: off", "", "<b>T1</b> takes Alice off call (uncommitted). It locks Alice's row only.", {Alice: {u: "off/1", l: "X1"}}),
+        E(2, "wr", "UPDATE Bob: off", "", "<b>T2</b> takes Bob off call. A different row, so no lock is in the way and nothing waits.", {Bob: {u: "off/2", l: "X2"}}),
+        E(1, "ok", "COMMIT", "✓", "<b>T1</b> commits: Alice is off call.", {Alice: {c: "off", u: "", l: ""}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits: Bob is off call. Each transaction was correct on its own; together they broke the rule.", {Bob: {c: "off", u: "", l: ""}})
+      ], out: [false, "Anomaly: write skew", "Both saw 2 on call, each changed a different row, and both committed: nobody is on call. No row was written twice, so nothing conflicted."] },
+      si: { ev: [
+        E(1, "rd", "count on call", "→ 2", "<b>T1</b> (Alice) checks the rule in its snapshot: 2 doctors on call, so Alice may leave."),
+        E(2, "rd", "count on call", "→ 2", "<b>T2</b> (Bob) checks in its own snapshot and also sees 2."),
+        E(1, "wr", "UPDATE Alice: off", "", "<b>T1</b> takes Alice off call (uncommitted) and locks Alice's row.", {Alice: {u: "off/1", l: "X1"}}),
+        E(2, "wr", "UPDATE Bob: off", "", "<b>T2</b> takes Bob off call. Snapshot isolation only catches two writes to the <em>same</em> row; this is a different one, so nothing waits or fails.", {Bob: {u: "off/2", l: "X2"}}),
+        E(1, "ok", "COMMIT", "✓", "<b>T1</b> commits: Alice is off call.", {Alice: {c: "off", u: "", l: ""}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits: Bob is off call. Nobody is left.", {Bob: {c: "off", u: "", l: ""}})
+      ], out: [false, "Anomaly: write skew", "A snapshot stops lost updates because they write the same row. These writes touch different rows, so both commit: nobody is on call."] },
+      my: { ev: [
+        E(1, "rd", "count on call", "→ 2", "<b>T1</b> (Alice) counts with a plain SELECT from its snapshot: 2 on call, so Alice may leave."),
+        E(2, "rd", "count on call", "→ 2", "<b>T2</b> (Bob) does the same and also sees 2. Plain SELECTs take no locks."),
+        E(1, "wr", "UPDATE Alice: off", "", "<b>T1</b> takes Alice off call by primary key, so InnoDB locks only Alice's row.", {Alice: {u: "off/1", l: "X1"}}),
+        E(2, "wr", "UPDATE Bob: off", "", "<b>T2</b> takes Bob off call: a different row, so no lock is in the way.", {Bob: {u: "off/2", l: "X2"}}),
+        E(1, "ok", "COMMIT", "✓", "<b>T1</b> commits: Alice is off call.", {Alice: {c: "off", u: "", l: ""}}),
+        E(2, "ok", "COMMIT", "✓", "<b>T2</b> commits: Bob is off call. Nobody is left.", {Bob: {c: "off", u: "", l: ""}})
+      ], out: [false, "Anomaly: write skew", "The counts took no locks and each UPDATE locked only its own row, so T1 and T2 never met. Both committed: nobody is on call."] },
+      ssi: { ev: [
+        E(1, "rd", "count on call", "→ 2", "<b>T1</b> reads both doctors' rows from its snapshot. PostgreSQL notes what it read with SIRead locks, which never block.", {Alice: {l: "R1"}, Bob: {l: "R1"}}),
+        E(2, "rd", "count on call", "→ 2", "<b>T2</b> reads both rows too and also sees 2.", {Alice: {l: "R1 R2"}, Bob: {l: "R1 R2"}}),
+        E(1, "wr", "UPDATE Alice: off", "", "<b>T1</b> writes Alice's row, which T2 has read: a read/write dependency, T2 must come before T1.", {Alice: {u: "off/1", l: "R1 R2 X1"}}),
+        E(2, "wr", "UPDATE Bob: off", "", "<b>T2</b> writes Bob's row, which T1 has read: T1 must come before T2. Each must now come before the other, which no serial order allows. Nothing has failed yet.", {Bob: {u: "off/2", l: "R1 R2 X2"}}),
+        E(1, "ok", "COMMIT", "✓", "<b>T1</b> commits first: Alice is off call. Its commit check finds that T2 now has a read/write dependency in and one out, and marks T2 to fail.", {Alice: {c: "off", u: "", l: "R1 R2"}}),
+        E(2, "ab", "COMMIT", "✗ 40001", "<b>T2</b>'s commit fails: <code>ERROR: could not serialize access due to read/write dependencies among transactions</code> (SQLSTATE 40001). Its change to Bob is rolled back.", {Alice: {l: ""}, Bob: {u: "", l: ""}}),
+        E(2, "rt", "<i>retry</i> count on call", "→ 1", "The application retries <b>T2</b>. Only Bob is on call now.", {Alice: {l: "R2"}, Bob: {l: "R2"}}),
+        E(2, "ok", "1 left: stay, COMMIT", "✓", "The rule says Bob must stay, so <b>T2</b> commits without changing anything.", {Alice: {l: ""}, Bob: {l: ""}})
+      ], out: [true, "Prevented by abort + retry", "SSI saw T1 and T2 each read a row the other wrote, the dangerous structure from slide 15, and aborted the second committer. Its retry saw 1 on call: Bob stayed."] },
+      "2pl": { ev: [
+        E(1, "rd", "count on call", "→ 2", MYFS + "<b>T1</b> holds shared locks on both rows it counted.", {Alice: {l: "S1"}, Bob: {l: "S1"}}),
+        E(2, "rd", "count on call", "→ 2", "<b>T2</b> reads both rows too. Shared locks don't conflict, so it also sees 2.", {Alice: {l: "S1 S2"}, Bob: {l: "S1 S2"}}),
+        E(1, "wait", "UPDATE Alice: off", "waits for T2", "<b>T1</b> needs an exclusive lock on Alice's row, but T2 holds a shared lock on it. T1 waits."),
+        E(2, "wait", "UPDATE Bob: off", "waits for T1", "<b>T2</b> needs an exclusive lock on Bob's row, but T1 holds a shared lock on it. Each waits for the other: a deadlock."),
+        E(2, "ab", "↳ UPDATE Bob: off", "✗ 1213", "InnoDB picks a victim to break the deadlock, here <b>T2</b>, and rolls it back with <code>ERROR 1213 (40001)</code>, releasing its locks.", {Alice: {l: "S1"}, Bob: {l: "S1"}}),
+        E(1, "go", "↳ UPDATE Alice: off", "", "<b>T1</b> gets its exclusive lock and takes Alice off call (uncommitted).", {Alice: {u: "off/1", l: "X1"}}),
+        E(1, "ok", "COMMIT", "✓", "<b>T1</b> commits: Alice is off call. Its locks are released.", {Alice: {c: "off", u: "", l: ""}, Bob: {l: ""}}),
+        E(2, "rt", "<i>retry</i> count on call", "→ 1", "The application retries <b>T2</b>. T1 has committed, so the count is 1.", {Alice: {l: "S2"}, Bob: {l: "S2"}}),
+        E(2, "ok", "1 left: stay, COMMIT", "✓", "The rule says Bob must stay, so <b>T2</b> commits without changing anything.", {Alice: {l: ""}, Bob: {l: ""}})
+      ], out: [true, "Prevented by deadlock + retry", "Locking every row it read made T1 and T2 collide. InnoDB rolled back T2, and its retry saw 1 doctor on call, so Bob stayed."] }
+    }
+  };
+
+  var step = 0, timer = null, lastOut = null;
+  function cur(){ return RUN[scSel.value][lvSel.value]; }
+  function stop(){ if (timer){ clearInterval(timer); timer = null; } }
+
+  function locksHtml(l){
+    if (!l) return "";
+    var by = {}, order = [];
+    l.split(" ").forEach(function(tok){
+      var m = tok.charAt(0), tx = tok.charAt(1);
+      if (!by[m]){ by[m] = []; order.push(m); }
+      by[m].push('<span class="al-t' + tx + '">T' + tx + '</span>');
+    });
+    return order.map(function(m){
+      return '<span class="al-lk">' + (m === "R" ? "SIRead" : m) + " " + by[m].join(" ") + "</span>";
+    }).join("");
+  }
+  function cellHtml(e){
+    var res = e.res ? ' <span class="al-res al-k-' + e.k + (e.x ? " al-x" : "") + '">' + e.res + "</span>" : "";
+    return '<span class="al-op">' + e.op + "</span>" + res;
+  }
+
+  function render(){
+    var sc = SC[scSel.value], run = cur(), ev = run.ev, n = ev.length, done = step >= n;
+    /* data: start from the initial rows and apply each executed event's explicit changes */
+    var st = {}, chg = {};
+    sc.rows.forEach(function(r){ st[r] = {c: sc.init[r], u: "", l: ""}; });
+    for (var i = 0; i < step; i++){
+      var s = ev[i].set;
+      if (!s) continue;
+      for (var r in s){
+        for (var f in s[r]){ st[r][f] = s[r][f]; if (i === step - 1) chg[r + f] = true; }
+      }
+    }
+    /* schedule */
+    var html = "";
+    for (var j = 0; j < n; j++){
+      var e = ev[j], cells = ["", ""];
+      if (j < step){
+        cells[e.t - 1] = cellHtml(e);
+        var other = e.t === 1 ? 2 : 1, last = null;
+        for (var q = 0; q < j; q++) if (ev[q].t === other) last = ev[q];
+        if (last && last.k === "wait") cells[other - 1] = '<span class="al-blk">waiting…</span>';
+      }
+      var cls = j >= step ? "fut" : (j === step - 1 ? "now" : "");
+      html += '<tr class="' + cls + '"><td class="n">' + (j + 1) + "</td>" +
+              '<td class="' + (j < step && e.t === 1 ? "t1" : "") + '">' + cells[0] + "</td>" +
+              '<td class="' + (j < step && e.t === 2 ? "t2" : "") + '">' + cells[1] + "</td></tr>";
+    }
+    stepsEl.innerHTML = html;
+    /* committed data */
+    var vals = {};
+    rowsEl.innerHTML = sc.rows.map(function(r){
+      var o = st[r], u = o.u ? o.u.split("/") : null;
+      vals[r] = o.c;
+      return "<tr><td class=\"k\">" + r + "</td>" +
+        '<td class="c' + (chg[r + "c"] ? " chg" : "") + '">' + fmt(o.c) + "</td>" +
+        '<td class="' + (chg[r + "u"] && o.u ? "chg" : "") + '">' + (u ? fmt(+u[0] || u[0]) + ' <span class="al-t' + u[1] + '">T' + u[1] + "</span>" : "—") + "</td>" +
+        '<td class="' + (chg[r + "l"] && o.l ? "chg" : "") + '">' + locksHtml(o.l) + "</td></tr>";
+    }).join("");
+    var inv = sc.inv(vals, done);
+    invEl.textContent = inv[0];
+    invEl.className = "al-inv" + (inv[1] ? " " + inv[1] : "");
+    /* outcome: rewrite only when it changes, so the status region isn't re-announced on every step */
+    var outHtml = done ? "<b>" + run.out[1] + "</b> " + run.out[2]
+                       : "<b>Outcome</b> Step to the end to see whether the anomaly gets through at this level.";
+    outEl.className = "al-out" + (done ? (run.out[0] ? " ok" : " bad") : "");
+    if (outHtml !== lastOut){ outEl.innerHTML = outHtml; lastOut = outHtml; }
+    logEl.innerHTML = step === 0 ? sc.intro : "<b>" + step + ".</b> " + ev[step - 1].log;
+    posEl.textContent = "step " + step + " of " + n;
+    bStep.disabled = done; bRun.disabled = done;
+    if (done && (document.activeElement === bStep || document.activeElement === bRun)) bReset.focus({preventScroll: true});
+  }
+
+  function setup(){
+    var sc = SC[scSel.value];
+    keyEl.textContent = sc.key;
+    r1.textContent = sc.r1; r2.textContent = sc.r2;
+    Array.prototype.forEach.call(takes, function(p){ p.hidden = p.getAttribute("data-sc") !== scSel.value; });
+  }
+  function reset(){ stop(); step = 0; render(); }
+  function next(){ if (step < cur().ev.length){ step += 1; render(); } if (step >= cur().ev.length) stop(); }
+
+  bStep.addEventListener("click", function(){ stop(); next(); });
+  bRun.addEventListener("click", function(){
+    stop();
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce){ step = cur().ev.length; render(); return; }
+    next();
+    if (step < cur().ev.length) timer = setInterval(next, 450);
+  });
+  bReset.addEventListener("click", reset);
+  scSel.addEventListener("change", function(){ setup(); reset(); });
+  lvSel.addEventListener("change", reset);
+  /* Space on a focused lab button presses it; keep the deck from also treating it as "next slide" */
+  root.addEventListener("keydown", function(e){
+    if (e.key === " " && e.target && e.target.tagName === "BUTTON") e.stopPropagation();
+  });
+
+  setup();
+  reset();
+})();
+</script>
+<script src="../../shared/deck-index.js"></script>
+</body>
+</html>

@@ -59,9 +59,10 @@
       { path: "books/#library", icon: "pdf", title: "PDF library" }
     ] },
     { id: "slides", path: "slides/", icon: "slides", title: "Slides", kids: [
-      { path: "slides/database-guide/", icon: "deck", title: "A Field Guide to Databases" },
-      { path: "slides/database-anatomy-part2/", icon: "deck", title: "Database Anatomy, Part 2" },
-      { path: "slides/distributed-databases/", icon: "deck", title: "Distributed OLTP Databases" }
+      { path: "slides/database-guide/", icon: "deck", title: "Part 1 · Models, Storage & Architecture" },
+      { path: "slides/distributed-databases/", icon: "deck", title: "Part 2 · Distributed Databases" },
+      { path: "slides/database-transactions/", icon: "deck", title: "Part 3 · Transactions" },
+      { path: "slides/database-anatomy-part2/", icon: "deck", title: "Part 4 · Analytical Databases" }
     ] }
   ];
 

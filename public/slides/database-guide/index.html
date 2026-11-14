@@ -1,5 +1,5 @@
-<!doctype html><html lang="en" data-theme="dark"><head><meta charset=utf8><meta name="description" content="A Field Guide to Databases: a 20-slide visual guide to OLTP vs OLAP, data models, B-Tree vs LSM-Tree, compute/storage separation and distributed SQL."><link rel="canonical" href="https://gouravb20.github.io/learn/slides/database-guide/"><meta property="og:type" content="article"><meta property="og:site_name" content="System Design Notes"><meta property="og:title" content="A Field Guide to Databases"><meta property="og:description" content="A 20-slide visual guide to how databases differ: OLTP vs OLAP, data models, B-Tree vs LSM-Tree and distributed SQL."><meta property="og:url" content="https://gouravb20.github.io/learn/slides/database-guide/"><meta name="twitter:card" content="summary"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><link rel="icon" href="../../favicon.svg" type="image/svg+xml"></head><body>
-<title>A Field Guide to Databases</title>
+<!doctype html><html lang="en" data-theme="dark"><head><meta charset=utf8><meta name="description" content="Part 1 of A Field Guide to Databases: a 22-slide visual guide to how databases are classified: the workload, then three axes in three layers (data model &amp; query, storage structure, deployment &amp; architecture), the three cluster architectures (shared-nothing; disaggregated, shared-nothing storage; disaggregated, shared storage), and seven recurring archetypes."><link rel="canonical" href="https://gouravb20.github.io/learn/slides/database-guide/"><meta property="og:type" content="article"><meta property="og:site_name" content="System Design Notes"><meta property="og:title" content="Part 1 · Data Models, Storage &amp; Architecture"><meta property="og:description" content="Part 1 of A Field Guide to Databases: a 22-slide visual guide to how databases are classified: the workload, then three axes in three layers (data model &amp; query, storage structure, deployment &amp; architecture), the three cluster architectures (shared-nothing; disaggregated, shared-nothing storage; disaggregated, shared storage), and seven recurring archetypes."><meta property="og:url" content="https://gouravb20.github.io/learn/slides/database-guide/"><meta name="twitter:card" content="summary"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><link rel="icon" href="../../favicon.svg" type="image/svg+xml"></head><body>
+<title>Part 1 · Data Models, Storage &amp; Architecture</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -134,6 +134,8 @@
   strong { font-weight: 650; }
   code, .mono { font-family: var(--mono); }
   mark { background: var(--warm-soft); color: var(--warm); padding: 0 .25em; border-radius: 3px; font-weight: 600; }
+  mark, .nw { white-space: nowrap; }
+  p, .lead, .read { text-wrap: pretty; }
   .accent { color: var(--accent); }
 
   /* ---------- fixed chrome ---------- */
@@ -289,10 +291,135 @@
   a.go:hover, a.card.part:hover .go { text-decoration: underline; }
   .card.axis .go { margin-top: auto; padding-top: 8px; }
   .go.inline { font-family: inherit; font-size: inherit; }
-  a.card.part { display: block; color: inherit; text-decoration: none; transition: border-color .15s ease, transform .15s ease; }
+  a.card.part { display: flex; flex-direction: column; color: inherit; text-decoration: none; transition: border-color .15s ease, transform .15s ease; }
   a.card.part:hover { border-color: var(--accent); transform: translateY(-2px); }
-  a.card.part .go { margin-top: 12px; }
+  a.card.part .go { margin-top: auto; padding-top: 12px; align-self: flex-start; }
   @media (prefers-reduced-motion: reduce) { a.card.part { transition: none; } a.card.part:hover { transform: none; } }
+
+  /* ---------- dense slides (axes, archetypes): a tighter rhythm so each fits one screen ---------- */
+  @media (min-width: 861px){ .slide.dense { gap: 14px; padding-block: clamp(52px, 6.5vh, 88px); } }
+  .slide.dense .lead { font-size: clamp(1rem, 1.35vw, 1.15rem); max-width: 82ch; }
+  .lead strong { color: var(--fg); }
+  .db-row.sm { gap: 8px; }
+  .db-row.sm .db { padding: 6px 12px 6px 6px; gap: 9px; border-radius: 10px; }
+  .db-row.sm .logo-tile { width: 30px; height: 30px; border-radius: 7px; }
+  .db-row.sm .db-name { font-size: .9rem; }
+  .db-row.sm .db-sub { font-size: .62rem; }
+  .card.why, .card.exc { padding: 14px 16px; }
+  .card.why p, .card.exc p { font-size: .88rem; }
+  /* short laptop screens (768–820px tall): tighten the rhythm further rather than scroll */
+  @media (max-height: 900px) and (min-width: 861px){
+    .slide.dense { gap: 10px; padding-block: 26px 44px; }
+    .slide.dense h1 { font-size: clamp(2rem, 4.6vw, 3.3rem); }
+    .slide.dense h2 { font-size: clamp(1.6rem, 2.9vw, 2.15rem); }
+    .slide.dense .map { gap: 8px; }
+    .slide.dense table.matrix.wrap { font-size: .72rem; }
+    .slide.dense table.matrix.wrap th, .slide.dense table.matrix.wrap td { padding: 3px 8px; line-height: 1.3; }
+    .slide.dense .ask { margin-top: 7px; font-size: 1rem; }
+    .slide.dense .lead { margin-top: 6px !important; font-size: 1rem; }
+    .slide.dense .grid { gap: 10px; }
+    .slide.dense .card { padding: 11px 14px; }
+    .slide.dense .card p, .slide.dense .ticks li { font-size: .84rem; }
+    .slide.dense .ticks { margin-top: 6px !important; }
+    .slide.dense .fact { padding: 8px 12px; font-size: .84rem; }
+    .slide.dense .model-box { padding: 7px 10px; }
+    #s6 .dgm { max-width: 300px !important; }
+    #s22 .lead { margin-top: 14px !important; }
+  }
+  #s6 .dgm text { font-size: 15px; }
+  #s6 .dgm .sub, #s6 .dgm .lbl { font-size: 13px; }
+
+  /* ---------- axis slides: the question, then what it decides and how to tell ---------- */
+  .ask { display: flex; gap: 12px; align-items: baseline; margin-top: 12px; max-width: 96ch;
+    font-size: clamp(1rem, 1.5vw, 1.2rem); color: var(--fg); }
+  .ask::before { content: "ASK"; flex: none; font-family: var(--mono); font-size: .64rem; font-weight: 600;
+    letter-spacing: .16em; color: var(--on-accent); background: var(--accent); border-radius: 5px; padding: 2px 7px;
+    transform: translateY(-2px); }
+  .facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .facts.three { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 860px){ .facts.three { grid-template-columns: 1fr; } }
+  @media (max-width: 720px){ .facts { grid-template-columns: 1fr; } }
+  .fact { border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; background: var(--surface-2);
+    font-size: .88rem; color: var(--muted); }
+  .fact > b { display: block; font-family: var(--mono); font-size: .64rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 3px; font-weight: 600; }
+  .fact strong { color: var(--fg); }
+  .read { font-family: var(--mono); font-size: .74rem; color: var(--muted); }
+  .read a { color: var(--accent); text-decoration: none; }
+  .read a:hover { text-decoration: underline; }
+  .card.tight { padding: 14px 15px; }
+  .card.tight p { font-size: .87rem; }
+  .card .model-box { margin-top: 8px; }
+  .card .ex { display: block; margin-top: 8px; font-family: var(--mono); font-size: .7rem; color: var(--faint); }
+  /* ---------- cluster architectures (C1 · C2 · C3 cards) ---------- */
+  .arch .card h3 { margin-top: 8px; text-wrap: balance; }
+  .arch .card h3 .num { margin-right: 7px; font-weight: 400; }
+  .arch .dgm .sub { font-size: 9.5px; }
+  .arch .card p + p { margin-top: 4px; }
+  .arch .card p strong { color: var(--fg); }
+  @media (max-height: 760px) and (min-width: 861px){
+    .arch .dgm { max-width: 160px !important; }
+    .arch .card h3 { font-size: .95rem; margin-top: 6px; }
+    .arch + .note { font-size: .84rem; padding: 7px 12px; }
+  }
+
+  /* ---------- the map: one root, three layers of two axes ---------- */
+  .map { display: grid; gap: 10px; }
+  .map-root { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; border: 1.5px solid var(--warm);
+    background: var(--warm-soft); border-radius: 14px; padding: 11px 16px; }
+  .map-root h3 { color: var(--warm); }
+  .map-root p { color: var(--fg); font-size: .9rem; }
+  .map-root .go { margin-left: auto; }
+  .map-layer { display: grid; grid-template-columns: 170px 1fr 1fr; gap: 10px; align-items: stretch; }
+  .lname { font-family: var(--mono); font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent);
+    border-left: 3px solid var(--accent); padding: 4px 0 4px 11px; display: flex; flex-direction: column; justify-content: center; gap: 3px; font-weight: 600; }
+  .lname span { font-family: var(--body); text-transform: none; letter-spacing: 0; font-size: .82rem; color: var(--muted); font-weight: 400; }
+  .map-layer .card { padding: 12px 14px; }
+  .map-layer .card h3 .num { margin-right: 8px; font-weight: 400; }
+  .map-layer .card p { font-size: .86rem; }
+  @media (max-width: 860px){ .map-layer { grid-template-columns: 1fr 1fr; } .lname { grid-column: 1 / -1; } }
+  @media (max-width: 560px){ .map-layer { grid-template-columns: 1fr; } }
+  .map-layer.one { grid-template-columns: 170px 1fr; }
+  @media (max-width: 860px){ .map-layer.one { grid-template-columns: 1fr; } }
+  /* one axis per layer: title, text and link on one row */
+  @media (min-width: 861px){
+    .map-layer.one .card.axis { display: grid; grid-template-columns: 280px 1fr auto; align-items: center; gap: 4px 16px; }
+    .map-layer.one .card.axis h3 { margin: 0; }
+    .map-layer.one .card.axis .go { margin: 0; padding: 0; }
+  }
+
+  /* ---------- archetype signature: one cell per axis ---------- */
+  .sig { display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 8px; margin: 0; }
+  .sig > div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; min-width: 0; box-shadow: var(--shadow); }
+  .sig dt { font-family: var(--mono); font-size: .6rem; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+  .sig dt i { font-style: normal; color: var(--accent); margin-right: 4px; }
+  .sig dd { margin: 3px 0 0; font-size: .8rem; color: var(--fg); line-height: 1.35; }
+  @media (max-width: 640px){ .sig { grid-template-columns: 1fr; } }
+  .card.why h3 { color: var(--good); }
+  .card.exc { border-color: var(--warm); }
+  .card.exc h3 { color: var(--warm); }
+
+  /* ---------- the rest of the series (map + title slide) ---------- */
+  .series { display: grid; grid-template-columns: 170px repeat(3, 1fr); gap: 10px; align-items: stretch; }
+  .series .lname { color: var(--muted); border-left-color: var(--border-strong); }
+  .series a.card.part { padding: 9px 13px; }
+  .series a.card.part .num { display: block; }
+  .series a.card.part p { font-size: .82rem; }
+  @media (max-width: 860px){ .series { grid-template-columns: 1fr 1fr 1fr; } .series .lname { grid-column: 1 / -1; } }
+  @media (max-width: 640px){ .series { grid-template-columns: 1fr; } }
+
+  /* ---------- archetype index + cheat-sheet tags ---------- */
+  .card.part .sigline { display: block; font-family: var(--mono); font-size: .7rem; color: var(--accent); margin: 2px 0 6px; line-height: 1.45; text-wrap: balance; }
+  a.card.part.tight { padding: 13px 14px; }
+  a.card.part.tight p { font-size: .84rem; }
+  a.card.part.tight .go { padding-top: 8px; }
+  .an { font-family: var(--mono); font-size: .62rem; font-weight: 600; color: var(--accent); border: 1px solid var(--accent);
+    border-radius: 5px; padding: 0 4px; margin-left: 6px; vertical-align: 1px; }
+  table.matrix.wrap { min-width: 800px; font-size: .76rem; }
+  table.matrix.wrap th, table.matrix.wrap td { padding: 4px 9px; }
+  table.matrix.wrap td { white-space: normal; vertical-align: top; }
+  table.matrix.wrap th { white-space: normal; vertical-align: bottom; }
+  table.matrix.wrap td.name, table.matrix.wrap td:nth-child(2), table.matrix.wrap td:nth-child(4) { white-space: nowrap; }
 </style>
 
 <div id="progress"></div>
@@ -304,306 +431,206 @@
   <!-- 1 — TITLE -->
   <section class="slide" id="s1" style="justify-content:center;">
     <div>
-      <p class="eyebrow">A field guide · Part 1 of 3</p>
+      <p class="eyebrow">A field guide · Part 1 of 4 · models, storage, architecture</p>
       <h1>How databases<br>are <span class="accent">classified</span>.</h1>
-      <p class="lead" style="margin-top:18px;">Four axes that describe every database — and why the ones you think go together usually don't. Data model, storage engine, architecture and topology, through the systems we actually use.</p>
+      <p class="lead" style="margin-top:18px; max-width:56ch;">A database isn't one “type”. It's a set of answers to a few independent questions: what workload it serves, what the application sees, how one machine stores the data, and where it runs. Learn the questions, and any new database becomes one row in a table.</p>
       <div class="tag-row" style="margin-top:22px;">
-        <span class="pill">relational ↔ non-relational</span>
-        <span class="pill">B-Tree ↔ LSM</span>
-        <span class="pill">compute ⁄ storage split</span>
-        <span class="pill">single-node ↔ distributed</span>
+        <span class="pill warm">root · workload</span>
+        <span class="pill on">logical · data model &amp; query</span>
+        <span class="pill on">physical · storage structure</span>
+        <span class="pill on">system · deployment &amp; architecture</span>
       </div>
       <p class="muted" style="margin-top:26px; font-size:.85rem;">Navigate with <span class="kbd">↓</span> <span class="kbd">↑</span> <span class="kbd">Space</span> or the arrows, bottom-right. Press <span class="kbd">G</span> or tap the slide counter to see every slide and jump to one.</p>
+      <p class="muted" style="margin-top:8px; font-size:.85rem;">The rest of the series: <a class="go inline" href="../distributed-databases/index.html">Part 2 · distributed databases</a> · <a class="go inline" href="../database-transactions/index.html">Part 3 · transactions</a> · <a class="go inline" href="../database-anatomy-part2/index.html">Part 4 · analytical databases</a></p>
     </div>
     <div class="foot">DATABASES / 01</div>
   </section>
 
-  <!-- 2 — SCOPE -->
-  <section class="slide" id="s2">
+  <!-- 2 — ROOT: WORKLOAD -->
+  <section class="slide dense" id="s2">
     <div>
-      <p class="eyebrow">Scoping today</p>
-      <h2>Databases split into OLTP vs. OLAP</h2>
-      <p class="lead" style="margin-top:10px;">Databases are generally divided by workload. Today we look at <strong>OLTP, row-oriented</strong> databases only.</p>
+      <p class="eyebrow">The root question · workload</p>
+      <h2>Start with the workload. It picks the layout.</h2>
+      <p class="ask">What does a typical query touch: a few whole records, or a few columns of millions of records?</p>
     </div>
     <div class="grid cols-2">
       <div class="card">
-        <h3>Workload · OLTP vs OLAP</h3>
-        <p><strong>OLTP</strong> — many small reads/writes, point lookups, strict consistency. Your app's live database.<br><br><strong>OLAP</strong> — few huge scans, aggregates over billions of rows. Warehouses &amp; analytics.</p>
-        <div class="tag-row"><span class="pill on">OLTP — today</span><span class="pill warm">OLAP — Part 2</span></div>
+        <h3>OLTP · online transaction processing</h3>
+        <p>Many small reads and writes by key, from users, in milliseconds: “load order 2”, “add item to cart”. Each query wants a <strong>whole record</strong>, so a record's fields are stored together: a <strong>row layout</strong>.</p>
+        <div class="model-box">page → [1 Ana NYC 30] [2 Bo SF 12] [3 Cy LA 7]<br><span class="c">get order 2</span> → read one page</div>
+        <div class="tag-row"><span class="pill on">row layout · this deck</span></div>
       </div>
       <div class="card">
-        <h3>Layout · Row vs Columnar</h3>
-        <p><strong>Row-oriented</strong> stores a whole record together — great for “fetch this user”.<br><br><strong>Columnar</strong> stores each column together — great for “average this column over 1B rows”. It is an OLAP technique.</p>
-        <div class="tag-row"><span class="pill on">row — today</span><span class="pill warm">columnar — Part 2</span></div>
+        <h3>OLAP · online analytical processing</h3>
+        <p>Few big queries from analysts, scanning millions of rows: “revenue by city this year”. Each query wants <strong>a few columns</strong>, so each column is stored (and compressed) on its own: a <strong>column layout</strong>.</p>
+        <div class="model-box">id → 1 2 3 &nbsp;· name → Ana Bo Cy<br>city → NYC SF LA · total → 30 12 7<br><span class="c">sum(total)</span> → read one column</div>
+        <div class="tag-row"><span class="pill warm">column layout · Part 4</span></div>
       </div>
     </div>
-    <p class="note"><b>Watch the wording:</b> “<strong>wide-column</strong>” (Cassandra, Bigtable) is <strong>not</strong> “columnar”. Wide-column is still row-oriented storage — we'll hit that trap head-on later.</p>
-    <div class="foot">SCOPE / 02</div>
+    <p class="muted" style="font-size:.88rem;"><strong>HTAP</strong> systems serve both, usually as a row store plus a columnar copy (TiDB with TiFlash). <strong>Specialized</strong> workloads (search, time-series, vectors, graphs) get their own engines in Part 4.</p>
+    <p class="note"><b>Watch the wording:</b> “<strong>wide-column</strong>” (Cassandra, Bigtable) is <strong>not</strong> “columnar”. Wide-column stores keep a row's cells together (Bigtable and HBase per column family), so they use a row layout with a flexible set of columns.</p>
+    <p class="read">Read more: <a href="../../books/notes/ddia/ch3/">DDIA ch. 3, Storage and Retrieval</a> · <a href="../../books/notes/database-internals/ch1/">Database Internals ch. 1</a></p>
+    <div class="foot">WORKLOAD / 02</div>
   </section>
 
-  <!-- 3 — THE 4 AXES -->
-  <section class="slide" id="s3">
+  <!-- 3 — THE MAP -->
+  <section class="slide dense" id="s3">
     <div>
       <p class="eyebrow">The map</p>
-      <h2>Four independent axes</h2>
-      <p class="lead" style="margin-top:10px;">Within OLTP, row-oriented databases, a database isn't one “type”. It's a point on each of these axes at once.</p>
+      <h2>One root, three axes, three layers</h2>
+      <p class="lead" style="margin-top:10px; max-width:none;">Pick the workload first; then each layer answers its own question.</p>
     </div>
-    <div class="grid cols-4">
-      <div class="card axis"><span class="num">01</span><h3>Data Model</h3><p>Relational vs. non-relational — tables, documents, key-value, wide-column — and how fixed the schema is.</p><a class="go" href="#s5">Slide 05 →</a></div>
-      <div class="card axis"><span class="num">02</span><h3>Storage engine</h3><p>How rows are placed on disk: <strong>B-Tree</strong> vs. <strong>LSM-Tree</strong>.</p><a class="go" href="#s6">Slide 06 →</a></div>
-      <div class="card axis"><span class="num">03</span><h3>Architecture</h3><p>Coupled compute+storage vs. <strong>disaggregated</strong>, scaled independently.</p><a class="go" href="#s7">Slide 07 →</a></div>
-      <div class="card axis"><span class="num">04</span><h3>Topology</h3><p>Single-node vs. distributed / sharded / replicated.</p><a class="go" href="#s8">Slide 08 →</a></div>
+    <div class="map">
+      <div class="map-root"><h3>Root · Workload</h3><p>OLTP, OLAP or both. It decides the layout: rows for OLTP, columns for OLAP.</p><a class="go" href="#s2">Slide 02 →</a></div>
+      <div class="map-layer one">
+        <div class="lname">Logical<span>what the application sees</span></div>
+        <div class="card axis"><h3><span class="num">01</span>Data model &amp; query</h3><p>Tables, documents, keys, wide rows or graphs. Asked in SQL or through an API.</p><a class="go" href="#s5">Slide 05 →</a></div>
+      </div>
+      <div class="map-layer one">
+        <div class="lname">Physical<span>how one machine stores it</span></div>
+        <div class="card axis"><h3><span class="num">02</span>Storage structure</h3><p>Overwrite in place (B-tree) or append and merge later (<span class="nw">LSM-tree</span>): the choice that sets the balance of read, write and space costs.</p><a class="go" href="#s6">Slide 06 →</a></div>
+      </div>
+      <div class="map-layer one">
+        <div class="lname">System<span>where it runs, what's shared</span></div>
+        <div class="card axis"><h3><span class="num">03</span>Deployment &amp; architecture</h3><p>Embedded, single server or cluster: <span class="nw">shared-nothing</span>; disaggregated, <span class="nw">shared-nothing</span> storage; or disaggregated, shared storage.</p><a class="go" href="#s9">Slides 09–10 →</a></div>
+      </div>
+      <div class="series">
+        <div class="lname">The rest of the series<span>each part is its own deck</span></div>
+        <a class="card part" href="../distributed-databases/index.html#s4"><span class="num">PART 2 →</span><h3>Distributed databases</h3><p>Replication, partitioning, consensus</p></a>
+        <a class="card part" href="../database-transactions/index.html#s4"><span class="num">PART 3 →</span><h3>Transactions</h3><p>Scope, durability, isolation</p></a>
+        <a class="card part" href="../database-anatomy-part2/index.html"><span class="num">PART 4 →</span><h3>Analytical databases</h3><p>Columnar, lakehouses, vectors</p></a>
+      </div>
     </div>
-    <p class="muted" style="font-size:.85rem;">Then a tour of real systems (slides 09–17) and a one-page <a class="go inline" href="#s19">cheat sheet</a>.</p>
-    <div class="foot">THE 4 AXES / 03</div>
+    <p class="muted" style="font-size:.85rem;">Then the seven <a class="go inline" href="#s11">archetypes</a> that recur (slides 11–19), <a class="go inline" href="#s20">what really relates</a>, and a one-page <a class="go inline" href="#s21">cheat sheet</a>.</p>
+    <div class="foot">THE MAP / 03</div>
   </section>
 
-  <!-- 4 — ORTHOGONAL -->
+  <!-- 4 — WHY INDEPENDENT -->
   <section class="slide" id="s4">
     <div>
-      <p class="eyebrow">The one idea to keep</p>
-      <h2>The axes are (mostly) orthogonal</h2>
-      <p class="lead" style="margin-top:10px;">Pick any combination. Real systems prove almost every box can be ticked independently.</p>
+      <p class="eyebrow">Why the axes are independent</p>
+      <h2>Each layer hides the one below it</h2>
+      <p class="lead" style="margin-top:10px; max-width:64ch;">Codd's 1970 relational paper argued that applications must not depend on how data is organized inside the machine. The ANSI/SPARC model of the mid-1970s named the levels: what users see, the logical schema, the physical storage. Deployment adds a fourth level: <em>which machines</em> hold the bytes, and what they share. Each hidden level can be swapped without the others noticing.</p>
     </div>
     <div class="grid cols-3">
-      <div class="card">
-        <h3>Model ⟂ Engine</h3>
-        <p><strong>Relational</strong> doesn't imply B-Tree. CockroachDB is full SQL built on an <mark>LSM</mark> engine.</p>
+      <div class="card tight">
+        <h3>Model ⟂ structure</h3>
+        <p>CockroachDB and TiDB are SQL over an <mark>LSM</mark>. MongoDB is documents over a <mark>B-tree</mark>.</p>
       </div>
-      <div class="card">
-        <h3>Engine ⟂ Topology</h3>
-        <p>The same B-Tree or LSM engine runs on one laptop or across 500 nodes. Distribution is a layer above.</p>
+      <div class="card tight">
+        <h3>Structure ⟂ architecture</h3>
+        <p><strong>RocksDB</strong> runs embedded, and as TiKV's engine under TiDB's disaggregated SQL tier. <strong>Aurora</strong> keeps <mark>B-tree</mark> pages on shared storage.</p>
       </div>
-      <div class="card">
-        <h3>Model ⟂ Architecture</h3>
-        <p><strong>Bigtable</strong> is NoSQL <em>and</em> separates compute (tablet servers) from storage (Colossus).</p>
+      <div class="card tight">
+        <h3>Model ⟂ architecture</h3>
+        <p>Disaggregated, shared storage: <strong>Bigtable</strong> (NoSQL) and <strong>Aurora</strong> (SQL). Shared-nothing: <strong>Cassandra</strong> (NoSQL) and <strong>CockroachDB</strong> (SQL).</p>
       </div>
-      <div class="card">
-        <h3>SQL ⟂ Scale</h3>
-        <p>Google <strong>Spanner</strong> gives you SQL + ACID across continents. “SQL” never meant “single node”.</p>
+      <div class="card tight">
+        <h3>Same engine, every deployment</h3>
+        <p><strong>InnoDB</strong> runs in a single MySQL server, under Aurora MySQL's shared storage, and in each Vitess shard.</p>
       </div>
-      <div class="card">
-        <h3>Architecture ⟂ Engine</h3>
-        <p><strong>Aurora</strong> splits compute from storage yet still uses <mark>B-Tree</mark> pages. Disaggregation says nothing about the engine.</p>
+      <div class="card tight">
+        <h3>And the other parts' axes</h3>
+        <p>Transactions <span class="nw">(<a class="go inline" href="../database-transactions/index.html#s4">Part 3</a>)</span> and distribution <span class="nw">(<a class="go inline" href="../distributed-databases/index.html#s4">Part 2</a>)</span> are mostly independent too. SQLite is serializable in one file; Spanner is strictly serializable across continents.</p>
       </div>
-      <div class="card" style="border-color:var(--accent); background:var(--accent-soft);">
-        <h3 class="accent">So… what clusters?</h3>
-        <p>A handful of <strong>archetypes</strong> recur because certain choices reinforce each other. The rest of the talk is a tour of them.</p>
+      <div class="card tight" style="border-color:var(--accent); background:var(--accent-soft);">
+        <h3 class="accent">Mostly independent</h3>
+        <p>Some answers suit each other, so a few combinations recur: the <a class="go inline" href="#s11">archetypes</a>. The few real dependencies are on <a class="go inline" href="#s20">slide 20</a>.</p>
       </div>
     </div>
-    <div class="foot">ORTHOGONALITY / 04</div>
+    <div class="foot">INDEPENDENCE / 04</div>
   </section>
 
-  <!-- 5 — DATA MODEL -->
-  <section class="slide" id="s5">
+  <!-- 5 — AXIS 01: DATA MODEL -->
+  <section class="slide dense" id="s5">
     <div>
-      <p class="eyebrow">Axis 01 · Data Model</p>
-      <h2>Data Model: four ways to shape data</h2>
+      <p class="eyebrow">Axis 01 · logical · data model &amp; query</p>
+      <h2>What shape is the data?</h2>
+      <p class="ask">Rows in tables, whole documents, values behind keys, or nodes and edges? Asked in SQL, or through an API?</p>
     </div>
-    <div class="grid cols-4">
-      <div class="card">
+    <div class="grid cols-3">
+      <div class="card tight">
         <h3>Relational</h3>
-        <p class="muted" style="margin-bottom:8px;">Fixed schema · rows &amp; typed columns · joins &amp; FKs.</p>
-        <div class="model-box"><table class="mini"><tr><th>id</th><th>name</th><th>tier</th></tr><tr><td>1</td><td>Ana</td><td>gold</td></tr><tr><td>2</td><td>Bo</td><td>free</td></tr></table></div>
+        <p>Rows with typed columns; joins and foreign keys. Asked in SQL.</p>
+        <div class="model-box"><table class="mini"><tr><th>id</th><th>name</th><th>city</th></tr><tr><td>1</td><td>Ana</td><td>NYC</td></tr></table></div>
       </div>
-      <div class="card">
+      <div class="card tight">
         <h3>Document</h3>
-        <p class="muted" style="margin-bottom:8px;">Flexible / schemaless · nested JSON per record.</p>
-        <div class="model-box">{<br>&nbsp;&nbsp;<span class="k">"_id"</span>: 1,<br>&nbsp;&nbsp;<span class="k">"name"</span>: <span class="s">"Ana"</span>,<br>&nbsp;&nbsp;<span class="k">"tags"</span>: [<span class="s">"vip"</span>],<br>&nbsp;&nbsp;<span class="k">"addr"</span>: { <span class="k">"city"</span>:<span class="s">"NYC"</span> }<br>}</div>
+        <p>Self-contained JSON-like trees, read and written whole.</p>
+        <div class="model-box">{ <span class="k">"_id"</span>: 1, <span class="k">"name"</span>: <span class="s">"Ana"</span>,<br>&nbsp;&nbsp;<span class="k">"addr"</span>: { <span class="k">"city"</span>: <span class="s">"NYC"</span> } }</div>
       </div>
-      <div class="card">
-        <h3>Key–Value</h3>
-        <p class="muted" style="margin-bottom:8px;">Opaque value behind a key · fastest lookup.</p>
-        <div class="model-box"><span class="k">user:1</span> <span class="c">→</span> <span class="s">"{...blob...}"</span><br><span class="k">cart:42</span> <span class="c">→</span> <span class="s">"3 items"</span><br><span class="k">sess:x9</span> <span class="c">→</span> <span class="s">"token"</span></div>
+      <div class="card tight">
+        <h3>Key–value</h3>
+        <p>An opaque value behind a key: get, put, delete. The database can't look inside.</p>
+        <div class="model-box"><span class="k">user:1</span> <span class="c">→</span> <span class="s">"…bytes…"</span></div>
       </div>
-      <div class="card">
-        <h3>Wide-Column</h3>
-        <p class="muted" style="margin-bottom:8px;">Rows keyed by partition; sparse, many columns.</p>
-        <div class="model-box"><table class="mini"><tr><th>row key</th><th>col:A</th><th>col:B</th></tr><tr><td>usr#1</td><td>x</td><td>—</td></tr><tr><td>usr#2</td><td>—</td><td>y</td></tr></table></div>
+      <div class="card tight">
+        <h3>Wide-column</h3>
+        <p>A <strong>partition key</strong> picks the node; a <strong>sort key</strong> orders rows inside it. Columns may differ per row.</p>
+        <div class="model-box"><span class="k">user#1</span> │ <span class="c">2025-01-03</span> → {…}<br><span class="k">user#1</span> │ <span class="c">2025-01-07</span> → {…}</div>
+      </div>
+      <div class="card tight">
+        <h3>Graph</h3>
+        <p>Vertices and edges with properties; queries walk paths (Cypher, Gremlin). Covered in <a class="go inline" href="../database-anatomy-part2/index.html#s15">Part 4</a>.</p>
+        <div class="model-box">(<span class="k">Ana</span>)-[<span class="c">:FOLLOWS</span>]-&gt;(<span class="k">Bo</span>)</div>
+      </div>
+      <div class="card tight" style="border-color:var(--accent);">
+        <h3 class="accent">Two sub-questions</h3>
+        <p><strong>Schema</strong>: checked by the database on write (relational) or by the app on read (document, key–value).<br><strong>Query</strong>: declarative (SQL says what; the planner picks how) or an API of operations (get, put, find).</p>
       </div>
     </div>
-    <p class="muted" style="font-size:.88rem; text-align:center;">Schema spectrum: <strong>fixed</strong> (relational) → <strong>flexible</strong> (document, add fields freely) → <strong>schemaless</strong> (KV: the DB never sees inside the value).</p>
-    <div class="foot">DATA MODELS / 05</div>
+    <div class="facts">
+      <p class="fact"><b>What it decides</b>Which queries are natural and which hurt (joins, ad-hoc filters, path walks), and how much checking the database does for you.</p>
+      <p class="fact"><b>How to tell</b>The query language, and the <strong>unit of an atomic write</strong>: a row, a document, an item. The models converge: Postgres stores JSON; MongoDB has joins.</p>
+    </div>
+    <p class="read">Read more: <a href="../../books/notes/ddia/ch2/">DDIA ch. 2, Data Models and Query Languages</a></p>
+    <div class="foot">DATA MODEL / 05</div>
   </section>
 
-  <!-- 6 — STORAGE ENGINE -->
-  <section class="slide" id="s6">
+  <!-- 6 — AXIS 02: STORAGE STRUCTURE -->
+  <section class="slide dense" id="s6">
     <div>
-      <p class="eyebrow">Axis 02 · storage engine</p>
-      <h2>B-Tree vs. LSM-Tree</h2>
-      <p class="lead" style="margin-top:10px;">How the engine physically places and finds rows. This is the single most under-appreciated axis.</p>
+      <p class="eyebrow">Axis 02 · physical · storage structure</p>
+      <h2>How does a write change the bytes on disk?</h2>
+      <p class="ask">Does the engine overwrite data where it lives, or append new versions and merge them later?</p>
     </div>
-    <div class="split">
+    <div class="split" style="align-items:stretch;">
       <div class="card">
-        <h3 class="accent">B-Tree</h3>
-        <ul class="ticks" style="margin-top:10px;">
-          <li><strong>Update in place</strong> — find the page, overwrite it.</li>
-          <li>Balanced tree of pages; <strong>read-optimized</strong>, predictable point lookups.</li>
-          <li>Random writes → write amplification under heavy load.</li>
-          <li>The default for <strong>relational &amp; OLTP</strong> for 40 years.</li>
+        <h3 class="accent">B-tree · update in place</h3>
+        <ul class="ticks" style="margin-top:8px;">
+          <li>Walk a sorted tree of pages to the right leaf, change it, write the page back (a write-ahead log makes it crash-safe).</li>
+          <li><strong>Reads</strong>: one root-to-leaf path, predictable. <strong>Writes</strong>: random, and a small change rewrites a whole page.</li>
         </ul>
-        <div class="panel-light" style="margin-top:14px;">
-<svg class="dgm" viewBox="0 0 360 140" role="img" aria-label="B-Tree: a root page pointing to three sorted leaf pages" style="max-width:440px"><defs><marker id="ab1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-b" x="120" y="8" width="120" height="36" rx="8"/><text x="180.0" y="30.5" text-anchor="middle">30 | 60</text><path class="ln" d="M180 44 L60 96" marker-end="url(#ab1)"/><path class="ln" d="M180 44 L180 96" marker-end="url(#ab1)"/><path class="ln" d="M180 44 L300 96" marker-end="url(#ab1)"/><rect class="n-b" x="8" y="96" width="104" height="36" rx="8"/><text x="60.0" y="118.5" text-anchor="middle">10 · 20</text><rect class="n-b" x="128" y="96" width="104" height="36" rx="8"/><text x="180.0" y="118.5" text-anchor="middle">40 · 50</text><rect class="n-b" x="248" y="96" width="104" height="36" rx="8"/><text x="300.0" y="118.5" text-anchor="middle">70 · 80</text></svg>
-          <p class="cap">Sorted pages · O(log n) to any key</p>
+        <span class="ex">Postgres&nbsp;· MySQL&nbsp;· SQL&nbsp;Server&nbsp;· Oracle&nbsp;· SQLite&nbsp;· <span class="nw">MongoDB&nbsp;· DynamoDB</span></span>
+        <div class="panel-light" style="margin-top:8px; padding:8px;">
+<svg class="dgm" viewBox="0 0 360 140" role="img" aria-label="B-Tree: a root page pointing to three sorted leaf pages" style="max-width:330px"><defs><marker id="ab1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-b" x="120" y="8" width="120" height="36" rx="8"/><text x="180.0" y="30.5" text-anchor="middle">30 | 60</text><path class="ln" d="M180 44 L60 96" marker-end="url(#ab1)"/><path class="ln" d="M180 44 L180 96" marker-end="url(#ab1)"/><path class="ln" d="M180 44 L300 96" marker-end="url(#ab1)"/><rect class="n-b" x="8" y="96" width="104" height="36" rx="8"/><text x="60.0" y="118.5" text-anchor="middle">10 · 20</text><rect class="n-b" x="128" y="96" width="104" height="36" rx="8"/><text x="180.0" y="118.5" text-anchor="middle">40 · 50</text><rect class="n-b" x="248" y="96" width="104" height="36" rx="8"/><text x="300.0" y="118.5" text-anchor="middle">70 · 80</text></svg>
         </div>
       </div>
       <div class="card">
-        <h3 class="warm" style="color:var(--warm)">LSM-Tree</h3>
-        <ul class="ticks" style="margin-top:10px;">
-          <li><strong>Never overwrite</strong> — buffer writes in RAM, flush as sorted files.</li>
-          <li>Sequential writes → <strong>huge write throughput</strong>.</li>
-          <li>Reads may touch several files; <strong>bloom filters</strong> + compaction keep it fast.</li>
-          <li>The engine behind most <strong>big-data / write-heavy</strong> stores.</li>
+        <h3 style="color:var(--warm)">LSM-tree · append, merge later</h3>
+        <ul class="ticks" style="margin-top:8px;">
+          <li>Buffer writes in a sorted in-memory table, flush it as an immutable sorted file, merge files in the background.</li>
+          <li><strong>Writes</strong>: sequential, high throughput. <strong>Reads</strong>: may check several files; bloom filters skip most.</li>
         </ul>
-        <div class="panel-light" style="margin-top:14px;">
-<svg class="dgm" viewBox="0 0 420 172" role="img" aria-label="LSM write path: write to WAL and memtable, flush to SSTable L0, compact into L1" style="max-width:440px"><defs><marker id="ab2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-w" x="6" y="8" width="74" height="48" rx="8"/><text x="43.0" y="36.5" text-anchor="middle">write</text><rect class="n-w" x="116" y="8" width="74" height="48" rx="8"/><text x="153.0" y="36.5" text-anchor="middle">WAL</text><rect class="n-w" x="226" y="8" width="188" height="48" rx="8"/><text x="320.0" y="29.0" text-anchor="middle">Memtable</text><text class="sub" x="320.0" y="44.0" text-anchor="middle">RAM · sorted</text><path class="ln" d="M80 32 L114 32" marker-end="url(#ab2)"/><path class="ln" d="M190 32 L224 32" marker-end="url(#ab2)"/><rect class="n-w" x="226" y="112" width="188" height="48" rx="8"/><text x="320.0" y="133.0" text-anchor="middle">SSTable L0</text><text class="sub" x="320.0" y="148.0" text-anchor="middle">disk · immutable</text><path class="ln" d="M320 56 L320 110" marker-end="url(#ab2)"/><text class="lbl halo" x="330" y="88" text-anchor="start">flush</text><rect class="n-w" x="6" y="112" width="154" height="48" rx="8"/><text x="83.0" y="133.0" text-anchor="middle">SSTable L1</text><text class="sub" x="83.0" y="148.0" text-anchor="middle">merged · sorted</text><path class="ln" d="M224 136 L162 136" marker-end="url(#ab2)"/><text class="lbl halo" x="193" y="128" text-anchor="middle">compact</text></svg>
-          <p class="cap">Append-only · merge later</p>
+        <span class="ex">RocksDB&nbsp;· Cassandra&nbsp;· ScyllaDB&nbsp;· Bigtable&nbsp;· HBase&nbsp;· CockroachDB&nbsp;· TiKV</span>
+        <div class="panel-light" style="margin-top:8px; padding:8px;">
+<svg class="dgm" viewBox="0 0 420 172" role="img" aria-label="LSM write path: write to WAL and memtable, flush to SSTable L0, compact into L1" style="max-width:380px"><defs><marker id="ab2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-w" x="6" y="8" width="74" height="48" rx="8"/><text x="43.0" y="36.5" text-anchor="middle">write</text><rect class="n-w" x="116" y="8" width="74" height="48" rx="8"/><text x="153.0" y="36.5" text-anchor="middle">WAL</text><rect class="n-w" x="226" y="8" width="188" height="48" rx="8"/><text x="320.0" y="29.0" text-anchor="middle">Memtable</text><text class="sub" x="320.0" y="44.0" text-anchor="middle">RAM · sorted</text><path class="ln" d="M80 32 L114 32" marker-end="url(#ab2)"/><path class="ln" d="M190 32 L224 32" marker-end="url(#ab2)"/><rect class="n-w" x="226" y="112" width="188" height="48" rx="8"/><text x="320.0" y="133.0" text-anchor="middle">SSTable L0</text><text class="sub" x="320.0" y="148.0" text-anchor="middle">disk · immutable</text><path class="ln" d="M320 56 L320 110" marker-end="url(#ab2)"/><text class="lbl halo" x="330" y="88" text-anchor="start">flush</text><rect class="n-w" x="6" y="112" width="154" height="48" rx="8"/><text x="83.0" y="133.0" text-anchor="middle">SSTable L1</text><text class="sub" x="83.0" y="148.0" text-anchor="middle">merged · sorted</text><path class="ln" d="M224 136 L162 136" marker-end="url(#ab2)"/><text class="lbl halo" x="193" y="128" text-anchor="middle">compact</text></svg>
         </div>
       </div>
     </div>
-    <div class="foot">STORAGE ENGINE / 06</div>
+    <div class="facts three">
+      <p class="fact"><b>Also on this axis</b><strong>Heap + indexes</strong> (Postgres writes a new row version; VACUUM reclaims the old) · <strong>clustered</strong> on the key (InnoDB) · <strong>copy-on-write</strong> B-tree (LMDB) · <strong>log + hash index</strong> (Bitcask) · hash tables and skiplists (Redis).</p>
+      <p class="fact"><b>What it decides</b>The balance of read, write and space amplification. B-trees favour reads; LSM-trees favour writes and usually take less space.</p>
+      <p class="fact"><b>How to tell</b>The engine's vocabulary: <strong>page, vacuum, fill factor</strong> point to a B-tree; <strong>memtable, SSTable, compaction</strong> to an LSM.</p>
+    </div>
+    <p class="read">Read more: <a href="../../books/notes/ddia/ch3/">DDIA ch. 3</a> · Database Internals <a href="../../books/notes/database-internals/ch2/">ch. 2</a>, <a href="../../books/notes/database-internals/ch6/">ch. 6</a>, <a href="../../books/notes/database-internals/ch7/">ch. 7</a>, which frames this axis as three choices: buffering, mutability, ordering.</p>
+    <div class="foot">STORAGE STRUCTURE / 06</div>
   </section>
 
-  <!-- 7 — ARCHITECTURE -->
-  <section class="slide" id="s7">
+  <!-- 7 — LSM CONCEPTS -->
+  <section class="slide dense" id="s7">
     <div>
-      <p class="eyebrow">Axis 03 · architecture</p>
-      <h2>Separating compute from storage</h2>
-      <p class="lead" style="margin-top:10px;">The cloud-native move: let the query engines and the data layer scale — and fail — independently.</p>
-    </div>
-    <div class="split">
-      <div>
-        <ul class="ticks">
-          <li><strong>Coupled</strong> — CPU and disk live on the same node. Scale one, you pay for both.</li>
-          <li><strong>Disaggregated</strong> — stateless compute talks to a shared, replicated storage service over the network.</li>
-          <li>Add read replicas in seconds; storage grows on its own; compute can scale to zero.</li>
-          <li><span class="muted">Amazon Aurora, Neon, Spanner, TiDB, Snowflake (OLAP).</span></li>
-        </ul>
-        <p class="note" style="margin-top:14px;"><b>Note:</b> classic <strong>Aurora</strong> disaggregates storage but still uses <strong>B-Tree pages</strong> — architecture ⟂ engine, again.</p>
-      </div>
-      <div class="panel-light">
-<svg class="dgm" viewBox="0 0 360 250" role="img" aria-label="Architecture: stateless query nodes read from a shared durable storage layer" style="max-width:420px"><defs><marker id="ab4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="cl" x="8" y="6" width="344" height="96" rx="12"/><text class="lbl" x="22" y="26">compute — stateless, elastic</text><rect class="n-b" x="36" y="42" width="124" height="40" rx="8"/><text x="98.0" y="66.5" text-anchor="middle">query node</text><rect class="n-b" x="200" y="42" width="124" height="40" rx="8"/><text x="262.0" y="66.5" text-anchor="middle">query node</text><rect class="cl" x="8" y="146" width="344" height="96" rx="12"/><text class="lbl" x="22" y="166">storage — shared, durable, replicated</text><rect class="n-w" x="110" y="184" width="140" height="40" rx="8"/><text x="180.0" y="208.5" text-anchor="middle">log + pages</text><path class="ln" d="M98 82 L150 182" marker-end="url(#ab4)"/><path class="ln" d="M262 82 L210 182" marker-end="url(#ab4)"/></svg>
-        <p class="cap">scale the two sides on their own curves</p>
-      </div>
-    </div>
-    <div class="foot">ARCHITECTURE / 07</div>
-  </section>
-
-  <!-- 8 — TOPOLOGY -->
-  <section class="slide" id="s8">
-    <div>
-      <p class="eyebrow">Axis 04 · topology</p>
-      <h2>Single-node vs. distributed</h2>
-    </div>
-    <div class="split">
-      <div>
-        <ul class="ticks">
-          <li><strong>Single-node</strong> — one machine owns all the data. Simple, strongly consistent, limited by one box. <span class="muted">Postgres, MySQL, SQLite.</span></li>
-          <li><strong>Distributed</strong> — data is <strong>sharded</strong> (split by key) and <strong>replicated</strong> (copied for safety) across many nodes.</li>
-          <li>Buys horizontal scale + fault tolerance — pays in consensus (Raft/Paxos), clock skew, and the CAP trade-offs.</li>
-          <li>Orthogonal to everything else: any model, any engine can be distributed.</li>
-        </ul>
-        <a class="go" href="../distributed-databases/index.html" style="margin-top:6px;">Deep dive on this axis: Part 3, distributed OLTP →</a>
-      </div>
-      <div class="panel-light">
-<svg class="dgm" viewBox="0 0 360 220" role="img" aria-label="Topology: a client talks to a router which fans out to three shards, each replicated three times" style="max-width:420px"><defs><marker id="ab3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-b" x="130" y="6" width="100" height="30" rx="8"/><text x="180.0" y="25.5" text-anchor="middle">client</text><path class="ln" d="M180 36 L180 64" marker-end="url(#ab3)"/><rect class="n-b" x="80" y="64" width="200" height="34" rx="8"/><text x="180.0" y="85.5" text-anchor="middle">router / coordinator</text><path class="ln" d="M180 98 L60 148" marker-end="url(#ab3)"/><path class="ln" d="M180 98 L180 148" marker-end="url(#ab3)"/><path class="ln" d="M180 98 L300 148" marker-end="url(#ab3)"/><rect class="n-b" x="8" y="148" width="104" height="56" rx="8"/><text x="60.0" y="173.0" text-anchor="middle">shard A</text><text class="sub" x="60.0" y="188.0" text-anchor="middle">replicas ×3</text><rect class="n-b" x="128" y="148" width="104" height="56" rx="8"/><text x="180.0" y="173.0" text-anchor="middle">shard B</text><text class="sub" x="180.0" y="188.0" text-anchor="middle">replicas ×3</text><rect class="n-b" x="248" y="148" width="104" height="56" rx="8"/><text x="300.0" y="173.0" text-anchor="middle">shard C</text><text class="sub" x="300.0" y="188.0" text-anchor="middle">replicas ×3</text></svg>
-        <p class="cap">shard for scale · replicate for safety</p>
-      </div>
-    </div>
-    <div class="foot">TOPOLOGY / 08</div>
-  </section>
-
-  <!-- 9 — TOUR: KEY VALUE -->
-  <section class="slide" id="s9">
-    <div>
-      <p class="eyebrow">The tour · archetype 1</p>
-      <h2>Key–value &amp; in-memory</h2>
-      <p class="lead" style="margin-top:10px;">Start simple: one key, one value, microsecond latency. Mostly caches &amp; sessions.</p>
-    </div>
-    <div class="db-row">
-      <div class="db db-lg"><span class="logo-tile" data-icon="redis" style="--brand:#FF4438"></span><span class="db-name">Redis<span class="db-sub">memory-first · data structures</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="valkey" data-mono="VK" style="--brand:#5a2fd6"></span><span class="db-name">Valkey<span class="db-sub">open-source Redis fork</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="memcached" data-mono="MC" style="--brand:#1a7f37"></span><span class="db-name">Memcached<span class="db-sub">pure cache · no persistence</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="aerospike" style="--brand:#C9252C"></span><span class="db-name">Aerospike<span class="db-sub">RAM index · SSD · durable</span></span></div>
-    </div>
-    <dl class="kv" style="max-width:720px; margin-top:6px;">
-      <dt>model</dt><dd>key → value (Redis also lists, sets, hashes, streams)</dd>
-      <dt>engine</dt><dd>hash tables / skiplists in memory — <em>not</em> B-Tree or LSM</dd>
-      <dt>why</dt><dd>offload reads, hold sessions &amp; rate-limits, sub-millisecond response</dd>
-    </dl>
-    <p class="muted" style="font-size:.85rem;">Note the license story: <strong>Valkey</strong> is the Linux-Foundation fork created after Redis changed its license in 2024.</p>
-    <div class="foot">KEY–VALUE / 09</div>
-  </section>
-
-  <!-- 10 — TOUR: TRADITIONAL SQL -->
-  <section class="slide" id="s10">
-    <div>
-      <p class="eyebrow">The tour · archetype 2</p>
-      <h2>Traditional SQL</h2>
-      <p class="lead" style="margin-top:10px;">The classic stack, and the reason these four properties <em>feel</em> inseparable.</p>
-    </div>
-    <div class="db-row">
-      <div class="db"><span class="logo-tile" data-icon="postgresql" style="--brand:#336791"></span><span class="db-name">PostgreSQL</span></div>
-      <div class="db"><span class="logo-tile" data-icon="mysql" style="--brand:#4479A1"></span><span class="db-name">MySQL</span></div>
-      <div class="db"><span class="logo-tile" data-icon="mariadb" style="--brand:#003545"></span><span class="db-name">MariaDB</span></div>
-      <div class="db"><span class="logo-tile" data-icon="microsoftsqlserver" data-mono="SQL" style="--brand:#CC2927"></span><span class="db-name">SQL Server</span></div>
-      <div class="db"><span class="logo-tile" data-icon="oracle" style="--brand:#C74634"></span><span class="db-name">Oracle</span></div>
-      <div class="db"><span class="logo-tile" data-icon="sqlite" style="--brand:#003B57"></span><span class="db-name">SQLite</span></div>
-    </div>
-    <div class="tag-row" style="margin-top:4px;">
-      <span class="pill on">Relational</span><span class="pill on">OLTP</span><span class="pill on">B-Tree</span><span class="pill on">Row-oriented</span><span class="pill on">Single-node*</span>
-    </div>
-    <p class="muted" style="font-size:.9rem; max-width:60ch;">This <strong>archetype</strong> is why we conflate the axes: all five tend to ship together. <span class="accent">* Single-node by default</span> — but read-replicas and extensions push past it. Distributed SQL, later in the tour, breaks the “SQL = one box” assumption entirely.</p>
-    <div class="foot">TRADITIONAL SQL / 10</div>
-  </section>
-
-  <!-- 11 — TOUR: DOCUMENT -->
-  <section class="slide" id="s11">
-    <div>
-      <p class="eyebrow">The tour · archetype 3</p>
-      <h2>Document databases</h2>
-      <p class="lead" style="margin-top:10px;">Flexible JSON records, high throughput, horizontal scale — and B-Trees quietly doing the indexing.</p>
-    </div>
-    <div class="db-row">
-      <div class="db db-lg"><span class="logo-tile" data-icon="mongodb" style="--brand:#47A248"></span><span class="db-name">MongoDB<span class="db-sub">WiredTiger · B-Tree</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="amazondynamodb" style="--brand:#4053D6"></span><span class="db-name">DynamoDB<span class="db-sub">WAL + B-Tree per replica</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="firebase" style="--brand:#FFCA28"></span><span class="db-name">Firestore<span class="db-sub">built on Spanner</span></span></div>
-    </div>
-    <ul class="ticks" style="margin-top:6px;">
-      <li>Model is <strong>document / flexible schema</strong> — but the <em>indexes</em> are classic <strong>B-Trees</strong>. Model ⟂ engine once more.</li>
-      <li><strong>MongoDB</strong>'s WiredTiger engine is B-Tree by default. <strong>DynamoDB</strong> (per the 2022 paper) is a write-ahead log plus a B-Tree per partition replica.</li>
-      <li><strong>Firestore</strong> runs on Google's <strong>Spanner</strong> infrastructure — its indexes are Spanner tables.</li>
-    </ul>
-    <p class="muted" style="font-size:.85rem;">Takeaway: “NoSQL / document” tells you about the <em>API &amp; schema</em>, almost nothing about the storage engine.</p>
-    <div class="foot">DOCUMENT / 11</div>
-  </section>
-
-  <!-- 12 — TOUR: WIDE COLUMN -->
-  <section class="slide" id="s12">
-    <div>
-      <p class="eyebrow">The tour · archetype 4 · into big-data</p>
-      <h2>Wide-column, on LSM</h2>
-      <p class="lead" style="margin-top:10px;">Built for relentless write throughput and append-heavy, massive-scale workloads — the gateway to data engineering.</p>
-    </div>
-    <div class="db-row">
-      <div class="db db-lg"><span class="logo-tile" data-icon="googlecloud" style="--brand:#4285F4"></span><span class="db-name">Bigtable<span class="db-sub">the 2006 original</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="apachecassandra" style="--brand:#1287B1"></span><span class="db-name">Cassandra<span class="db-sub">masterless · AP</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="scylladb" style="--brand:#0F9DCE"></span><span class="db-name">ScyllaDB<span class="db-sub">C++ Cassandra, shard-per-core</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="apachehbase" style="--brand:#BF2026"></span><span class="db-name">HBase<span class="db-sub">Bigtable on Hadoop</span></span></div>
-    </div>
-    <ul class="ticks" style="margin-top:4px;">
-      <li>Why they exist: <strong>ingest firehoses</strong> — events, metrics, IoT, feeds — at a scale single-node SQL can't touch.</li>
-      <li>Keyed by <strong>partition + clustering</strong> key; data sorted on disk by that key — the sort order <em>is</em> the primary index.</li>
-      <li><strong>RocksDB</strong> is the embedded <strong>LSM key-value engine</strong> these ideas spawned — it powers TiKV &amp; others (CockroachDB uses its cousin, Pebble). It's an <em>engine</em>, not a wide-column DB itself.</li>
-    </ul>
-    <p class="note"><b>The trap again:</b> wide-column ≠ columnar. Cassandra &amp; Bigtable store each row's cells <strong>together</strong> (row-oriented). “Columnar” is an OLAP layout — Part 2.</p>
-    <div class="foot">WIDE-COLUMN / 12</div>
-  </section>
-
-  <!-- 13 — LSM CONCEPTS -->
-  <section class="slide" id="s13">
-    <div>
-      <p class="eyebrow">Deep dive</p>
+      <p class="eyebrow">Axis 02 · deep dive</p>
       <h2>How an LSM-Tree works</h2>
       <p class="lead" style="margin-top:10px;">Log-Structured Merge-Tree: turn random writes into sequential ones, and clean up later.</p>
     </div>
@@ -624,13 +651,13 @@
       </div>
     </div>
     <p class="muted" style="font-size:.85rem; text-align:center;">Trade-off in one line: <strong>cheap writes, more work on reads</strong> — the mirror image of a B-Tree.</p>
-    <div class="foot">LSM · CONCEPTS / 13</div>
+    <div class="foot">LSM · CONCEPTS / 07</div>
   </section>
 
-  <!-- 14 — LSM ANIMATION -->
-  <section class="slide" id="s14">
+  <!-- 8 — LSM ANIMATION -->
+  <section class="slide" id="s8">
     <div>
-      <p class="eyebrow">Deep dive · interactive</p>
+      <p class="eyebrow">Axis 02 · interactive</p>
       <h2>Watch an LSM-Tree run</h2>
     </div>
     <div class="lsm">
@@ -660,76 +687,309 @@
         <button data-act="reset" style="margin-left:auto;">↺ Reset</button>
       </div>
     </div>
-    <div class="foot">LSM · LIVE / 14</div>
+    <div class="foot">LSM · LIVE / 08</div>
   </section>
 
-  <!-- 15 — TOUR: DISTRIBUTED SQL -->
-  <section class="slide" id="s15">
+  <!-- 9 — AXIS 03: DEPLOYMENT -->
+  <section class="slide dense" id="s9">
     <div>
-      <p class="eyebrow">The tour · archetype 5</p>
-      <h2>Distributed SQL at scale</h2>
-      <p class="lead" style="margin-top:10px;">Full SQL + ACID transactions, but sharded and replicated across the planet.</p>
+      <p class="eyebrow">Axis 03 · system · deployment</p>
+      <h2>Where does it run?</h2>
+      <p class="ask">A library in your process, one server, or a cluster of machines?</p>
     </div>
-    <div class="db-row">
-      <div class="db db-lg"><span class="logo-tile" data-icon="googlecloud" style="--brand:#4285F4"></span><span class="db-name">Google Spanner<span class="db-sub">TrueTime · external consistency</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="amazonrds" style="--brand:#527FFF"></span><span class="db-name">Aurora DSQL<span class="db-sub">disaggregated · Postgres-compatible</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="cockroachlabs" style="--brand:#6933FF"></span><span class="db-name">CockroachDB<span class="db-sub">Postgres wire · LSM engine</span></span></div>
+    <div class="grid cols-3">
+      <div class="card tight">
+        <div class="panel-light" style="padding:8px;">
+<svg class="dgm" viewBox="0 0 200 100" role="img" aria-label="Embedded: the database engine runs inside the application process and writes a local file" style="max-width:220px"><defs><marker id="ab7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="cl" x="6" y="4" width="188" height="56" rx="10"/><text class="lbl" x="14" y="18">app process</text><rect class="n-g" x="18" y="24" width="70" height="28" rx="7"/><text x="53" y="42.5" text-anchor="middle">app</text><rect class="n-b" x="112" y="24" width="70" height="28" rx="7"/><text x="147" y="42.5" text-anchor="middle">engine</text><path class="ln" d="M88 38 L110 38" marker-end="url(#ab7)"/><path class="ln" d="M147 52 L147 72" marker-end="url(#ab7)"/><rect class="n-w" x="117" y="72" width="60" height="24" rx="6"/><text x="147" y="88.5" text-anchor="middle">file</text></svg>
+        </div>
+        <h3 style="margin-top:10px;">Embedded</h3>
+        <p>A library linked into the app. No server and no network hop; the app's own process reads and writes the file.</p>
+        <span class="ex">SQLite · RocksDB · LMDB · DuckDB</span>
+      </div>
+      <div class="card tight">
+        <div class="panel-light" style="padding:8px;">
+<svg class="dgm" viewBox="0 0 200 100" role="img" aria-label="Single server: several clients connect over the network to one server that owns the disk" style="max-width:220px"><defs><marker id="ab8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-g" x="6" y="6" width="56" height="26" rx="7"/><text x="34" y="23.5" text-anchor="middle">app</text><rect class="n-g" x="6" y="40" width="56" height="26" rx="7"/><text x="34" y="57.5" text-anchor="middle">app</text><rect class="n-b" x="104" y="20" width="90" height="30" rx="7"/><text x="149" y="39.5" text-anchor="middle">server</text><path class="lnd" d="M62 19 L102 31" marker-end="url(#ab8)"/><path class="lnd" d="M62 53 L102 41" marker-end="url(#ab8)"/><path class="ln" d="M149 50 L149 70" marker-end="url(#ab8)"/><rect class="n-w" x="119" y="70" width="60" height="24" rx="6"/><text x="149" y="86.5" text-anchor="middle">disk</text></svg>
+        </div>
+        <h3 style="margin-top:10px;">Single server</h3>
+        <p>Clients connect over the network to one server that owns the disk. Scale up; add read replicas, full copies that serve reads and take over on failure.</p>
+        <span class="ex">Postgres · MySQL · SQL Server · Redis</span>
+      </div>
+      <div class="card tight">
+        <div class="panel-light" style="padding:8px;">
+<svg class="dgm" viewBox="0 0 200 100" role="img" aria-label="Cluster: five database nodes on several machines, linked by the network, acting as one database" style="max-width:220px"><defs><marker id="ab11" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="cl" x="4" y="4" width="192" height="92" rx="10"/><text class="lbl" x="12" y="18">cluster · one database</text><rect class="n-b" x="16" y="26" width="48" height="24" rx="7"/><text x="40" y="42.5" text-anchor="middle">node</text><rect class="n-b" x="76" y="26" width="48" height="24" rx="7"/><text x="100" y="42.5" text-anchor="middle">node</text><rect class="n-b" x="136" y="26" width="48" height="24" rx="7"/><text x="160" y="42.5" text-anchor="middle">node</text><rect class="n-b" x="46" y="64" width="48" height="24" rx="7"/><text x="70" y="80.5" text-anchor="middle">node</text><rect class="n-b" x="106" y="64" width="48" height="24" rx="7"/><text x="130" y="80.5" text-anchor="middle">node</text><path class="lnd" d="M64 38 L76 38"/><path class="lnd" d="M124 38 L136 38"/><path class="lnd" d="M94 76 L106 76"/><path class="lnd" d="M48 50 L60 64"/><path class="lnd" d="M92 50 L80 64"/><path class="lnd" d="M108 50 L120 64"/><path class="lnd" d="M152 50 L140 64"/></svg>
+        </div>
+        <h3 style="margin-top:10px;">Cluster</h3>
+        <p>Many machines act as one database, so the data must be split (partitioned) and copied (replicated). What the nodes share decides the rest: three architectures.</p>
+        <span class="ex">Cassandra · TiDB · Aurora · Spanner</span>
+        <a class="go" href="#s10" style="margin-top:6px;">Slide 10 →</a>
+      </div>
     </div>
-    <ul class="ticks" style="margin-top:6px;">
-      <li><strong>Spanner</strong> — SQL + ACID globally; storage descends from Bigtable on Colossus (an <mark>LSM-style</mark> format, Ressi, per the 2017 SIGMOD paper).</li>
-      <li><strong>Aurora DSQL</strong> — disaggregated query processors, journal &amp; storage; optimistic concurrency; scales reads &amp; writes independently.</li>
-      <li><strong>CockroachDB</strong> — shared-nothing distributed SQL, built on an <strong>LSM</strong> engine (Pebble) with Raft.</li>
-    </ul>
-    <p class="note"><b>Myth-buster:</b> “transactional SQL” does <strong>not</strong> require a B-Tree. Two of these three are LSM underneath.</p>
-    <div class="foot">DISTRIBUTED SQL / 15</div>
+    <div class="facts">
+      <p class="fact"><b>What it decides</b>How you scale (up or out), what a failover costs, how far apart the copies can live, and who has to operate it.</p>
+      <p class="fact"><b>How to tell</b>The install guide: a library you link, one server you start, or nodes you join into a cluster.</p>
+    </div>
+    <p class="read">How a cluster copies and splits its data (replication, partitioning, consensus) is <a href="../distributed-databases/index.html#s3">Part 2</a>.</p>
+    <div class="foot">DEPLOYMENT / 09</div>
   </section>
 
-  <!-- 16 — NEWSQL -->
-  <section class="slide" id="s16">
+  <!-- 10 — AXIS 03: CLUSTER ARCHITECTURE -->
+  <section class="slide dense" id="s10">
     <div>
-      <p class="eyebrow">The convergence · 1 of 2</p>
-      <h2>NewSQL</h2>
-      <p class="lead" style="margin-top:10px;">What happens when you want the SQL + ACID of the 1980s at the scale of the 2010s.</p>
+      <p class="eyebrow">Axis 03 · system · cluster architecture</p>
+      <h2>In a cluster, what do compute and storage share?</h2>
+      <p class="ask">Does the tier that runs the queries also hold a slice of the data? If yes, it's shared-nothing. If no, compute is disaggregated: over storage nodes that each own a slice, or over one shared storage pool.</p>
     </div>
+    <div class="grid cols-3 arch">
+      <div class="card tight">
+        <div class="panel-light" style="padding:6px;">
+<svg class="dgm" viewBox="0 0 200 84" role="img" aria-label="Shared-nothing: three machines, each a node that runs queries over its own disk holding one slice of the data" style="max-width:200px"><defs><marker id="ab9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="cl" x="2" y="1" width="60" height="82" rx="9"/><rect class="cl" x="70" y="1" width="60" height="82" rx="9"/><rect class="cl" x="138" y="1" width="60" height="82" rx="9"/><rect class="n-b" x="6" y="5" width="52" height="24" rx="7"/><text x="32" y="21.5" text-anchor="middle">node</text><rect class="n-b" x="74" y="5" width="52" height="24" rx="7"/><text x="100" y="21.5" text-anchor="middle">node</text><rect class="n-b" x="142" y="5" width="52" height="24" rx="7"/><text x="168" y="21.5" text-anchor="middle">node</text><path class="ln" d="M58 17 L74 17"/><path class="ln" d="M126 17 L142 17"/><path class="ln" d="M32 29 L32 43" marker-end="url(#ab9)"/><path class="ln" d="M100 29 L100 43" marker-end="url(#ab9)"/><path class="ln" d="M168 29 L168 43" marker-end="url(#ab9)"/><rect class="n-w" x="6" y="43" width="52" height="36" rx="6"/><text x="32" y="58" text-anchor="middle">disk</text><text class="sub" x="32" y="72" text-anchor="middle">slice A</text><rect class="n-w" x="74" y="43" width="52" height="36" rx="6"/><text x="100" y="58" text-anchor="middle">disk</text><text class="sub" x="100" y="72" text-anchor="middle">slice B</text><rect class="n-w" x="142" y="43" width="52" height="36" rx="6"/><text x="168" y="58" text-anchor="middle">disk</text><text class="sub" x="168" y="72" text-anchor="middle">slice C</text></svg>
+        </div>
+        <h3><span class="num">C1</span>Shared-nothing (integrated compute and storage)</h3>
+        <p>Every node keeps a slice of the data on its own disk and runs the queries on it. A router in front (mongos) doesn't change that.</p>
+        <p><strong>Buys:</strong> work on local data needs no extra hop; one kind of node to deploy.</p>
+        <p><strong>Costs:</strong> compute and storage grow together; rebalancing moves data.</p>
+        <span class="ex">Cassandra&nbsp;· ScyllaDB&nbsp;· MongoDB&nbsp;· CockroachDB&nbsp;· YugabyteDB</span>
+      </div>
+      <div class="card tight">
+        <div class="panel-light" style="padding:6px;">
+<svg class="dgm" viewBox="0 0 200 84" role="img" aria-label="Disaggregated compute over shared-nothing storage: stateless SQL nodes on top read from storage nodes that each own one slice of the data" style="max-width:200px"><defs><marker id="ab12" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-b" x="6" y="5" width="52" height="24" rx="7"/><text x="32" y="21.5" text-anchor="middle">SQL</text><rect class="n-b" x="74" y="5" width="52" height="24" rx="7"/><text x="100" y="21.5" text-anchor="middle">SQL</text><rect class="n-b" x="142" y="5" width="52" height="24" rx="7"/><text x="168" y="21.5" text-anchor="middle">SQL</text><path class="ln" d="M32 29 L32 43" marker-end="url(#ab12)"/><path class="ln" d="M100 29 L100 43" marker-end="url(#ab12)"/><path class="ln" d="M168 29 L168 43" marker-end="url(#ab12)"/><path class="lnd" d="M46 29 L86 43" marker-end="url(#ab12)"/><path class="lnd" d="M154 29 L114 43" marker-end="url(#ab12)"/><rect class="n-w" x="6" y="43" width="52" height="36" rx="6"/><text x="32" y="58" text-anchor="middle">store</text><text class="sub" x="32" y="72" text-anchor="middle">slice A</text><rect class="n-w" x="74" y="43" width="52" height="36" rx="6"/><text x="100" y="58" text-anchor="middle">store</text><text class="sub" x="100" y="72" text-anchor="middle">slice B</text><rect class="n-w" x="142" y="43" width="52" height="36" rx="6"/><text x="168" y="58" text-anchor="middle">store</text><text class="sub" x="168" y="72" text-anchor="middle">slice C</text></svg>
+        </div>
+        <h3><span class="num">C2</span>Disaggregated compute + <span class="nw">shared-nothing storage</span></h3>
+        <p>Stateless query nodes run the queries; separate storage nodes each own a slice of the data.</p>
+        <p><strong>Buys:</strong> query nodes scale apart from storage; workloads can get their own nodes.</p>
+        <p><strong>Costs:</strong> reads cross to storage (pushdown trims them); moving a slice copies it.</p>
+        <span class="ex"><span class="nw">TiDB over TiKV (classic)</span>&nbsp;· <span class="nw">VictoriaMetrics cluster</span></span>
+      </div>
+      <div class="card tight">
+        <div class="panel-light" style="padding:6px;">
+<svg class="dgm" viewBox="0 0 200 84" role="img" aria-label="Disaggregated compute over shared storage: stateless SQL nodes all read one shared, self-replicating storage pool" style="max-width:200px"><defs><marker id="ab10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-b" x="6" y="5" width="52" height="24" rx="7"/><text x="32" y="21.5" text-anchor="middle">SQL</text><rect class="n-b" x="74" y="5" width="52" height="24" rx="7"/><text x="100" y="21.5" text-anchor="middle">SQL</text><rect class="n-b" x="142" y="5" width="52" height="24" rx="7"/><text x="168" y="21.5" text-anchor="middle">SQL</text><path class="ln" d="M32 29 L56 43" marker-end="url(#ab10)"/><path class="ln" d="M100 29 L100 43" marker-end="url(#ab10)"/><path class="ln" d="M168 29 L144 43" marker-end="url(#ab10)"/><rect class="n-w" x="6" y="43" width="188" height="36" rx="7"/><text x="100" y="58" text-anchor="middle">shared storage</text><text class="sub" x="100" y="72" text-anchor="middle">one replicated pool</text></svg>
+        </div>
+        <h3><span class="num">C3</span>Disaggregated compute + shared distributed storage</h3>
+        <p>Stateless compute nodes all read one pool of storage that replicates itself.</p>
+        <p><strong>Buys:</strong> new replicas, failover and rebalancing copy no data; compute scales on its own.</p>
+        <p><strong>Costs:</strong> the network to storage is the bottleneck; one writer per volume (Aurora) or synced caches (Oracle RAC).</p>
+        <span class="ex">Aurora&nbsp;· Bigtable&nbsp;· HBase&nbsp;· Neon&nbsp;· AlloyDB&nbsp;· <span class="nw">Azure SQL Hyperscale</span></span>
+      </div>
+    </div>
+    <p class="note"><b>Where do Spanner and Bigtable go?</b> Both keep their files on Google’s Colossus. <strong>Bigtable</strong> is disaggregated, shared storage: nodes hold only pointers to tablets, so rebalancing copies no data; a cluster in another zone is a separate, eventually consistent copy. <strong>Spanner</strong> is a hybrid: shared storage inside a zone (moving a split copies nothing) and shared-nothing across zones (each read-write or read-only replica keeps a full copy). Google’s docs say “shared nothing”: each split has one server per zone.</p>
+    <p class="read">Landmarks: <span class="nw">Stonebraker, “The Case for Shared Nothing” (1986)</span> · <span class="nw">Oracle RAC: older shared disk</span> · <span class="nw">Aurora (2017)</span> · <span class="nw">TiDB (2020)</span></p>
+    <div class="foot">CLUSTER ARCHITECTURE / 10</div>
+  </section>
+
+  <!-- 11 — ARCHETYPES -->
+  <section class="slide dense" id="s11">
+    <div>
+      <p class="eyebrow">The archetypes</p>
+      <h2>Seven combinations recur</h2>
+      <p class="lead" style="margin-top:10px; max-width:64ch;">The axes are independent, but some answers suit each other. Those stable combinations are the <strong>archetypes</strong>: know one product in an archetype, and you can predict how the others behave.</p>
+    </div>
+    <div class="grid cols-4">
+      <a class="card part tight" href="#s12"><span class="num">A1</span><h3>Embedded engine</h3><span class="sigline">library · <span class="nw">B-tree</span> or LSM · embedded, no network</span><p>SQLite, RocksDB, LMDB</p><span class="go">Slide 12 →</span></a>
+      <a class="card part tight" href="#s13"><span class="num">A2</span><h3>Classic relational</h3><span class="sigline">SQL · <span class="nw">B-tree</span> · one server + replicas</span><p>Postgres, MySQL, SQL&nbsp;Server, Oracle</p><span class="go">Slide 13 →</span></a>
+      <a class="card part tight" href="#s14"><span class="num">A3</span><h3>Key–value store</h3><span class="sigline">key → value · hash tables or <span class="nw">log-structured</span> · single server or <span class="nw">shared-nothing</span></span><p>Redis, Valkey, Memcached, Aerospike</p><span class="go">Slide 14 →</span></a>
+      <a class="card part tight" href="#s15"><span class="num">A4</span><h3>Document store</h3><span class="sigline">JSON documents · <span class="nw">B-tree</span> (MongoDB, DynamoDB) · <span class="nw">shared-nothing</span> (Firestore: on Spanner)</span><p>MongoDB, Couchbase, DynamoDB, Firestore</p><span class="go">Slide 15 →</span></a>
+      <a class="card part tight" href="#s16"><span class="num">A5</span><h3>Wide-column store</h3><span class="sigline">sorted rows per partition · LSM · <span class="nw">shared-nothing</span> or disaggregated, shared storage</span><p>Cassandra, ScyllaDB, Bigtable, HBase</p><span class="go">Slide 16 →</span></a>
+      <a class="card part tight" href="#s17"><span class="num">A6</span><h3>Shared-storage SQL</h3><span class="sigline">SQL · <span class="nw">B-tree</span> pages · disaggregated, shared storage</span><p>Aurora, Neon, AlloyDB</p><span class="go">Slide 17 →</span></a>
+      <a class="card part tight" href="#s18"><span class="num">A7</span><h3>Distributed SQL</h3><span class="sigline">SQL · LSM · <span class="nw">shared-nothing</span> or disaggregated, <span class="nw">shared-nothing storage</span> (Spanner: hybrid)</span><p>Spanner, CockroachDB, TiDB, YugabyteDB</p><span class="go">Slides 18–19 →</span></a>
+      <a class="card part tight" href="../distributed-databases/index.html#s20" style="border-color:var(--accent); background:var(--accent-soft);"><span class="num">ANOTHER CUT</span><h3 class="accent">By how they distribute</h3><p>These are grouped by what the app sees and how a node stores data. Part 2 regroups the distributed ones by replication and routing.</p><span class="go">Part 2, slide 20 →</span></a>
+    </div>
+    <div class="foot">ARCHETYPES / 11</div>
+  </section>
+
+  <!-- 12 — A1 EMBEDDED -->
+  <section class="slide dense" id="s12">
+    <div>
+      <p class="eyebrow">Archetype A1 of 7 · embedded engine</p>
+      <h2>Embedded engines</h2>
+      <p class="lead" style="margin-top:8px;"><strong>The database is a library.</strong> No server and no network: the engine runs inside your process and stores to a local file. Phones, browsers, desktop apps, edge devices, and the storage layer of other databases.</p>
+    </div>
+    <div class="db-row sm">
+      <div class="db"><span class="logo-tile" data-icon="sqlite" style="--brand:#003B57"></span><span class="db-name">SQLite<span class="db-sub">relational · B-tree</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="rocksdb" data-mono="RX" style="--brand:#1f2937"></span><span class="db-name">RocksDB<span class="db-sub">key–value · LSM</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="lmdb" data-mono="LM" style="--brand:#4b5563"></span><span class="db-name">LMDB<span class="db-sub">key–value · copy-on-write</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="duckdb" data-mono="DK" style="--brand:#b08900"></span><span class="db-name">DuckDB<span class="db-sub">the OLAP cousin</span></span></div>
+    </div>
+    <dl class="sig">
+      <div><dt><i>01</i>Model</dt><dd>Relational (SQLite) or key–value (RocksDB, LMDB)</dd></div>
+      <div><dt><i>02</i>Structure</dt><dd>B-tree (SQLite), LSM (RocksDB), or copy-on-write B-tree (LMDB)</dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Embedded: a library in your process that reads and writes a local file; nothing to replicate or partition, by design</dd></div>
+    </dl>
     <div class="grid cols-2">
-      <div class="card">
-        <h3>The pitch</h3>
-        <p>Keep the relational model, SQL, and real transactions — but make the system <strong>distributed, elastic, and fault-tolerant</strong> like a NoSQL store.</p>
-      </div>
-      <div class="card">
-        <h3>How they're built</h3>
-        <p>Distributed consensus (Raft/Paxos) over an <strong>LSM</strong> key-value layer, usually with <strong>compute separated from storage</strong>. Several axes flip at once.</p>
-      </div>
+      <div class="card why"><h3>Why these answers travel together</h3><p>No network and no server means nothing to partition or replicate, and one writer at a time (SQLite, LMDB) buys the strongest isolation cheaply. SQLite is fully ACID out of the box; RocksDB syncs its log only when a write asks for it.</p></div>
+      <div class="card exc"><h3>The exception that proves the axes</h3><p>Embedded engines are also the <strong>bottom layer of distributed databases</strong>: TiKV runs RocksDB, YugabyteDB a fork of it, and CockroachDB's Pebble is modelled on it. rqlite and LiteFS replicate SQLite. The engine stays embedded; a system layer above adds distribution.</p></div>
     </div>
-    <div class="db-row">
-      <div class="db db-lg"><span class="logo-tile" data-icon="googlecloud" style="--brand:#4285F4"></span><span class="db-name">Google Spanner<span class="db-sub">TrueTime · external consistency</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="cockroachlabs" style="--brand:#6933FF"></span><span class="db-name">CockroachDB<span class="db-sub">Postgres wire · LSM engine</span></span></div>
-      <div class="db db-lg"><span class="logo-tile" data-icon="tidb" data-mono="Ti" style="--brand:#E60C0C"></span><span class="db-name">TiDB<span class="db-sub">MySQL wire · TiKV on RocksDB</span></span></div>
-    </div>
-    <div class="tag-row">
-      <span class="pill on">Relational + SQL</span><span class="pill on">Distributed</span><span class="pill warm">LSM engine</span><span class="pill on">Compute ⁄ storage split</span><span class="pill on">OLTP (often HTAP)</span>
-    </div>
-    <p class="muted" style="font-size:.9rem;">Examples: <strong>Google Spanner</strong>, <strong>CockroachDB</strong>, <strong>TiDB</strong>. This is the clearest proof that the four axes really are independent — NewSQL remixes them deliberately.</p>
-    <div class="foot">NEWSQL / 16</div>
+    <div class="foot">A1 · EMBEDDED / 12</div>
   </section>
 
-  <!-- 17 — TIDB -->
-  <section class="slide" id="s17">
+  <!-- 13 — A2 CLASSIC RELATIONAL -->
+  <section class="slide dense" id="s13">
     <div>
-      <p class="eyebrow">The convergence · 2 of 2</p>
+      <p class="eyebrow">Archetype A2 of 7 · classic relational server</p>
+      <h2>Classic relational</h2>
+      <p class="lead" style="margin-top:8px;"><strong>One server, strong guarantees.</strong> Tables, SQL and ACID transactions, with replicas for reads and failover. The <span class="nw">40-year</span> default, and the reason the axes <em>feel</em> inseparable: these answers almost always ship together.</p>
+    </div>
+    <div class="db-row sm">
+      <div class="db"><span class="logo-tile" data-icon="postgresql" style="--brand:#336791"></span><span class="db-name">PostgreSQL</span></div>
+      <div class="db"><span class="logo-tile" data-icon="mysql" style="--brand:#4479A1"></span><span class="db-name">MySQL</span></div>
+      <div class="db"><span class="logo-tile" data-icon="mariadb" style="--brand:#003545"></span><span class="db-name">MariaDB</span></div>
+      <div class="db"><span class="logo-tile" data-icon="microsoftsqlserver" data-mono="SQL" style="--brand:#CC2927"></span><span class="db-name">SQL Server</span></div>
+      <div class="db"><span class="logo-tile" data-icon="oracle" style="--brand:#C74634"></span><span class="db-name">Oracle</span></div>
+    </div>
+    <dl class="sig">
+      <div><dt><i>01</i>Model</dt><dd>Relational + SQL; JSON columns too</dd></div>
+      <div><dt><i>02</i>Structure</dt><dd>B-tree. Postgres keeps rows in a heap; InnoDB clusters them on the primary key</dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Single server: one leader takes every write, plus read replicas; table partitions normally stay on that server</dd></div>
+    </dl>
+    <div class="grid cols-2">
+      <div class="card why"><h3>Why these answers travel together</h3><p>One server owns all the data, so making any set of rows atomic and isolated needs no network round trips and no consensus. That's why transactions, joins and constraints feel like part of “SQL”. The limit is the one server: writes scale up, not out.</p></div>
+      <div class="card exc"><h3>The exception that proves the axes</h3><p>Same engines, other system-layer answers: <strong>Citus</strong> and <strong>Vitess</strong> shard Postgres and MySQL across nodes (shared-nothing), <strong>Oracle RAC</strong> runs several servers over shared disks, and <strong>Aurora</strong> moves the storage into a shared service (archetype <a class="go inline" href="#s17">A6</a>).</p></div>
+    </div>
+    <div class="foot">A2 · CLASSIC RELATIONAL / 13</div>
+  </section>
+
+  <!-- 14 — A3 KEY–VALUE -->
+  <section class="slide dense" id="s14">
+    <div>
+      <p class="eyebrow">Archetype A3 of 7 · key–value store</p>
+      <h2>Key–value stores</h2>
+      <p class="lead" style="margin-top:8px;"><strong>The key is the main door.</strong> Every get, put and delete names a key, and the database finds the value by that key. Caches, sessions, rate limits, leaderboards, feature flags, and the metadata of other systems.</p>
+    </div>
+    <div class="db-row sm">
+      <div class="db"><span class="logo-tile" data-icon="redis" style="--brand:#FF4438"></span><span class="db-name">Redis<span class="db-sub">values are data structures</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="valkey" data-mono="VK" style="--brand:#5a2fd6"></span><span class="db-name">Valkey<span class="db-sub">Linux Foundation fork of Redis</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="memcached" data-mono="MC" style="--brand:#1a7f37"></span><span class="db-name">Memcached<span class="db-sub">plain cache · bytes</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="aerospike" style="--brand:#C9252C"></span><span class="db-name">Aerospike<span class="db-sub">records with named bins</span></span></div>
+    </div>
+    <dl class="sig">
+      <div><dt><i>01</i>Model</dt><dd>Key → value. Redis: strings, hashes, lists, sets, sorted sets, streams; Aerospike: records with bins; Memcached: bytes</dd></div>
+      <div><dt><i>02</i>Structure</dt><dd>Hash tables and skiplists in RAM (Redis, Memcached); Aerospike: a key index over log-structured storage</dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Single server (Redis runs one command at a time). <span class="nw">Shared-nothing</span> when a hash of the key picks the owner: each Redis Cluster master serves its hash slots, each Aerospike node its partitions; Memcached leaves sharding to the client</dd></div>
+    </dl>
+    <div class="grid cols-2">
+      <div class="card why"><h3>Why these answers travel together</h3><p>If every request names a key, the database needs no query planner, and hashing the key picks the node, so partitioning is trivial and each operation is one small step. The price: queries across keys need an extra index, built in (Redis Search in Redis 8, Aerospike secondary indexes) or kept by the app (a Redis set of IDs, a sorted set for a leaderboard).</p></div>
+      <div class="card exc"><h3>The exception that proves the axes</h3><p>Key–value is also the <strong>layer under other models</strong>: TiDB's SQL runs on the TiKV key–value store (<a class="go inline" href="#s18">A7</a>), CockroachDB's SQL on the Pebble engine, and FoundationDB's Record Layer keeps structured records on its ordered keys. A table row becomes a key (table + primary key) with its columns as the value. How consistent a store is, from a cache to etcd, is a <a class="go inline" href="../distributed-databases/index.html#s19">Part 2</a> question.</p></div>
+    </div>
+    <div class="foot">A3 · KEY–VALUE / 14</div>
+  </section>
+
+  <!-- 15 — A4 DOCUMENT -->
+  <section class="slide dense" id="s15">
+    <div>
+      <p class="eyebrow">Archetype A4 of 7 · document store</p>
+      <h2>Document stores</h2>
+      <p class="lead" style="margin-top:8px;"><strong>The record is a tree.</strong> Each record is a self-contained JSON-like document (DynamoDB calls it an item), loaded and saved whole. A good fit when data is read together (an order with its lines) and the schema changes often.</p>
+    </div>
+    <div class="db-row sm">
+      <div class="db"><span class="logo-tile" data-icon="mongodb" style="--brand:#47A248"></span><span class="db-name">MongoDB<span class="db-sub">WiredTiger · B-tree</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="couchbase" data-mono="CB" style="--brand:#EA2328"></span><span class="db-name">Couchbase<span class="db-sub">JSON + key–value API</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="amazondynamodb" style="--brand:#4053D6"></span><span class="db-name">DynamoDB<span class="db-sub">key-first · B-tree</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="firebase" style="--brand:#FFCA28"></span><span class="db-name">Firestore<span class="db-sub">built on Spanner</span></span></div>
+    </div>
+    <dl class="sig">
+      <div><dt><i>01</i>Model</dt><dd>JSON-like documents, flexible schema. MongoDB and Firestore query any indexed field; DynamoDB goes by partition + sort key, plus secondary indexes</dd></div>
+      <div><dt><i>02</i>Structure</dt><dd>B-tree: MongoDB's WiredTiger, and DynamoDB's storage nodes (a B-tree plus a write-ahead log). Firestore sits on Spanner</dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing: each MongoDB shard and DynamoDB storage node serves the data it holds; mongos and DynamoDB's request routers only route. Couchbase splits by service: key–value calls go to the Data node that owns the vBucket; SQL++ runs in the Query service, which fetches from Data nodes (disaggregated, shared-nothing storage). Firestore runs on Spanner (per Google's ICDE 2023 paper), so it inherits Spanner's hybrid</dd></div>
+    </dl>
+    <div class="grid cols-2">
+      <div class="card why"><h3>Why these answers travel together</h3><p>If one request's data lives in one document, the document is the natural unit for everything: written atomically, stored on one partition, loaded in one read. DynamoDB takes it furthest: related items share a partition key and come back in one query. Joins and <a class="go inline" href="../database-transactions/index.html#s16">multi-document transactions</a> exist, but cost more, so you shape the data around the reads.</p></div>
+      <div class="card exc"><h3>The exception that proves the axes</h3><p>Document doesn't mean LSM or a special “NoSQL engine”: MongoDB and DynamoDB both store data in <strong>B-trees</strong>. DynamoDB shares a name with the 2007 Dynamo paper, not its design: each partition elects a leader with Multi-Paxos. And <strong>Firestore</strong> keeps its documents in Spanner (<a class="go inline" href="#s18">A7</a>).</p></div>
+    </div>
+    <div class="foot">A4 · DOCUMENT / 15</div>
+  </section>
+
+  <!-- 16 — A5 WIDE-COLUMN -->
+  <section class="slide dense" id="s16">
+    <div>
+      <p class="eyebrow">Archetype A5 of 7 · wide-column store</p>
+      <h2>Wide-column stores</h2>
+      <p class="lead" style="margin-top:8px;"><strong>Sorted rows inside a partition.</strong> A partition key picks the node; inside it, rows are sorted by a clustering key, and each row can have its own columns. Built for huge write volumes read back by key and range: events per device, messages per chat, a feed per user.</p>
+    </div>
+    <div class="db-row sm">
+      <div class="db"><span class="logo-tile" data-icon="apachecassandra" style="--brand:#1287B1"></span><span class="db-name">Cassandra<span class="db-sub">CQL · leaderless</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="scylladb" style="--brand:#0F9DCE"></span><span class="db-name">ScyllaDB<span class="db-sub">Cassandra-compatible, in C++</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="googlecloud" style="--brand:#4285F4"></span><span class="db-name">Bigtable<span class="db-sub">Google · tablets</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="apachehbase" style="--brand:#BF2026"></span><span class="db-name">HBase<span class="db-sub">open-source Bigtable</span></span></div>
+    </div>
+    <dl class="sig">
+      <div><dt><i>01</i>Model</dt><dd>Partition key → rows sorted by a clustering key; columns can differ per row; no joins</dd></div>
+      <div><dt><i>02</i>Structure</dt><dd>LSM in all four: memtable, SSTables, compaction (the Bigtable paper named them)</dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing, no leader: Cassandra (a hash ring) and ScyllaDB (hash-split tablets) nodes serve the ranges they store. Disaggregated, shared storage: Bigtable and HBase serve each key range from one server, but the range's files sit on Colossus or HDFS, so a range moves without copying data</dd></div>
+    </dl>
+    <div class="grid cols-2">
+      <div class="card why"><h3>Why these answers travel together</h3><p>Two lineages. <strong>Bigtable</strong> (2006) gave the data model and the LSM engine. <strong>Dynamo</strong> (2007) gave the hash ring and <a class="go inline" href="../distributed-databases/index.html#s8">leaderless replication</a>. Cassandra combines both. Heavy writes suit an LSM, and a request by partition key touches one node; a query without it must scan the cluster.</p></div>
+      <div class="card exc"><h3>The exception that proves the axes</h3><p><strong>Wide-column ≠ columnar</strong>: Cassandra keeps a row's cells together, Bigtable and HBase keep them together per column family; none stores one column across rows. Columnar storage is <a class="go inline" href="../database-anatomy-part2/index.html#s3">Part 4</a>. And one model runs on two architectures: Cassandra is shared-nothing, while Bigtable and HBase run on disaggregated, shared storage (Colossus, HDFS).</p></div>
+    </div>
+    <div class="foot">A5 · WIDE-COLUMN / 16</div>
+  </section>
+
+  <!-- 17 — A6 SHARED-STORAGE SQL -->
+  <section class="slide dense" id="s17">
+    <div>
+      <p class="eyebrow">Archetype A6 of 7 · shared-storage SQL</p>
+      <h2>Shared-storage SQL</h2>
+      <p class="lead" style="margin-top:8px;"><strong>Keep the engine, replace the disk.</strong> Postgres, MySQL or SQL Server over a replicated storage service. The SQL, the planner and the B-tree pages stay; durability, replicas and backups move into storage.</p>
+    </div>
+    <div class="db-row sm">
+      <div class="db"><span class="logo-tile" data-icon="amazonrds" style="--brand:#527FFF"></span><span class="db-name">Aurora<span class="db-sub">Postgres · MySQL</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="neon" data-mono="NE" style="--brand:#00a37a"></span><span class="db-name">Neon<span class="db-sub">Postgres</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="googlecloud" style="--brand:#4285F4"></span><span class="db-name">AlloyDB<span class="db-sub">Postgres</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="azuresqlhyperscale" data-mono="HS" style="--brand:#0078D4"></span><span class="db-name">Azure SQL Hyperscale<span class="db-sub">SQL Server</span></span></div>
+    </div>
+    <dl class="sig">
+      <div><dt><i>01</i>Model</dt><dd>Relational; wire-compatible with Postgres, MySQL or SQL Server</dd></div>
+      <div><dt><i>02</i>Structure</dt><dd>B-tree pages, rebuilt by storage from the log</dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Disaggregated, shared storage, one writer per volume: Aurora's writer and up to 15 readers mount one volume, which storage keeps as 6 copies across 3 zones</dd></div>
+    </dl>
+    <div class="grid cols-2">
+      <div class="card why"><h3>Why these answers travel together</h3><p>The writer sends only log records, and storage builds the pages (Aurora's “the log is the database”). Network traffic stays small, and readers share the same volume, so a new replica or a failover copies no data. But there is still <strong>one writer</strong>: writes scale up, not out.</p></div>
+      <div class="card exc"><h3>The exception that proves the axes</h3><p>That one-writer ceiling is why AWS added partitioning on top: <strong>Aurora Limitless</strong> shards across writers, and <strong>Aurora DSQL</strong> is a distributed SQL design (<a class="go inline" href="#s18">A7</a>). Disaggregated, shared storage isn't SQL-only either: <strong>Bigtable</strong> servers keep their files on Colossus.</p></div>
+    </div>
+    <div class="foot">A6 · SHARED-STORAGE SQL / 17</div>
+  </section>
+
+  <!-- 18 — A7 DISTRIBUTED SQL -->
+  <section class="slide dense" id="s18">
+    <div>
+      <p class="eyebrow">Archetype A7 of 7 · distributed SQL (NewSQL)</p>
+      <h2>Distributed SQL</h2>
+      <p class="lead" style="margin-top:8px;"><strong>ACID across many nodes.</strong> Cut the data into key ranges, replicate each range with consensus, and let any node serve SQL. Called NewSQL in the 2010s; now a common way to scale SQL writes out.</p>
+    </div>
+    <div class="db-row sm">
+      <div class="db"><span class="logo-tile" data-icon="googlecloud" style="--brand:#4285F4"></span><span class="db-name">Spanner<span class="db-sub">TrueTime</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="cockroachlabs" style="--brand:#6933FF"></span><span class="db-name">CockroachDB<span class="db-sub">Postgres wire · Pebble</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="tidb" data-mono="Ti" style="--brand:#E60C0C"></span><span class="db-name">TiDB<span class="db-sub">MySQL wire · TiKV</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="yugabytedb" data-mono="YB" style="--brand:#FF6E42"></span><span class="db-name">YugabyteDB<span class="db-sub">Postgres · DocDB</span></span></div>
+      <div class="db"><span class="logo-tile" data-icon="amazonrds" style="--brand:#527FFF"></span><span class="db-name">Aurora DSQL<span class="db-sub">Postgres-compatible</span></span></div>
+    </div>
+    <dl class="sig">
+      <div><dt><i>01</i>Model</dt><dd>Relational; Postgres- or MySQL-compatible SQL</dd></div>
+      <div><dt><i>02</i>Structure</dt><dd>LSM: Pebble, RocksDB; Spanner's Ressi format is LSM-style</dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing: every node of a single-tenant CockroachDB cluster, and every YugabyteDB node, runs SQL and stores Raft-replicated ranges. Disaggregated, shared-nothing storage: stateless TiDB servers over TiKV (classic TiDB); Aurora DSQL is similar, plus a shared commit journal. Spanner is a hybrid <span class="nw">(<a class="go inline" href="#s10">slide 10</a>)</span></dd></div>
+    </dl>
+    <div class="grid cols-2">
+      <div class="card why"><h3>Why these answers travel together</h3><p>Transactions across ranges need <a class="go inline" href="../distributed-databases/index.html#s14">consensus per range</a> (one agreed history each) and a <a class="go inline" href="../distributed-databases/index.html#s18">shared clock</a> (TrueTime, hybrid clocks, a timestamp oracle) so ranges agree on commit order. Ranges are slices of one sorted key space, so an ordered key–value engine below makes them cheap to split and move.</p></div>
+      <div class="card exc"><h3>The exception that proves the axes</h3><p>Transactional SQL doesn't need a B-tree: most of these run on <mark>LSM</mark> engines. And the layering varies: <strong>Aurora DSQL</strong> splits SQL, conflict checks, the commit journal and storage into separate services, with optimistic concurrency.</p></div>
+    </div>
+    <div class="foot">A7 · DISTRIBUTED SQL / 18</div>
+  </section>
+
+  <!-- 19 — TIDB -->
+  <section class="slide dense" id="s19">
+    <div>
+      <p class="eyebrow">Archetype A7 · case study</p>
       <h2>Case study: TiDB</h2>
-      <p class="lead" style="margin-top:10px;">A textbook of this whole talk in one architecture diagram.</p>
+      <p class="lead" style="margin-top:10px;">One system where the axes are separate parts you can point at: SQL, storage engine, placement and an analytics copy. It is the canonical <a class="go inline" href="#s10">disaggregated, shared-nothing storage</a> design (classic TiDB): stateless TiDB servers over TiKV nodes that each own their Regions.</p>
     </div>
     <div class="split">
       <div>
         <ul class="ticks">
-          <li><strong>TiDB</strong> — stateless SQL layer (MySQL-compatible). Pure <em>compute</em>; scale it out freely.</li>
-          <li><strong>TiKV</strong> — distributed KV <em>storage</em>, built on <strong>RocksDB (LSM)</strong>, replicated by Raft.</li>
-          <li><strong>PD</strong> (Placement Driver) — the brain: metadata, data placement, timestamps.</li>
-          <li><strong>TiFlash</strong> — a columnar replica for analytics → <strong>HTAP</strong> in one system (the bridge to Part 2).</li>
+          <li><strong>TiDB</strong>: stateless SQL layer (MySQL-compatible). Pure <em>compute</em>; scale it out freely.</li>
+          <li><strong>TiKV</strong>: distributed KV <em>storage</em> on <strong>RocksDB (LSM)</strong>. Each node owns Regions (key ranges), each a Raft group; moving a Region copies its data (classic TiDB; TiDB Cloud's TiDB X keeps the data in object storage, so adding a TiKV node moves no data).</li>
+          <li><strong>PD</strong> (Placement Driver): the brain, holding metadata, data placement and timestamps.</li>
+          <li><strong>TiFlash</strong>: a columnar replica for analytics → <strong>HTAP</strong> in one system (the bridge to <a class="go inline" href="../database-anatomy-part2/index.html">Part 4</a>).</li>
         </ul>
         <div class="tag-row" style="margin-top:12px;">
-          <span class="pill on">SQL</span><span class="pill warm">LSM</span><span class="pill on">distributed</span><span class="pill on">compute ⁄ storage split</span>
+          <span class="pill on">SQL</span><span class="pill warm">LSM</span><span class="pill on">distributed</span><span class="pill on">disaggregated, shared-nothing storage</span>
         </div>
       </div>
       <div class="panel-light">
@@ -737,97 +997,102 @@
         <p class="cap">compute (TiDB) ⟂ storage (TiKV/LSM) ⟂ brain (PD)</p>
       </div>
     </div>
-    <div class="foot">TiDB / 17</div>
+    <div class="foot">TiDB / 19</div>
   </section>
 
-  <!-- 18 — WHICH PROPERTIES RELATE -->
-  <section class="slide" id="s18">
+  <!-- 20 — WHAT RELATES -->
+  <section class="slide dense" id="s20">
     <div>
       <p class="eyebrow">Payoff</p>
       <h2>So which properties actually relate?</h2>
+      <p class="lead" style="margin-top:10px; max-width:62ch;">A few answers genuinely pull others along, each for a mechanical reason. Everything else is habit or marketing.</p>
     </div>
     <div class="grid cols-2">
       <div class="card" style="border-color:var(--good);">
-        <h3 style="color:var(--good)">Genuinely correlated</h3>
+        <h3 style="color:var(--good)">Real dependencies, and why</h3>
         <ul class="ticks" style="margin-top:8px;">
-          <li><strong>OLAP ⇒ columnar</strong> storage (analytics scans columns).</li>
-          <li><strong>OLTP ⇒ row-oriented</strong> (fetch whole records).</li>
-          <li><strong>Write-heavy / big-data ⇒ LSM</strong> (sequential writes win).</li>
-          <li><strong>In-memory KV ⇒</strong> hash/skiplist, <em>no</em> B-Tree/LSM.</li>
-          <li><strong>Global scale ⇒</strong> distributed + compute/storage split.</li>
+          <li><strong>OLTP ⇒ rows, OLAP ⇒ columns</strong>: a query reads whole records or a few columns.</li>
+          <li><strong>Write-heavy ingest ⇒ LSM</strong>: sequential appends beat random page writes.</li>
+          <li><strong>Shared-nothing storage (C1 and C2) ⇒ partition by key</strong>: a query without the key asks every storage node.</li>
+          <li><strong>Ranges that split and move ⇒ an ordered key–value engine underneath</strong>: a range is a slice of one sorted key space, so splitting it is cheap.</li>
+          <li><strong>Shared storage (C3) ⇒ writers must coordinate</strong>: most designs give each piece of data one owner (Aurora: one writer for the whole volume, so writes scale up, not out; Bigtable: one server per tablet). Oracle RAC lets every instance write and keeps their caches in sync with Cache Fusion.</li>
+          <li><strong>Disaggregated compute ⇒ query nodes scale apart from storage</strong>, but data they don't cache crosses the network.</li>
         </ul>
       </div>
       <div class="card" style="border-color:var(--accent);">
         <h3 class="accent">Independent (the myths)</h3>
         <ul class="ticks" style="margin-top:8px;">
-          <li><strong>Relational ≠ B-Tree</strong> — CockroachDB is SQL on LSM.</li>
-          <li><strong>SQL ≠ single-node</strong> — Spanner is global SQL.</li>
-          <li><strong>Document ≠ no index</strong> — Mongo/Dynamo use B-Trees.</li>
-          <li><strong>Wide-column ≠ columnar</strong> — it's row-oriented.</li>
-          <li><strong>Distributed ≠ NoSQL</strong> — NewSQL is distributed SQL.</li>
-          <li><strong>Disaggregated ≠ new engine</strong> — Aurora splits compute from storage, still B-Tree pages.</li>
+          <li><strong>Relational ≠ B-tree</strong>: CockroachDB and TiDB are SQL on LSM.</li>
+          <li><strong>SQL ≠ single node</strong>: Spanner and CockroachDB spread SQL across many nodes.</li>
+          <li><strong>NoSQL ≠ LSM</strong>: MongoDB and DynamoDB use B-trees.</li>
+          <li><strong>Wide-column ≠ columnar</strong>: it's a row layout.</li>
+          <li><strong>Shared storage ≠ new engine</strong>: Aurora still uses B-tree pages.</li>
+          <li><strong>NoSQL ≠ shared-nothing</strong>: Bigtable runs on <span class="nw">disaggregated, shared storage</span>.</li>
         </ul>
       </div>
     </div>
-    <p class="muted" style="font-size:.9rem; text-align:center;">Name the point on each axis — not the brand's marketing word.</p>
-    <div class="foot">WHAT RELATES / 18</div>
+    <p class="muted" style="font-size:.9rem; text-align:center;">Name the point on each axis, not the brand's marketing word.</p>
+    <p class="read" style="text-align:center;">Myths about transactions and consistency: <a href="../distributed-databases/index.html#s22">Part 2, distributed</a> · <a href="../database-transactions/index.html#s19">Part 3, transactions</a></p>
+    <div class="foot">WHAT RELATES / 20</div>
   </section>
 
-  <!-- 19 — MATRIX -->
-  <section class="slide" id="s19">
+  <!-- 21 — CHEAT SHEET -->
+  <section class="slide dense" id="s21">
     <div>
       <p class="eyebrow">One-page cheat sheet</p>
-      <h2>The whole tour, as a matrix</h2>
+      <h2>Every database is one row</h2>
     </div>
     <div class="matrix-wrap">
-      <table class="matrix">
-        <thead><tr><th>Database</th><th>Model</th><th>Engine</th><th>Architecture</th><th>Topology</th></tr></thead>
+      <table class="matrix wrap">
+        <thead><tr><th>Database</th><th>01 Model</th><th>Query</th><th>02 Structure</th><th>03 Architecture</th></tr></thead>
         <tbody>
-          <tr><td class="name">PostgreSQL / MySQL</td><td>Relational</td><td class="m-eng-btree">B-Tree</td><td>Coupled</td><td>Single-node*</td></tr>
-          <tr><td class="name">SQLite</td><td>Relational</td><td class="m-eng-btree">B-Tree</td><td>Coupled</td><td>Embedded</td></tr>
-          <tr><td class="name">Spanner</td><td>Relational</td><td class="m-eng-lsm">LSM (Ressi)</td><td>Split</td><td>Distributed</td></tr>
-          <tr><td class="name">Aurora DSQL</td><td>Relational</td><td>journal · undisclosed</td><td>Split</td><td>Distributed</td></tr>
-          <tr><td class="name">CockroachDB</td><td>Relational</td><td class="m-eng-lsm">LSM (Pebble)</td><td>Shared-nothing</td><td>Distributed</td></tr>
-          <tr><td class="name">TiDB</td><td>Relational</td><td class="m-eng-lsm">LSM (RocksDB)</td><td>Split</td><td>Distributed</td></tr>
-          <tr><td class="name">MongoDB</td><td>Document</td><td class="m-eng-btree">B-Tree</td><td>Coupled</td><td>Distributed</td></tr>
-          <tr><td class="name">DynamoDB</td><td>Document / KV</td><td class="m-eng-btree">B-Tree + WAL</td><td>Coupled</td><td>Distributed</td></tr>
-          <tr><td class="name">Firestore</td><td>Document</td><td class="m-eng-lsm">on Spanner</td><td>Split</td><td>Distributed</td></tr>
-          <tr><td class="name">Bigtable / HBase</td><td>Wide-column</td><td class="m-eng-lsm">LSM</td><td>Split</td><td>Distributed</td></tr>
-          <tr><td class="name">Cassandra / ScyllaDB</td><td>Wide-column</td><td class="m-eng-lsm">LSM</td><td>Coupled</td><td>Distributed</td></tr>
-          <tr><td class="name">RocksDB</td><td>Key-value (lib)</td><td class="m-eng-lsm">LSM</td><td>Coupled</td><td>Embedded</td></tr>
-          <tr><td class="name">Redis / Valkey</td><td>Key-value+</td><td class="m-eng-mem">hash/skiplist</td><td>Coupled</td><td>Single ↝ cluster</td></tr>
-          <tr><td class="name">Memcached</td><td>Key-value</td><td class="m-eng-mem">hash table</td><td>Coupled</td><td>Single-node</td></tr>
-          <tr><td class="name">Aerospike</td><td>Key-value</td><td class="m-eng-mem">RAM idx + SSD</td><td>Coupled</td><td>Distributed</td></tr>
+          <tr><td class="name">SQLite<span class="an">A1</span></td><td>Relational</td><td>SQL</td><td class="m-eng-btree">B-tree</td><td>embedded</td></tr>
+          <tr><td class="name">RocksDB<span class="an">A1</span></td><td>Key–value</td><td>get/put API</td><td class="m-eng-lsm">LSM</td><td>embedded</td></tr>
+          <tr><td class="name">PostgreSQL<span class="an">A2</span></td><td>Relational</td><td>SQL</td><td class="m-eng-btree">heap + B-tree</td><td>single server + replicas</td></tr>
+          <tr><td class="name">MySQL InnoDB<span class="an">A2</span></td><td>Relational</td><td>SQL</td><td class="m-eng-btree">clustered B-tree</td><td>single server + replicas</td></tr>
+          <tr><td class="name">Redis / Valkey<span class="an">A3</span></td><td>Key → structure</td><td>Redis commands</td><td class="m-eng-mem">hash, skiplist</td><td>single server; Cluster: shared-nothing</td></tr>
+          <tr><td class="name">Memcached<span class="an">A3</span></td><td>Key → bytes</td><td>get/set API</td><td class="m-eng-mem">hash table</td><td>single server; client-side sharding</td></tr>
+          <tr><td class="name">Aerospike<span class="an">A3</span></td><td>Key → record</td><td>get/put API + index queries</td><td>log-structured</td><td>shared-nothing</td></tr>
+          <tr><td class="name">MongoDB<span class="an">A4</span></td><td>Document</td><td>MQL</td><td class="m-eng-btree">B-tree</td><td>shared-nothing</td></tr>
+          <tr><td class="name">DynamoDB<span class="an">A4</span></td><td>Document, key-first</td><td>DynamoDB API / PartiQL</td><td class="m-eng-btree">B-tree + WAL</td><td>shared-nothing, serverless</td></tr>
+          <tr><td class="name">Firestore<span class="an">A4</span></td><td>Document</td><td>Firestore SDK queries</td><td class="m-eng-lsm">on Spanner</td><td>serverless; on Spanner</td></tr>
+          <tr><td class="name">Cassandra · Scylla<span class="an">A5</span></td><td>Wide-column</td><td>CQL</td><td class="m-eng-lsm">LSM</td><td>shared-nothing</td></tr>
+          <tr><td class="name">Bigtable / HBase<span class="an">A5</span></td><td>Wide-column</td><td>Bigtable API / HBase API</td><td class="m-eng-lsm">LSM</td><td>disaggregated, shared storage (Colossus / HDFS)</td></tr>
+          <tr><td class="name">Aurora<span class="an">A6</span></td><td>Relational</td><td>SQL</td><td class="m-eng-btree">B-tree pages</td><td>disaggregated, shared storage, one writer</td></tr>
+          <tr><td class="name">Spanner<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM-style</td><td>hybrid: shared storage per zone, shared-nothing across zones</td></tr>
+          <tr><td class="name">CockroachDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (Pebble)</td><td>shared-nothing (Raft per range); multi-tenant cloud: SQL split off</td></tr>
+          <tr><td class="name">TiDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (RocksDB)</td><td>disaggregated, shared-nothing storage (TiKV); TiDB X: disaggregated, shared storage</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="muted" style="font-size:.78rem;">* single-node by default; replicas &amp; extensions push further. Colours: <span class="m-eng-btree">B-Tree</span> · <span class="m-eng-lsm">LSM</span> · <span class="m-eng-mem">in-memory</span>.</p>
-    <div class="foot">CHEAT SHEET / 19</div>
+    <p class="muted" style="font-size:.78rem;">A1–A7: archetype (slide <a class="go inline" href="#s11">11</a>) · architectures: slide <a class="go inline" href="#s10">10</a>. Colours: <span class="m-eng-btree">B-tree</span> · <span class="m-eng-lsm">LSM</span> · <span class="m-eng-mem">hash</span>.</p>
+    <div class="foot">CHEAT SHEET / 21</div>
   </section>
 
-  <!-- 20 — NEXT TIME -->
-  <section class="slide" id="s20" style="justify-content:center;">
+  <!-- 22 — NEXT TIME -->
+  <section class="slide dense" id="s22" style="justify-content:center;">
     <div>
       <p class="eyebrow">End of Part 1 · keep going</p>
-      <h1>Next: the <span class="accent">analytical</span> side,<br>and the <span class="accent">distributed</span> one.</h1>
-      <div class="grid cols-2" style="margin-top:28px;">
-        <a class="card part" href="../database-anatomy-part2/index.html"><span class="num">PART 2</span><h3>Analytics, lakehouses &amp; vectors</h3><p>Why columnar wins for OLAP, warehouses and lakehouses, vector search with HNSW, time-series, graph and search engines.</p><span class="go">Open Part 2 →</span></a>
-        <a class="card part" href="../distributed-databases/index.html"><span class="num">PART 3</span><h3>Distributed OLTP databases</h3><p>Axis 04 up close: leader, multi-leader and leaderless replication, partitioning and routing, consensus, isolation levels and clocks.</p><span class="go">Open Part 3 →</span></a>
+      <h1>Next: <span class="accent">distributed</span>, <span class="accent">transactional</span>, <span class="accent">analytical</span>.</h1>
+      <div class="grid cols-3" style="margin-top:28px;">
+        <a class="card part" href="../distributed-databases/index.html"><span class="num">PART 2</span><h3>Distributed databases</h3><p>Replication, partitioning, consensus, distributed transactions, clocks: how a cluster copies and splits the data, and keeps the copies in agreement.</p><span class="go">Open Part 2 →</span></a>
+        <a class="card part" href="../database-transactions/index.html"><span class="num">PART 3</span><h3>Transactions</h3><p>ACID, durability, isolation levels, MVCC, locks, SSI: what a commit promises, and what concurrent transactions can see.</p><span class="go">Open Part 3 →</span></a>
+        <a class="card part" href="../database-anatomy-part2/index.html"><span class="num">PART 4</span><h3>Analytical databases</h3><p>Columnar storage, warehouses and lakehouses, vectors, time-series: the other branch of the root, where OLAP wins.</p><span class="go">Open Part 4 →</span></a>
       </div>
-      <p class="lead" style="margin-top:28px;">Thank you — questions?</p>
+      <p class="lead" style="margin-top:28px;">Thank you. Questions?</p>
     </div>
-    <div class="foot">END · PART 1 / 20</div>
+    <div class="foot">END · PART 1 / 22</div>
   </section>
 
 </main>
 
 <div id="hud">
   <button class="hud-btn" id="prev" aria-label="Previous slide" title="Previous (↑)">↑</button>
-  <button type="button" id="counter" title="All slides (G)">1 / 20</button>
+  <button type="button" id="counter" title="All slides (G)">1 / 22</button>
   <button class="hud-btn" id="next" aria-label="Next slide" title="Next (↓ / Space)">↓</button>
 </div>
 
-<script src="icons.js"></script>
+<script src="../../shared/icons.js"></script>
 <script src="../../shared/sitenav.js"></script>
 <script>
 (function(){

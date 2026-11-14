@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Distributed OLTP Databases</title>
-<meta name="description" content="A field guide to distributed OLTP databases: single-leader, multi-leader and leaderless replication, partitioning, request routing and partition metadata, consensus, transaction isolation and clocks, across Spanner, CockroachDB, TiDB, MongoDB, Cassandra, Aerospike, DynamoDB and more.">
+<title>Part 2 · Distributed Databases: Replication, Partitioning &amp; Consensus</title>
+<meta name="description" content="Part 2 of A Field Guide to Databases: a 23-slide deck on replication (single-leader, multi-leader, leaderless, with a quorum lab), partitioning, routing and partition metadata, consensus, distributed transactions and atomic commit, clocks and consistency.">
 <link rel="canonical" href="https://gouravb20.github.io/learn/slides/distributed-databases/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="System Design Notes">
-<meta property="og:title" content="Distributed OLTP Databases, Classified">
-<meta property="og:description" content="How distributed OLTP databases differ: replication model, partitioning, routing and metadata, consensus, isolation levels and clocks.">
+<meta property="og:title" content="Part 2 · Distributed Databases: Replication, Partitioning &amp; Consensus">
+<meta property="og:description" content="Part 2 of A Field Guide to Databases: a 23-slide deck on replication (single-leader, multi-leader, leaderless, with a quorum lab), partitioning, routing and partition metadata, consensus, distributed transactions and atomic commit, clocks and consistency.">
 <meta property="og:url" content="https://gouravb20.github.io/learn/slides/distributed-databases/">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
@@ -30,13 +30,13 @@
     --surface-2: #f5f7fa;
     --fg: #14171d;
     --muted: #5a6473;
-    --faint: #8b94a3;
+    --faint: #646d7e;
     --accent: #2f54eb;
     --accent-soft: #e7ecff;
     --on-accent: #ffffff;
-    --warm: #d9480f;
+    --warm: #c2410c;
     --warm-soft: #ffece0;
-    --good: #2b8a3e;
+    --good: #237a35;
     --border: #dfe3ea;
     --border-strong: #c6ccd6;
     --shadow: 0 1px 2px rgba(20,23,29,.06), 0 8px 24px rgba(20,23,29,.07);
@@ -54,7 +54,7 @@
       --surface-2: #1b212d;
       --fg: #e7eaf1;
       --muted: #9aa4b4;
-      --faint: #6d7688;
+      --faint: #8a93a5;
       --accent: #7f9bff;
       --accent-soft: #1d2640;
       --on-accent: #0b0e14;
@@ -73,7 +73,7 @@
     --surface-2: #1b212d;
     --fg: #e7eaf1;
     --muted: #9aa4b4;
-    --faint: #6d7688;
+    --faint: #8a93a5;
     --accent: #7f9bff;
     --accent-soft: #1d2640;
     --on-accent: #0b0e14;
@@ -143,6 +143,7 @@
   h3 { font-family: var(--display); font-weight: 600; font-size: 1.05rem; margin: 0; letter-spacing: -.01em; }
   p { margin: 0; }
   .lead { font-size: clamp(1.05rem, 1.7vw, 1.35rem); color: var(--muted); max-width: 46ch; }
+  .lead, .ask { text-wrap: pretty; }
   .muted { color: var(--muted); }
   strong { font-weight: 650; }
   code, .mono { font-family: var(--mono); }
@@ -214,6 +215,10 @@
   .logo-tile .mono-mark { font-family: var(--mono); font-weight: 700; font-size: .8rem; color: var(--brand, #333); }
   .db-name { font-family: var(--display); font-weight: 600; font-size: 1rem; line-height: 1.1; }
   .db-sub { display: block; font-family: var(--mono); font-size: .68rem; color: var(--faint); font-weight: 400; margin-top: 2px; letter-spacing: .03em; }
+  .db-row.sm { gap: 8px; }
+  .db-row.sm .db { padding: 6px 12px 6px 6px; gap: 9px; border-radius: 10px; }
+  .db-row.sm .logo-tile { width: 30px; height: 30px; border-radius: 7px; }
+  .db-row.sm .db-name { font-size: .9rem; }
 
   /* ---------- diagram / mermaid panel (always light) ---------- */
   .panel-light { background: #f8fafc; border: 1px solid #dfe3ea; border-radius: 14px;
@@ -298,7 +303,7 @@
   .dgm .cl  { fill: none; stroke: #c6ccd6; stroke-width: 1.4; stroke-dasharray: 5 4; }
 
   /* ============================================================
-     PART 3 ADDITIONS — same tokens as Part 1; only new components below.
+     PART 2 ADDITIONS — same tokens as Part 1; only new components below.
      ============================================================ */
   .slide a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
   a.pill { text-decoration: none; }
@@ -374,6 +379,70 @@
   ol.qs { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: var(--muted); font-size: .92rem; }
   ol.qs li::marker { color: var(--accent); font-family: var(--mono); font-weight: 600; }
   ol.qs li strong { color: var(--fg); }
+
+  /* in-deck links (as in Part 1) */
+  .go { display: inline-block; font-family: var(--mono); font-size: .74rem; color: var(--accent); text-decoration: none; }
+  a.go:hover { text-decoration: underline; }
+  .card.axis .go { margin-top: auto; padding-top: 8px; }
+  .go.inline { font-family: inherit; font-size: inherit; }
+
+  /* ---------- ported from Part 1: the question, what it decides, how to tell ---------- */
+  .ask { display: flex; gap: 12px; align-items: baseline; margin-top: 12px; max-width: 96ch;
+    font-size: clamp(1rem, 1.5vw, 1.2rem); color: var(--fg); }
+  .ask::before { content: "ASK"; flex: none; font-family: var(--mono); font-size: .64rem; font-weight: 600;
+    letter-spacing: .16em; color: var(--on-accent); background: var(--accent); border-radius: 5px; padding: 2px 7px;
+    transform: translateY(-2px); }
+  .facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  @media (max-width: 720px){ .facts { grid-template-columns: 1fr; } }
+  .fact { border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; background: var(--surface-2);
+    font-size: .88rem; color: var(--muted); }
+  .fact > b { display: block; font-family: var(--mono); font-size: .64rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 3px; font-weight: 600; }
+  .fact strong { color: var(--fg); }
+  .read { font-family: var(--mono); font-size: .74rem; color: var(--faint); }
+  .read a { color: var(--accent); text-decoration: none; }
+  .read a:hover { text-decoration: underline; }
+  .card .ex { display: block; margin-top: 8px; font-family: var(--mono); font-size: .7rem; color: var(--faint); }
+
+  /* ---------- ported from Part 1: replication × partitioning grid ---------- */
+  .quad { display: grid; grid-template-columns: 120px 1fr 1fr; gap: 10px; }
+  .quad .qh { font-family: var(--mono); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+    display: flex; align-items: flex-end; padding: 0 2px 2px; font-weight: 600; }
+  .quad .qr { align-items: center; border-left: 3px solid var(--border-strong); padding-left: 10px; }
+  .quad .card { padding: 12px 14px; }
+  .quad .card p { font-size: .86rem; }
+  .quad .card.hot { border-color: var(--accent); }
+  @media (max-width: 640px){ .quad { grid-template-columns: 1fr; } .quad .qh.blank { display: none; }
+    .quad .qh:not(.qr):not(.blank) { display: none; } }
+  .quad .card .qtag { display: none; font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-bottom: 4px; }
+  @media (max-width: 640px){ .quad .card .qtag { display: block; } }
+
+  /* atomic commit: numbered steps inside a card */
+  .commit { grid-template-columns: 1.35fr 1fr 1fr; }
+  @media (max-width: 860px){ .commit { grid-template-columns: 1fr; } }
+  .commit ol.qs { font-size: .86rem; gap: 4px; margin-top: 6px; }
+  .commit .num + p { margin-top: 4px; }
+
+  /* short laptop screens (768–900px tall): tighten the dense slides rather than scroll */
+  @media (max-height: 900px) and (min-width: 861px){
+    .slide.dense { gap: 10px; padding-block: 26px 44px; }
+    .slide.dense h2 { font-size: clamp(1.6rem, 2.9vw, 2.15rem); }
+    .slide.dense .lead { margin-top: 6px !important; font-size: 1rem; }
+    .slide.dense .ask { margin-top: 7px; font-size: 1rem; }
+    .slide.dense .grid { gap: 10px; }
+    .slide.dense .card { padding: 11px 14px; }
+    .slide.dense .card p, .slide.dense .ticks li, .slide.dense .commit ol.qs { font-size: .84rem; }
+    .slide.dense .fact { padding: 8px 12px; font-size: .84rem; }
+    .slide.dense .note { padding: 7px 12px; font-size: .84rem; }
+    .slide.dense table.matrix.wrap { font-size: .74rem; }
+    .slide.dense table.matrix.wrap th, .slide.dense table.matrix.wrap td { padding: 3px 9px; line-height: 1.3; }
+    .slide.dense table.matrix th, .slide.dense table.matrix td { padding-inline: 9px; }
+    .slide.dense .tag-row { margin-top: 8px; gap: 5px; }
+    .slide.dense .pill { padding: 2px 8px; }
+    .slide.dense .db-row.sm { gap: 6px; }
+    .slide.dense .db-row.sm .db { padding: 4px 10px 4px 4px; }
+    .slide.dense .db-row.sm .logo-tile { width: 26px; height: 26px; }
+  }
 </style>
 </head>
 <body>
@@ -387,27 +456,28 @@
   <!-- 1 — TITLE -->
   <section class="slide" id="s1" style="justify-content:center;">
     <div>
-      <p class="eyebrow">A field guide · Part 3 · distributed OLTP</p>
-      <h1>Distributed OLTP<br>databases, <span class="accent">classified</span>.</h1>
-      <p class="lead" style="margin-top:18px;">One transactional dataset, many machines. Six questions sort every such system: who accepts writes, how the keys are split, who finds the right node, what the nodes agree on, what a transaction promises, and where time comes from.</p>
+      <p class="eyebrow">A field guide · Part 2 of 4 · distributed databases</p>
+      <h1>Distributed databases, <span class="accent">classified</span>.</h1>
+      <p class="lead" style="margin-top:18px;">One dataset, many machines. Six questions sort every such system: who accepts writes, how the keys are split, who finds the right node, what the nodes agree on, how a transaction spans nodes, and where time comes from.</p>
       <div class="tag-row" style="margin-top:22px;">
         <span class="pill">single-leader ↔ multi-leader ↔ leaderless</span>
         <span class="pill">range ↔ hash ↔ fixed slots</span>
         <span class="pill">any node ↔ router ↔ smart client</span>
         <span class="pill">Raft ↔ Paxos ↔ gossip</span>
-        <span class="pill">read committed → strict serializable</span>
+        <span class="pill">one shard → global ACID</span>
+        <span class="pill">TrueTime ↔ HLC ↔ oracle</span>
       </div>
-      <p class="muted" style="margin-top:26px; font-size:.85rem;">Zooms into axis 04 (topology) of <a href="../database-guide/index.html">Part 1</a>, using the vocabulary of DDIA chapters 5–9. Navigate with <span class="kbd">↓</span> <span class="kbd">↑</span> <span class="kbd">Space</span> or the arrows, bottom-right. Press <span class="kbd">G</span> or tap the slide counter to see every slide and jump to one.</p>
+      <p class="muted" style="margin-top:26px; font-size:.85rem;">Builds on the architecture axis of <a href="../database-guide/index.html#s9">Part 1</a> and uses the vocabulary of DDIA (1st ed.) chapters 5–9. Isolation levels and single-node concurrency control are <a href="../database-transactions/index.html#s4">Part 3</a>; analytical engines are <a href="../database-anatomy-part2/index.html">Part 4</a>. Navigate with <span class="kbd">↓</span> <span class="kbd">↑</span> <span class="kbd">Space</span> or the arrows, bottom-right. Press <span class="kbd">G</span> or tap the slide counter to see every slide and jump to one.</p>
     </div>
-    <div class="foot">DISTRIBUTED OLTP / 01</div>
+    <div class="foot">DISTRIBUTED DATABASES / 01</div>
   </section>
 
   <!-- 2 — SCOPE -->
-  <section class="slide" id="s2">
+  <section class="slide dense" id="s2">
     <div>
       <p class="eyebrow">Scoping today</p>
-      <h2>Why distribute an OLTP database?</h2>
-      <p class="lead" style="margin-top:10px;">Three pressures push a database past one machine. DDIA answers with two mechanisms, and real systems almost always use both.</p>
+      <h2>Why distribute a database?</h2>
+      <p class="lead" style="margin-top:10px;">Three pressures push a transactional (OLTP) database past one machine. DDIA answers with two mechanisms, and real systems almost always use both.</p>
     </div>
     <div class="grid cols-3">
       <div class="card"><span class="num">PRESSURE 1</span><h3>Scale</h3><p>The data or the write rate outgrows one box. Splitting the keys across machines spreads both.</p></div>
@@ -426,31 +496,57 @@
         <div class="tag-row"><a class="pill on" href="../../books/notes/ddia/ch6/">DDIA ch 6 · Partitioning</a></div>
       </div>
     </div>
-    <p class="note"><b>Out of scope:</b> OLAP engines (ClickHouse, Snowflake, BigQuery) and pure caches. Those are Part 2. ClickHouse comes back once, as an aside on request routing.</p>
+    <p class="note"><b>Out of scope:</b> OLAP engines (ClickHouse, Snowflake, BigQuery) are <a href="../database-anatomy-part2/index.html">Part 4</a>; ClickHouse comes back once, as an aside on request routing. Isolation levels, MVCC and locking are <a href="../database-transactions/index.html#s4">Part 3</a>. Pure caches are skipped.</p>
     <div class="foot">SCOPE / 02</div>
   </section>
 
-  <!-- 3 — THE MAP -->
-  <section class="slide" id="s3">
+  <!-- 3 — COPIES × PIECES -->
+  <section class="slide dense" id="s3">
+    <div>
+      <p class="eyebrow">Two mechanisms · copies × pieces</p>
+      <h2>Copies and pieces: replication × partitioning</h2>
+      <p class="ask">Does each node hold a copy of all the data, a piece of it, or copies of pieces?</p>
+    </div>
+    <div class="quad">
+      <div class="qh blank"></div>
+      <div class="qh">Not partitioned · every node has it all</div>
+      <div class="qh">Partitioned · each node has a piece</div>
+      <div class="qh qr">One copy</div>
+      <div class="card"><span class="qtag">one copy · not partitioned</span><h3>One node</h3><p>Simplest, and strongly consistent for free. One failure is an outage; one machine is the limit.</p><span class="ex">SQLite · a lone Postgres</span></div>
+      <div class="card"><span class="qtag">one copy · partitioned</span><h3>Pieces, no copies</h3><p>Scales, but losing a node loses its piece. Rare for databases; normal for caches.</p><span class="ex">Memcached, sharded by the client</span></div>
+      <div class="qh qr">Replicated</div>
+      <div class="card"><span class="qtag">replicated · not partitioned</span><h3>Copies of everything</h3><p>Survives failures and scales reads. Every write still lands on every node, so writes don't scale out.</p><span class="ex">Postgres + replicas · MongoDB replica set · Redis</span></div>
+      <div class="card hot"><span class="qtag">replicated · partitioned</span><h3 class="accent">Copies of pieces</h3><p>Each piece lives on several nodes. Scales reads and writes and survives failures; the default for distributed databases. With <a href="../database-guide/index.html#s10">disaggregated, shared storage</a> (Aurora, Bigtable), the storage layer below the compute nodes makes the copies.</p><span class="ex">Cassandra · DynamoDB · Spanner · CockroachDB · TiDB</span></div>
+    </div>
+    <div class="facts">
+      <p class="fact"><b>What it decides</b>How far writes scale, what survives a node or a region failing, and what consistency costs: the more copies and pieces, the more the nodes must agree on.</p>
+      <p class="fact"><b>How to tell</b>Look for <strong>replica set, replication factor</strong> (copies) and <strong>shard key, partition key, tablet, range, region (TiKV, HBase)</strong> (pieces).</p>
+    </div>
+    <p class="read">The rest of this deck asks the next questions: <a class="go inline" href="#s5">who accepts writes</a> · <a class="go inline" href="#s10">how keys are cut</a> · <a class="go inline" href="#s13">where the partition map lives</a> · <a class="go inline" href="#s14">how nodes agree</a><br>Read more: <a href="../../books/notes/ddia/ch5/">DDIA ch. 5</a>, <a href="../../books/notes/ddia/ch6/">ch. 6</a></p>
+    <div class="foot">COPIES × PIECES / 03</div>
+  </section>
+
+  <!-- 4 — THE MAP -->
+  <section class="slide dense" id="s4">
     <div>
       <p class="eyebrow">The map</p>
-      <h2>Six axes for distributed OLTP</h2>
+      <h2>Six axes for distributed databases</h2>
       <p class="lead" style="margin-top:10px;">As in Part 1, a database is a point on every axis at once, and the axes are mostly independent.</p>
     </div>
     <div class="grid cols-6">
-      <div class="card axis"><span class="num">01</span><h3>Replication</h3><p>Who accepts writes for a key: <strong>single-leader</strong>, <strong>multi-leader</strong> or <strong>leaderless</strong>.</p></div>
-      <div class="card axis"><span class="num">02</span><h3>Partitioning</h3><p>How keys are cut (<strong>range</strong>, <strong>hash</strong>, <strong>fixed slots</strong>) and how partitions move when nodes join.</p></div>
-      <div class="card axis"><span class="num">03</span><h3>Routing &amp; metadata</h3><p>Who finds the owner (<strong>any node</strong>, a <strong>router</strong>, the <strong>client</strong>) and where the partition map lives.</p></div>
-      <div class="card axis"><span class="num">04</span><h3>Consensus</h3><p>What nodes must agree on (data log, metadata, membership) and with what: <strong>Raft</strong>, <strong>Paxos</strong>, or only <strong>gossip</strong>.</p></div>
-      <div class="card axis"><span class="num">05</span><h3>Transactions &amp; isolation</h3><p>Scope (one key → many shards) and level (<strong>read committed</strong> → <strong>strict serializable</strong>).</p></div>
-      <div class="card axis"><span class="num">06</span><h3>Clocks &amp; consistency</h3><p>Where timestamps come from (<strong>TrueTime</strong>, <strong>HLC</strong>, an <strong>oracle</strong>) and how stale a read may be.</p></div>
+      <div class="card axis"><span class="num">01</span><h3>Replication</h3><p>Who accepts writes for a key: <strong>single-leader</strong>, <strong>multi-leader</strong> or <strong>leaderless</strong>.</p><a class="go" href="#s5">Slide 05 →</a></div>
+      <div class="card axis"><span class="num">02</span><h3>Partitioning</h3><p>How keys are cut (<strong>range</strong>, <strong>hash</strong>, <strong>fixed slots</strong>) and how partitions move when nodes join.</p><a class="go" href="#s10">Slide 10 →</a></div>
+      <div class="card axis"><span class="num">03</span><h3>Routing &amp; metadata</h3><p>Who finds the owner (<strong>any node</strong>, a <strong>router</strong>, the <strong>client</strong>) and where the partition map lives.</p><a class="go" href="#s12">Slide 12 →</a></div>
+      <div class="card axis"><span class="num">04</span><h3>Consensus</h3><p>What nodes must agree on (data log, metadata, membership) and with what: <strong>Raft</strong>, <strong>Paxos</strong>, or only <strong>gossip</strong>.</p><a class="go" href="#s14">Slide 14 →</a></div>
+      <div class="card axis"><span class="num">05</span><h3>Distributed transactions</h3><p>How far one transaction reaches (<strong>one key</strong> → <strong>many shards</strong>), how it commits atomically (<strong>2PC</strong>, <strong>Percolator</strong>) and how it stays isolated (<strong>locks</strong>, <strong>OCC</strong>).</p><a class="go" href="#s15">Slide 15 →</a></div>
+      <div class="card axis"><span class="num">06</span><h3>Clocks &amp; consistency</h3><p>Where timestamps come from (<strong>TrueTime</strong>, <strong>HLC</strong>, an <strong>oracle</strong>) and how stale a read may be.</p><a class="go" href="#s18">Slide 18 →</a></div>
     </div>
     <p class="muted" style="font-size:.88rem;">Independence in one example: <strong>Cassandra</strong> and <strong>DynamoDB</strong> both hash-partition keys, but one is leaderless and the other runs a single leader per partition.</p>
-    <div class="foot">THE 6 AXES / 03</div>
+    <div class="foot">THE 6 AXES / 04</div>
   </section>
 
-  <!-- 4 — REPLICATION: THREE MODELS -->
-  <section class="slide" id="s4">
+  <!-- 5 — REPLICATION: THREE MODELS -->
+  <section class="slide dense" id="s5">
     <div>
       <p class="eyebrow">Axis 01 · replication</p>
       <h2>Three ways to accept a write</h2>
@@ -477,11 +573,11 @@
       </div>
     </div>
     <div class="tag-row"><a class="pill on" href="../../books/notes/ddia/ch5/">DDIA ch 5 · Replication</a><span class="pill">sync vs async is a separate dial, next slide</span></div>
-    <div class="foot">REPLICATION / 04</div>
+    <div class="foot">REPLICATION / 05</div>
   </section>
 
-  <!-- 5 — SINGLE LEADER PER SHARD -->
-  <section class="slide" id="s5">
+  <!-- 6 — SINGLE LEADER PER SHARD -->
+  <section class="slide dense" id="s6">
     <div>
       <p class="eyebrow">Axis 01 · single-leader</p>
       <h2>Single-leader means one leader <span class="accent">per shard</span></h2>
@@ -502,11 +598,11 @@
         <p class="note" style="margin-top:14px;"><b>Unit of leadership:</b> Spanner <em>split</em> · CockroachDB <em>range</em> · TiKV <em>region</em> · YugabyteDB <em>tablet</em> · MongoDB <em>replica set per shard</em> · DynamoDB <em>partition</em> · Aerospike <em>partition</em> (master + replicas) · Redis Cluster <em>slot range</em>.</p>
       </div>
     </div>
-    <div class="foot">SINGLE-LEADER / 05</div>
+    <div class="foot">SINGLE-LEADER / 06</div>
   </section>
 
-  <!-- 6 — MULTI-LEADER -->
-  <section class="slide" id="s6">
+  <!-- 7 — MULTI-LEADER -->
+  <section class="slide dense" id="s7">
     <div>
       <p class="eyebrow">Axis 01 · multi-leader</p>
       <h2>Multi-leader: every region writes</h2>
@@ -527,11 +623,11 @@
       </dl>
     </div>
     <p class="note"><b>Edge case:</b> <strong>Galera Cluster</strong> and <strong>MySQL Group Replication</strong> (multi-primary mode) let every node write, but <em>certify</em> each commit against concurrent ones through group communication. Conflicts abort instead of merging, which is closer to synchronous replication than to classic multi-leader.</p>
-    <div class="foot">MULTI-LEADER / 06</div>
+    <div class="foot">MULTI-LEADER / 07</div>
   </section>
 
-  <!-- 7 — LEADERLESS -->
-  <section class="slide" id="s7">
+  <!-- 8 — LEADERLESS -->
+  <section class="slide dense" id="s8">
     <div>
       <p class="eyebrow">Axis 01 · leaderless</p>
       <h2>Leaderless: quorums instead of a leader</h2>
@@ -547,7 +643,7 @@
         <dt>CAS</dt><dd><strong>Lightweight transactions</strong> (<code>IF …</code>) run Paxos per partition: a linearizable compare-and-set.</dd>
       </dl>
       <div>
-        <div class="db-row">
+        <div class="db-row" style="flex-direction:column;align-items:stretch;max-width:300px">
           <div class="db db-lg"><span class="logo-tile" data-icon="apachecassandra" style="--brand:#1287B1"></span><span class="db-name">Cassandra<span class="db-sub">gossip ring · tunable CL</span></span></div>
           <div class="db db-lg"><span class="logo-tile" data-icon="scylladb" style="--brand:#0F9DCE"></span><span class="db-name">ScyllaDB<span class="db-sub">Raft metadata · tablets</span></span></div>
           <div class="db db-lg"><span class="logo-tile" data-mono="Rk" style="--brand:#e7461d"></span><span class="db-name">Riak<span class="db-sub">historic · version vectors</span></span></div>
@@ -555,11 +651,11 @@
         <p class="note" style="margin-top:16px;"><b>Myth-buster: Dynamo ≠ DynamoDB.</b> The 2007 Dynamo paper is leaderless. <strong>DynamoDB</strong> is not: each partition is a Multi-Paxos group with one leader across three availability zones (USENIX ATC 2022 paper).</p>
       </div>
     </div>
-    <div class="foot">LEADERLESS / 07</div>
+    <div class="foot">LEADERLESS / 08</div>
   </section>
 
-  <!-- 8 — QUORUM LAB -->
-  <section class="slide" id="s8">
+  <!-- 9 — QUORUM LAB -->
+  <section class="slide dense" id="s9">
     <div>
       <p class="eyebrow">Axis 01 · interactive</p>
       <h2>Play with N, W and R</h2>
@@ -583,11 +679,11 @@
         <button data-q="reset" style="margin-left:auto;">↺ Reset</button>
       </div>
     </div>
-    <div class="foot">QUORUM · LIVE / 08</div>
+    <div class="foot">QUORUM · LIVE / 09</div>
   </section>
 
-  <!-- 9 — PARTITIONING -->
-  <section class="slide" id="s9">
+  <!-- 10 — PARTITIONING -->
+  <section class="slide dense" id="s10">
     <div>
       <p class="eyebrow">Axis 02 · partitioning</p>
       <h2>Cutting the key space</h2>
@@ -617,11 +713,11 @@
       <div class="card axis"><span class="num">REBALANCE · D</span><h3>Tablets</h3><p>Per-table tablets moved one at a time under Raft: ScyllaDB 6.0+.</p></div>
     </div>
     <p class="muted" style="font-size:.85rem;">DDIA's warning: never <code>hash(key) mod N</code>. Change N and almost every key moves. <a href="../../books/notes/ddia/ch6/">DDIA ch 6 →</a></p>
-    <div class="foot">PARTITIONING / 09</div>
+    <div class="foot">PARTITIONING / 10</div>
   </section>
 
-  <!-- 10 — SECONDARY INDEXES -->
-  <section class="slide" id="s10">
+  <!-- 11 — SECONDARY INDEXES -->
+  <section class="slide dense" id="s11">
     <div>
       <p class="eyebrow">Axis 02 · secondary indexes</p>
       <h2>Local vs. global secondary indexes</h2>
@@ -645,28 +741,28 @@
         <p class="who"><b>DynamoDB GSIs</b> (updated asynchronously, eventually consistent) · <b>Spanner</b>, <b>CockroachDB</b>, <b>TiDB</b>, <b>YugabyteDB</b> (the index is just more ranges, updated in the same distributed transaction)</p>
       </div>
     </div>
-    <div class="foot">SECONDARY INDEXES / 10</div>
+    <div class="foot">SECONDARY INDEXES / 11</div>
   </section>
 
-  <!-- 11 — ROUTING -->
-  <section class="slide" id="s11">
+  <!-- 12 — ROUTING -->
+  <section class="slide dense" id="s12">
     <div>
       <p class="eyebrow">Axis 03 · request routing</p>
       <h2>Who finds the node that owns the key?</h2>
-      <p class="lead" style="margin-top:10px;">DDIA lists exactly three answers, and your three examples land on one each.</p>
+      <p class="lead" style="margin-top:10px;">DDIA lists exactly three answers, and each database leans on one.</p>
     </div>
     <div class="grid cols-3">
       <div class="panel-light">
         <p class="ptitle">① Any node coordinates</p>
         <p class="psub">connect anywhere · it forwards</p>
 <svg class="dgm" viewBox="0 0 260 178" role="img" aria-label="Any node: the client connects to node N1, which forwards the request to N3, the owner" style="max-width:320px"><defs><marker id="dd11a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-b" x="70" y="6" width="120" height="28" rx="8"/><text x="130" y="24.5" text-anchor="middle">client</text><path class="ln" d="M112 34 L44 82" marker-end="url(#dd11a)"/><text class="lbl halo" x="96" y="66" text-anchor="end">any</text><rect class="n-b" x="10" y="84" width="54" height="40" rx="8"/><text x="37" y="101" text-anchor="middle">N1</text><text class="sub" x="37" y="116" text-anchor="middle">coord.</text><rect class="n-g" x="72" y="84" width="54" height="40" rx="8"/><text x="99" y="108.5" text-anchor="middle">N2</text><rect class="n-w" x="134" y="84" width="54" height="40" rx="8"/><text x="161" y="101" text-anchor="middle">N3</text><text class="sub" x="161" y="116" text-anchor="middle">owner</text><rect class="n-g" x="196" y="84" width="54" height="40" rx="8"/><text x="223" y="108.5" text-anchor="middle">N4</text><path class="lnw" d="M37 124 Q 99 172 159 127" marker-end="url(#dd11a)"/><text class="lbl halo" x="99" y="168" text-anchor="middle">forwards to owner</text></svg>
-        <p class="pdbs"><b>Cassandra</b>, <b>ScyllaDB</b> (coordinator node) · <b>CockroachDB</b> (gateway node) · <b>TiDB</b>, <b>YugabyteDB</b> (any SQL node) · Citus 11+.<br><b>Your ClickHouse example</b> works the same way: a <code>Distributed</code> table on any node coordinates. But ClickHouse is OLAP, and SELECTs fan out to all shards unless pruned by the sharding key.</p>
+        <p class="pdbs"><b>Cassandra</b>, <b>ScyllaDB</b> (coordinator node) · <b>CockroachDB</b> (gateway node) · <b>TiDB</b>, <b>YugabyteDB</b> (any SQL node) · Citus 11+.<br><b>ClickHouse</b> works the same way: a <code>Distributed</code> table on any node coordinates. But ClickHouse is OLAP, and SELECTs fan out to all shards unless pruned by the sharding key.</p>
       </div>
       <div class="panel-light">
         <p class="ptitle">② Routing tier</p>
         <p class="psub">stateless routers · cached map</p>
-<svg class="dgm" viewBox="0 0 260 178" role="img" aria-label="Routing tier: the client talks to a mongos router, which caches the chunk map from the config servers and sends the request to shard 2" style="max-width:320px"><defs><marker id="dd11b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-b" x="30" y="6" width="110" height="28" rx="8"/><text x="85" y="24.5" text-anchor="middle">client</text><path class="ln" d="M85 34 L85 58" marker-end="url(#dd11b)"/><rect class="n-b" x="20" y="60" width="130" height="38" rx="8"/><text x="85" y="76" text-anchor="middle">mongos</text><text class="sub" x="85" y="91" text-anchor="middle">router × many</text><rect class="n-g" x="176" y="60" width="78" height="38" rx="8"/><text x="215" y="76" text-anchor="middle">config</text><text class="sub" x="215" y="91" text-anchor="middle">servers</text><path class="lnd" d="M176 79 L152 79" marker-end="url(#dd11b)"/><text class="lbl halo" x="204" y="52" text-anchor="middle">chunk map</text><path class="lnw" d="M100 98 L128 128" marker-end="url(#dd11b)"/><rect class="n-b" x="6" y="130" width="76" height="40" rx="8"/><text x="44" y="146" text-anchor="middle">shard 1</text><text class="sub" x="44" y="161" text-anchor="middle">replica set</text><rect class="n-w" x="92" y="130" width="76" height="40" rx="8"/><text x="130" y="146" text-anchor="middle">shard 2</text><text class="sub" x="130" y="161" text-anchor="middle">replica set</text><rect class="n-b" x="178" y="130" width="76" height="40" rx="8"/><text x="216" y="146" text-anchor="middle">shard 3</text><text class="sub" x="216" y="161" text-anchor="middle">replica set</text></svg>
-        <p class="pdbs"><b>MongoDB</b> (mongos + config servers) · <b>Vitess</b> (VTGate + topo server) · <b>DynamoDB</b> (request routers + metadata service) · Spanner front-ends.<br><b>Your MongoDB example:</b> yes for a sharded cluster, but mongos is not one central server. You run many stateless ones; the config-server replica set holds the map.</p>
+<svg class="dgm" viewBox="0 0 260 178" role="img" aria-label="Routing tier: the client talks to a mongos router, which caches the chunk map from the config servers and sends the request to shard 2" style="max-width:320px"><defs><marker id="dd11b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-b" x="30" y="6" width="110" height="28" rx="8"/><text x="85" y="24.5" text-anchor="middle">client</text><path class="ln" d="M85 34 L85 58" marker-end="url(#dd11b)"/><rect class="n-b" x="20" y="60" width="130" height="38" rx="8"/><text x="85" y="76" text-anchor="middle">mongos</text><text class="sub" x="85" y="91" text-anchor="middle">router × many</text><rect class="n-g" x="176" y="60" width="78" height="38" rx="8"/><text x="215" y="76" text-anchor="middle">config</text><text class="sub" x="215" y="91" text-anchor="middle">servers</text><path class="lnd" d="M176 79 L152 79" marker-end="url(#dd11b)"/><text class="lbl halo" x="204" y="52" text-anchor="middle">chunk map</text><path class="lnw" d="M100 98 L128 128" marker-end="url(#dd11b)"/><rect class="n-b" x="6" y="130" width="76" height="40" rx="8"/><text x="44" y="146" text-anchor="middle">shard 1</text><text class="sub" x="44" y="161" text-anchor="middle">replicas</text><rect class="n-w" x="92" y="130" width="76" height="40" rx="8"/><text x="130" y="146" text-anchor="middle">shard 2</text><text class="sub" x="130" y="161" text-anchor="middle">replicas</text><rect class="n-b" x="178" y="130" width="76" height="40" rx="8"/><text x="216" y="146" text-anchor="middle">shard 3</text><text class="sub" x="216" y="161" text-anchor="middle">replicas</text></svg>
+        <p class="pdbs"><b>MongoDB</b> (mongos + config servers) · <b>Vitess</b> (VTGate + topo server) · <b>DynamoDB</b> (request routers + metadata service) · Spanner front-ends.<br><b>Note:</b> mongos is not one central server. You run many stateless ones; the config-server replica set holds the map.</p>
       </div>
       <div class="panel-light">
         <p class="ptitle">③ Partition-aware client</p>
@@ -676,29 +772,29 @@
       </div>
     </div>
     <p class="muted" style="font-size:.85rem;">The lines blur: Cassandra lets any node coordinate, yet token-aware drivers skip that hop. TiDB's SQL nodes are themselves smart clients of TiKV, with a region cache filled from PD.</p>
-    <div class="foot">ROUTING / 11</div>
+    <div class="foot">ROUTING / 12</div>
   </section>
 
-  <!-- 12 — WHERE THE MAP LIVES -->
-  <section class="slide" id="s12">
+  <!-- 13 — WHERE THE MAP LIVES -->
+  <section class="slide dense" id="s13">
     <div>
       <p class="eyebrow">Axis 03 · partition metadata</p>
       <h2>Where does the partition map live?</h2>
-      <p class="lead" style="margin-top:10px;">A separate question from routing. A router needs the map; what matters is who owns the true copy and how changes reach everyone.</p>
+      <p class="lead" style="margin-top:10px;">Separate from routing: who owns the true copy of the map, and how do changes reach every router?</p>
     </div>
     <div class="grid cols-4">
       <div class="card">
         <span class="num">A · CENTRAL SERVICE</span>
         <h3>A small cluster that runs consensus</h3>
         <p>One authority; routers cache it and ask again on a miss.</p>
-        <p class="who"><b>MongoDB</b> config-server replica set · <b>TiDB</b> PD (embedded etcd, Raft) · <b>YugabyteDB</b> YB-Master (Raft) · <b>Vitess</b> topo (etcd / ZooKeeper / Consul) · HBase (ZooKeeper)</p>
+        <p class="who"><b>MongoDB</b> config-server replica set · <b>TiDB</b> PD (embedded etcd, Raft) · <b>YugabyteDB</b> YB-Master (Raft) · <b>Vitess</b> topo (etcd / ZooKeeper / Consul)</p>
         <div class="tag-row"><span class="pill on">consistent</span></div>
       </div>
       <div class="card">
         <span class="num">B · INSIDE THE DATA</span>
         <h3>Stored as ordinary keys</h3>
         <p>The map is replicated by the same consensus as user data; no extra service.</p>
-        <p class="who"><b>CockroachDB</b> meta1 / meta2 ranges (gossip only says where meta1 is) · <b>FoundationDB</b> system keys (<code>\xff</code>) · Bigtable METADATA tablets, Spanner's ancestry</p>
+        <p class="who"><b>CockroachDB</b> meta1 / meta2 ranges (gossip only says where meta1 is) · <b>FoundationDB</b> system keys (<code>\xff</code>) · Bigtable METADATA tablets (Spanner's ancestry) and HBase <code>hbase:meta</code>: Chubby / ZooKeeper only point to the root</p>
         <div class="tag-row"><span class="pill on">consistent</span></div>
       </div>
       <div class="card warm-hl">
@@ -709,19 +805,19 @@
         <div class="tag-row"><span class="pill warm">eventually consistent</span></div>
       </div>
       <div class="card hl">
-        <span class="num">D · AGREED, THEN EVERYWHERE</span>
+        <span class="num">D · ON EVERY NODE</span>
         <h3>A consensus log on every node</h3>
         <p>Every node holds the agreed map, so every node can route.</p>
-        <p class="who"><b>ScyllaDB</b> Raft group 0 (schema + topology, default since 6.0) · <b>Cassandra 6</b> TCM (CEP-21, alpha) · <b>Citus 11+</b> metadata on all nodes · <b>Aerospike</b>: membership agreed through a principal node; every node then computes the same partition map</p>
+        <p class="who"><b>ScyllaDB</b> Raft group 0 (schema + topology, default since 6.0) · <b>Cassandra 6</b> TCM (CEP-21, alpha) · <b>Citus 11+</b> metadata on all nodes · <b>Aerospike</b>: the principal node drives a membership vote; each node computes the same map</p>
         <div class="tag-row"><span class="pill on">consistent</span></div>
       </div>
     </div>
     <p class="note"><b>Stale caches are normal.</b> Correctness comes from the owner <em>rejecting</em> a wrong route (MongoDB <code>StaleConfig</code>, TiKV region-epoch / not-leader errors, Redis <code>MOVED</code>) and the router refreshing and retrying.</p>
-    <div class="foot">METADATA / 12</div>
+    <div class="foot">METADATA / 13</div>
   </section>
 
-  <!-- 13 — CONSENSUS -->
-  <section class="slide" id="s13">
+  <!-- 14 — CONSENSUS -->
+  <section class="slide dense" id="s14">
     <div>
       <p class="eyebrow">Axis 04 · consensus</p>
       <h2>What gets agreed, and with which algorithm</h2>
@@ -747,13 +843,13 @@
       </table>
     </div>
     <p class="note"><b>Gossip ≠ consensus.</b> Gossip spreads state eventually and may briefly disagree. Raft and Paxos make a majority agree on one order before anything is acknowledged. <a href="../../books/notes/ddia/ch9/">DDIA ch 9 →</a></p>
-    <div class="foot">CONSENSUS / 13</div>
+    <div class="foot">CONSENSUS / 14</div>
   </section>
 
-  <!-- 14 — TRANSACTION SCOPE -->
-  <section class="slide" id="s14">
+  <!-- 15 — TRANSACTION SCOPE -->
+  <section class="slide dense" id="s15">
     <div>
-      <p class="eyebrow">Axis 05 · transactions</p>
+      <p class="eyebrow">Axis 05 · distributed transactions · scope</p>
       <h2>"Supports transactions": up to which rung?</h2>
       <p class="lead" style="margin-top:10px;">Almost every database supports transactions, but they differ on how far one can reach before atomicity or isolation gives out.</p>
     </div>
@@ -775,100 +871,62 @@
       </div>
       <div class="rung r4">
         <div><span class="lvl">RUNG 4</span><h3>Cross-shard ACID</h3></div>
-        <div><p>Atomic <em>and</em> isolated across shards, via 2PC over Raft/Paxos groups (Spanner, CockroachDB parallel commits, YugabyteDB), Percolator (TiDB), OCC (FoundationDB, Aurora DSQL), or leaderless consensus (Accord).</p>
+        <div><p>Atomic <em>and</em> isolated across shards, via 2PC over Raft/Paxos groups (Spanner, CockroachDB parallel commits, YugabyteDB), Percolator (TiDB), an optimistic check then one write to the commit log (FoundationDB, Aurora DSQL), or leaderless consensus (Accord).</p>
           <div class="tag-row"><span class="pill on">Spanner</span><span class="pill on">CockroachDB</span><span class="pill on">TiDB</span><span class="pill on">YugabyteDB</span><span class="pill on">FoundationDB</span><span class="pill on">MongoDB 4.2+</span><span class="pill on">DynamoDB ≤ 100 items</span><span class="pill on">Aerospike 8</span><span class="pill on">Aurora DSQL</span><span class="pill">Cassandra 6 Accord (alpha)</span></div></div>
       </div>
     </div>
-    <div class="foot">TXN SCOPE / 14</div>
+    <div class="foot">TXN SCOPE / 15</div>
   </section>
 
-  <!-- 15 — ISOLATION REFRESHER -->
-  <section class="slide" id="s15">
+  <!-- 16 — ATOMIC COMMIT -->
+  <section class="slide dense" id="s16">
     <div>
-      <p class="eyebrow">Axis 05 · isolation</p>
-      <h2>Isolation levels, by what they prevent</h2>
+      <p class="eyebrow">Axis 05 · distributed transactions · atomic commit</p>
+      <h2>Committing across partitions</h2>
+      <p class="lead" style="margin-top:10px; max-width:64ch;">A transaction that writes to several shards must commit on all of them or on none.</p>
     </div>
-    <div class="split" style="align-items:start;">
-      <div class="matrix-wrap">
-        <table class="matrix" style="min-width:560px;">
-          <thead><tr><th>Anomaly</th><th class="c">Read committed</th><th class="c">Snapshot ("RR")</th><th class="c">Serializable</th><th class="c">Strict serializable</th></tr></thead>
-          <tbody>
-            <tr><td class="name">Dirty read / write</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
-            <tr><td class="name">Read skew</td><td class="n">✗</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
-            <tr><td class="name">Lost update</td><td class="n">✗</td><td class="y">✓*</td><td class="y">✓</td><td class="y">✓</td></tr>
-            <tr><td class="name">Write skew · phantoms</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓</td><td class="y">✓</td></tr>
-            <tr><td class="name">Real-time order</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓</td></tr>
-          </tbody>
-        </table>
-      </div>
+    <div class="grid commit">
       <div class="card">
-        <h3>Single-node baselines</h3>
-        <ul class="ticks" style="margin-top:8px;">
-          <li><strong>PostgreSQL</strong>: default <strong>Read Committed</strong>. Its Repeatable Read is true snapshot isolation; Serializable is SSI (optimistic, aborts dangerous patterns).</li>
-          <li><strong>MySQL InnoDB</strong>: default <strong>Repeatable Read</strong>. Plain SELECTs read a snapshot, but UPDATE and locking reads see the latest rows (next-key locks). *It does not detect lost updates.</li>
-        </ul>
+        <span class="num">TWO-PHASE COMMIT (2PC)</span>
+        <ol class="qs">
+          <li>The coordinator asks every participant to <strong>PREPARE</strong>.</li>
+          <li>Each makes its writes durable, keeps its locks and votes <strong>yes</strong>. One <strong>no</strong> aborts everything.</li>
+          <li>All yes: the coordinator logs <strong>COMMIT</strong>. That record is the commit point.</li>
+          <li>It tells every participant, which applies the writes and releases its locks.</li>
+        </ol>
       </div>
-    </div>
-    <p class="note"><b>Two different words.</b> <em>Serializability</em> is about transactions over many objects. <em>Linearizability</em> is about one object behaving like a single, up-to-date copy. <em>Strict serializability</em> is both. <a href="../../books/notes/ddia/ch7/">DDIA ch 7</a> vs <a href="../../books/notes/ddia/ch9/">ch 9</a>.</p>
-    <div class="foot">ISOLATION / 15</div>
-  </section>
-
-  <!-- 16 — RR MYTH -->
-  <section class="slide" id="s16">
-    <div>
-      <p class="eyebrow">Myth-buster</p>
-      <h2>"REPEATABLE READ" means different things</h2>
-      <p class="lead" style="margin-top:10px;">Same keyword, different guarantees. Ask which anomalies a level prevents, not what it's called.</p>
+      <div class="card warm-hl">
+        <span class="num">THE CATCH · 2PC BLOCKS</span>
+        <p>If the coordinator dies after the votes, the participants are <strong>in doubt</strong>. They may not commit or abort on their own, so they keep their locks and wait for it to come back. <a href="../../books/notes/ddia/ch9/">DDIA ch 9</a></p>
+      </div>
+      <div class="card hl">
+        <span class="num">THE FIX · REPLICATED 2PC</span>
+        <p>Keep the commit decision and every participant's prepared writes in <strong>Raft or Paxos groups</strong>. When a node dies, a replica takes over; the transaction commits or aborts without waiting for it.</p>
+        <p class="who"><b>Spanner</b> · <b>CockroachDB</b> · <b>YugabyteDB</b></p>
+      </div>
     </div>
     <div class="matrix-wrap">
       <table class="matrix wrap">
-        <thead><tr><th>Engine</th><th>What "repeatable read" actually is</th><th class="c">Write skew prevented?</th></tr></thead>
+        <thead><tr><th>Database</th><th>Atomic commit</th><th>Concurrency control</th><th>Timestamps</th></tr></thead>
         <tbody>
-          <tr><td class="name">ANSI SQL-92</td><td>Defined with locks: rows you read stay locked until commit; new rows (phantoms) may appear.</td><td class="y">✓ for rows read</td></tr>
-          <tr><td class="name">MySQL InnoDB</td><td>Snapshot for plain SELECTs; writes and locking reads act on the latest rows. Lost updates are not detected. <span class="s">the default</span></td><td class="n">✗</td></tr>
-          <tr><td class="name">PostgreSQL</td><td>True snapshot isolation; concurrent updates of the same row abort the second writer.</td><td class="n">✗</td></tr>
-          <tr><td class="name">TiDB</td><td>Snapshot isolation, named RR for MySQL compatibility. <span class="s">the default; SERIALIZABLE is rejected</span></td><td class="n">✗</td></tr>
-          <tr><td class="name">CockroachDB</td><td>An alias for SNAPSHOT. <span class="s">opt-in; the default is SERIALIZABLE</span></td><td class="n">✗</td></tr>
-          <tr><td class="name">Spanner</td><td>Snapshot isolation with optimistic concurrency. <span class="s">opt-in since 2025; the default is serializable</span></td><td class="n">✗</td></tr>
-          <tr><td class="name">Aurora DSQL</td><td>"Strong snapshot isolation", equivalent to PostgreSQL RR. <span class="s">the only level</span></td><td class="n">✗</td></tr>
-          <tr><td class="name">Oracle (bonus)</td><td>Its "SERIALIZABLE" is snapshot isolation too.</td><td class="n">✗</td></tr>
+          <tr><td class="name">Spanner</td><td>2PC across Paxos groups</td><td>2PL + wound-wait by default</td><td>TrueTime</td></tr>
+          <tr><td class="name">CockroachDB</td><td>parallel commits: writes + STAGING record in one consensus round</td><td>MVCC timestamp ordering + read refresh</td><td>HLC</td></tr>
+          <tr><td class="name">YugabyteDB</td><td>2PC over Raft tablets</td><td>locks wait or fail on conflict</td><td>HLC</td></tr>
+          <tr><td class="name">TiDB</td><td>Percolator 2PC: committing the primary lock commits it all</td><td>pessimistic locking by default</td><td>PD timestamp oracle</td></tr>
+          <tr><td class="name">MongoDB</td><td>2PC across shards (4.2+)</td><td>WiredTiger MVCC</td><td>cluster time</td></tr>
+          <tr><td class="name">DynamoDB</td><td>transaction coordinators, ≤ 100 items</td><td>timestamp ordering</td><td>coordinator clocks</td></tr>
+          <tr><td class="name">FoundationDB</td><td>the commit goes to every transaction log</td><td>OCC: resolvers check at commit</td><td>central sequencer</td></tr>
+          <tr><td class="name">Aurora DSQL</td><td>the journal write is the commit point</td><td>OCC: adjudicators check at commit</td><td>synced clocks</td></tr>
+          <tr><td class="name">Vitess (2PC mode) · Citus</td><td class="m-less">2PC over per-shard engines: atomic, not isolated</td><td>each shard's engine (MySQL · PostgreSQL)</td><td>none global</td></tr>
         </tbody>
       </table>
     </div>
-    <div class="foot">RR ≠ RR / 16</div>
+    <p class="muted" style="font-size:.78rem;">Which isolation level each of these gives you: <a href="../database-transactions/index.html#s17">Part 3 · isolation per database</a>.</p>
+    <div class="foot">ATOMIC COMMIT / 16</div>
   </section>
 
-  <!-- 17 — ISOLATION BY DATABASE -->
-  <section class="slide" id="s17">
-    <div>
-      <p class="eyebrow">Axis 05 · the transactions cheat sheet</p>
-      <h2>Default vs. strongest isolation, per database</h2>
-    </div>
-    <div class="matrix-wrap">
-      <table class="matrix wrap" style="min-width:900px;">
-        <thead><tr><th>Database</th><th>Default</th><th>Strongest available</th><th>How</th><th>Timestamps</th></tr></thead>
-        <tbody>
-          <tr><td class="name">Spanner</td><td class="m-multi">serializable + external consistency</td><td class="m-multi">same (strict serializable) <span class="s">RR / snapshot opt-in since 2025</span></td><td>2PL + wound-wait; 2PC across Paxos groups; lock-free snapshot reads</td><td>TrueTime</td></tr>
-          <tr><td class="name">CockroachDB</td><td class="m-multi">SERIALIZABLE</td><td class="m-multi">SERIALIZABLE <span class="s">READ COMMITTED, SNAPSHOT opt-in</span></td><td>MVCC timestamp ordering, read refresh, parallel commits</td><td>HLC</td></tr>
-          <tr><td class="name">YugabyteDB</td><td>snapshot* <span class="s">real READ COMMITTED on new v2025.2+ deployments</span></td><td class="m-multi">SERIALIZABLE</td><td>2PC over Raft tablets; locks wait or fail on conflict</td><td>HLC</td></tr>
-          <tr><td class="name">TiDB</td><td class="m-less">REPEATABLE READ = snapshot</td><td class="m-less">snapshot <span class="s">SERIALIZABLE is rejected</span></td><td>Percolator-style 2PC; pessimistic locking by default</td><td>central TSO (PD)</td></tr>
-          <tr><td class="name">MongoDB</td><td class="m-less">snapshot inside a transaction</td><td class="m-less">snapshot <span class="s">no serializable; write skew possible</span></td><td>WiredTiger MVCC; 2PC across shards (4.2+)</td><td>cluster time (hybrid logical)</td></tr>
-          <tr><td class="name">Aurora DSQL</td><td class="m-less">strong snapshot (≈ PG RR)</td><td class="m-less">snapshot <span class="s">the only level</span></td><td>OCC: conflicts checked at commit, retry</td><td>synced physical clocks</td></tr>
-          <tr><td class="name">DynamoDB</td><td>single-item atomic; reads eventually consistent</td><td class="m-multi">serializable <span class="s">TransactWrite/GetItems, ≤ 100 items</span></td><td>transaction coordinators + timestamp ordering</td><td>coordinator clocks</td></tr>
-          <tr><td class="name">FoundationDB</td><td class="m-multi">strict serializable</td><td class="m-multi">same</td><td>OCC + MVCC; resolvers check conflicts; 5-second transactions</td><td>central sequencer</td></tr>
-          <tr><td class="name">Aerospike</td><td>single record; AP mode by default</td><td class="m-multi">strict serializable <span class="s">8.0 multi-record, strong-consistency namespaces</span></td><td>OCC for reads + 2PL for writes</td><td>record versions</td></tr>
-          <tr><td class="name">Cassandra · ScyllaDB</td><td class="m-less">no multi-row isolation; tunable CL</td><td>linearizable per partition (LWT) <span class="s">Cassandra 6 Accord: strict serializable, alpha</span></td><td>Paxos per partition</td><td>wall clock (LWW)</td></tr>
-          <tr><td class="name">Vitess · Citus</td><td>per shard: MySQL RR · PG RC</td><td class="m-less">atomic across shards, not isolated</td><td>2PC over per-shard engines</td><td>none global</td></tr>
-          <tr><td class="name">Redis Cluster</td><td>commands run one at a time</td><td><code>MULTI</code> in one slot <span class="s">no rollback</span></td><td>single-threaded per shard</td><td>none</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p class="muted" style="font-size:.78rem; padding-right:min(170px, 30%);">Colours: <span class="m-multi">serializable or stronger</span> · <span class="m-less">snapshot or weaker</span>. *YugabyteDB YSQL: READ COMMITTED falls back to snapshot unless <code>yb_enable_read_committed_isolation</code> is on; deployment-dependent.</p>
-    <div class="foot">ISOLATION BY DB / 17</div>
-  </section>
-
-  <!-- 18 — SERIALIZABLE != STRICT -->
-  <section class="slide" id="s18">
+  <!-- 17 — SERIALIZABLE != STRICT -->
+  <section class="slide dense" id="s17">
     <div>
       <p class="eyebrow">Axis 05 · serializability</p>
       <h2>Serializable ≠ strict serializable</h2>
@@ -876,24 +934,21 @@
     </div>
     <div class="split">
       <div>
-        <h3 style="margin-bottom:10px;">Three ways to be serializable (DDIA ch 7)</h3>
-        <dl class="kv">
-          <dt>serial</dt><dd><strong>Actually run one at a time</strong> per partition: VoltDB, Redis per shard, Calvin-style deterministic ordering.</dd>
-          <dt>2PL</dt><dd><strong>Pessimistic locks</strong> held to commit: Spanner read-write transactions, MySQL SERIALIZABLE, YugabyteDB.</dd>
-          <dt>SSI / OCC</dt><dd><strong>Optimistic</strong>: run, then abort on conflict: PostgreSQL SSI, CockroachDB, FoundationDB, Aerospike 8 reads.</dd>
-        </dl>
-        <p class="note" style="margin-top:14px;"><b>Strict:</b> Spanner (external consistency), FoundationDB, Aerospike 8, Cassandra Accord. <b>Serializable, not strict:</b> CockroachDB is linearizable per key, but across unrelated keys clock skew can order transactions against real time.</p>
+        <h3 style="margin-bottom:8px;">Three ways to be serializable (DDIA ch 7)</h3>
+        <p class="muted" style="font-size:.92rem;">Run transactions one at a time, lock (2PL), or validate at commit (SSI/OCC). Across shards, Spanner (by default) and YugabyteDB lock; CockroachDB, FoundationDB and Aerospike 8 validate.</p>
+        <p class="read" style="margin-top:8px;">How each one works on a single node: <a href="../database-transactions/index.html#s12">Part 3 · concurrency control</a></p>
+        <p class="note" style="margin-top:14px;"><b>Strict:</b> Spanner (external consistency), FoundationDB, Aerospike 8, Cassandra Accord (6.0 alpha). <b>Serializable, not strict:</b> CockroachDB is linearizable per key, but across unrelated keys clock skew can order transactions against real time.</p>
       </div>
       <div class="panel-light">
-<svg class="dgm" viewBox="0 0 380 176" role="img" aria-label="Timeline: T1 writes x equals 2 and commits; T2 starts afterwards and reads x. Strict serializability requires 2; plain serializability may return 1." style="max-width:460px"><defs><marker id="dd18" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-w" x="20" y="14" width="168" height="32" rx="8"/><text x="104" y="34.5" text-anchor="middle">T1: x = 2 · commit</text><path class="lnd" d="M188 14 L188 150"/><text class="lbl halo" x="194" y="64" text-anchor="start">T1 committed</text><rect class="n-b" x="210" y="74" width="150" height="32" rx="8"/><text x="285" y="94.5" text-anchor="middle">T2: read x</text><text class="lbl ok" x="20" y="128" text-anchor="start">strict serializable: T2 must see x = 2</text><text class="lbl bad" x="20" y="144" text-anchor="start">serializable: may order T2 first → x = 1</text><path class="ln" d="M20 164 L360 164" marker-end="url(#dd18)"/><text class="lbl" x="360" y="158" text-anchor="end">real time →</text></svg>
+<svg class="dgm" viewBox="0 0 380 176" role="img" aria-label="Timeline: T1 writes x equals 2 and commits; T2 starts afterwards and reads x. Strict serializability requires 2; plain serializability may return 1." style="max-width:460px"><defs><marker id="dd18" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-w" x="20" y="14" width="168" height="32" rx="8"/><text x="104" y="34.5" text-anchor="middle">T1: x = 2 · commit</text><path class="lnd" d="M188 14 L188 112"/><text class="lbl halo" x="194" y="64" text-anchor="start">T1 committed</text><rect class="n-b" x="210" y="74" width="150" height="32" rx="8"/><text x="285" y="94.5" text-anchor="middle">T2: read x</text><text class="lbl ok" x="20" y="128" text-anchor="start">strict serializable: T2 must see x = 2</text><text class="lbl bad" x="20" y="144" text-anchor="start">serializable: may order T2 first → x = 1</text><path class="ln" d="M20 164 L360 164" marker-end="url(#dd18)"/><text class="lbl" x="360" y="158" text-anchor="end">real time →</text></svg>
         <p class="cap">a stale read that is still "serializable"</p>
       </div>
     </div>
-    <div class="foot">STRICT / 18</div>
+    <div class="foot">STRICT / 17</div>
   </section>
 
-  <!-- 19 — CLOCKS -->
-  <section class="slide" id="s19">
+  <!-- 18 — CLOCKS -->
+  <section class="slide dense" id="s18">
     <div>
       <p class="eyebrow">Axis 06 · clocks</p>
       <h2>Where do timestamps come from?</h2>
@@ -931,11 +986,11 @@
         <p class="who"><b>Riak</b> · the Dynamo paper</p>
       </div>
     </div>
-    <div class="foot">CLOCKS / 19</div>
+    <div class="foot">CLOCKS / 18</div>
   </section>
 
-  <!-- 20 — CONSISTENCY -->
-  <section class="slide" id="s20">
+  <!-- 19 — CONSISTENCY -->
+  <section class="slide dense" id="s19">
     <div>
       <p class="eyebrow">Axis 06 · consistency</p>
       <h2>How stale may a read be, and who chooses?</h2>
@@ -962,52 +1017,52 @@
       </div>
     </div>
     <p class="note"><b>Why no CAP labels?</b> DDIA ch 9: CAP's "C" means only linearizability and network partitions are not optional, so "CA" says little. PACELC is more useful: even with no partition, you trade latency for consistency on every request.</p>
-    <div class="foot">CONSISTENCY / 20</div>
+    <div class="foot">CONSISTENCY / 19</div>
   </section>
 
-  <!-- 21 — ARCHETYPES -->
-  <section class="slide" id="s21">
+  <!-- 20 — ARCHETYPES -->
+  <section class="slide dense" id="s20">
     <div>
       <p class="eyebrow">The tour</p>
       <h2>Five archetypes recur</h2>
-      <p class="lead" style="margin-top:10px;">As in Part 1, certain choices reinforce each other and travel together.</p>
+      <p class="lead" style="margin-top:10px; max-width:64ch;">As in Part 1, certain choices reinforce each other and travel together.</p>
     </div>
     <div class="grid cols-6">
       <div class="card">
         <span class="num">ARCHETYPE 1</span><h3>Dynamo-style leaderless</h3>
-        <div class="db-row" style="margin:10px 0;"><div class="db"><span class="logo-tile" data-icon="apachecassandra" style="--brand:#1287B1"></span><span class="db-name">Cassandra</span></div><div class="db"><span class="logo-tile" data-icon="scylladb" style="--brand:#0F9DCE"></span><span class="db-name">ScyllaDB</span></div></div>
+        <div class="db-row sm" style="margin:10px 0;"><div class="db"><span class="logo-tile" data-icon="apachecassandra" style="--brand:#1287B1"></span><span class="db-name">Cassandra</span></div><div class="db"><span class="logo-tile" data-icon="scylladb" style="--brand:#0F9DCE"></span><span class="db-name">ScyllaDB</span></div></div>
         <div class="tag-row"><span class="pill">leaderless</span><span class="pill">hash ring</span><span class="pill">any node</span><span class="pill">tunable CL</span><span class="pill">LWT = Paxos</span></div>
       </div>
       <div class="card">
         <span class="num">ARCHETYPE 2</span><h3>Sharded primaries + router</h3>
-        <div class="db-row" style="margin:10px 0;"><div class="db"><span class="logo-tile" data-icon="mongodb" style="--brand:#47A248"></span><span class="db-name">MongoDB</span></div><div class="db"><span class="logo-tile" data-mono="Vt" style="--brand:#F16728"></span><span class="db-name">Vitess</span></div><div class="db"><span class="logo-tile" data-mono="Ci" style="--brand:#1f6feb"></span><span class="db-name">Citus</span></div></div>
+        <div class="db-row sm" style="margin:10px 0;"><div class="db"><span class="logo-tile" data-icon="mongodb" style="--brand:#47A248"></span><span class="db-name">MongoDB</span></div><div class="db"><span class="logo-tile" data-mono="Vt" style="--brand:#F16728"></span><span class="db-name">Vitess</span></div><div class="db"><span class="logo-tile" data-mono="Ci" style="--brand:#1f6feb"></span><span class="db-name">Citus</span></div></div>
         <div class="tag-row"><span class="pill">leader per shard</span><span class="pill">central config</span><span class="pill">routing tier</span><span class="pill">ACID per shard</span></div>
       </div>
       <div class="card">
         <span class="num">ARCHETYPE 3</span><h3>Smart-client partitioned KV</h3>
-        <div class="db-row" style="margin:10px 0;"><div class="db"><span class="logo-tile" data-icon="aerospike" style="--brand:#C9252C"></span><span class="db-name">Aerospike</span></div><div class="db"><span class="logo-tile" data-icon="redis" style="--brand:#FF4438"></span><span class="db-name">Redis Cluster</span></div><div class="db"><span class="logo-tile" data-mono="FDB" style="--brand:#5b3cc4"></span><span class="db-name">FoundationDB</span></div></div>
+        <div class="db-row sm" style="margin:10px 0;"><div class="db"><span class="logo-tile" data-icon="aerospike" style="--brand:#C9252C"></span><span class="db-name">Aerospike</span></div><div class="db"><span class="logo-tile" data-icon="redis" style="--brand:#FF4438"></span><span class="db-name">Redis Cluster</span></div><div class="db"><span class="logo-tile" data-mono="FDB" style="--brand:#5b3cc4"></span><span class="db-name">FoundationDB</span></div></div>
         <div class="tag-row"><span class="pill">fixed slots / ranges</span><span class="pill">client holds map</span><span class="pill">one hop</span></div>
       </div>
       <div class="card hl">
         <span class="num">ARCHETYPE 4</span><h3>Consensus-per-range SQL</h3>
-        <div class="db-row" style="margin:10px 0;"><div class="db"><span class="logo-tile" data-icon="googlecloud" style="--brand:#4285F4"></span><span class="db-name">Spanner</span></div><div class="db"><span class="logo-tile" data-icon="cockroachlabs" style="--brand:#6933FF"></span><span class="db-name">CockroachDB</span></div><div class="db"><span class="logo-tile" data-mono="Ti" style="--brand:#E60C0C"></span><span class="db-name">TiDB</span></div><div class="db"><span class="logo-tile" data-mono="YB" style="--brand:#FF5F3B"></span><span class="db-name">YugabyteDB</span></div></div>
+        <div class="db-row sm" style="margin:10px 0;"><div class="db"><span class="logo-tile" data-icon="googlecloud" style="--brand:#4285F4"></span><span class="db-name">Spanner</span></div><div class="db"><span class="logo-tile" data-icon="cockroachlabs" style="--brand:#6933FF"></span><span class="db-name">CockroachDB</span></div><div class="db"><span class="logo-tile" data-mono="Ti" style="--brand:#E60C0C"></span><span class="db-name">TiDB</span></div><div class="db"><span class="logo-tile" data-mono="YB" style="--brand:#FF5F3B"></span><span class="db-name">YugabyteDB</span></div></div>
         <div class="tag-row"><span class="pill on">Raft / Paxos per range</span><span class="pill on">any SQL node</span><span class="pill on">cross-shard ACID</span></div>
       </div>
       <div class="card">
         <span class="num">ARCHETYPE 5</span><h3>Managed hyperscale</h3>
-        <div class="db-row" style="margin:10px 0;"><div class="db"><span class="logo-tile" data-icon="amazondynamodb" style="--brand:#4053D6"></span><span class="db-name">DynamoDB</span></div><div class="db"><span class="logo-tile" data-mono="Cos" style="--brand:#0078D4"></span><span class="db-name">Cosmos DB</span></div><div class="db"><span class="logo-tile" data-icon="amazonrds" style="--brand:#527FFF"></span><span class="db-name">Aurora DSQL</span></div></div>
-        <div class="tag-row"><span class="pill">hidden routing tier</span><span class="pill">consistency per request</span><span class="pill">multi-region modes</span></div>
+        <div class="db-row sm" style="margin:10px 0;"><div class="db"><span class="logo-tile" data-icon="amazondynamodb" style="--brand:#4053D6"></span><span class="db-name">DynamoDB</span></div><div class="db"><span class="logo-tile" data-mono="Cos" style="--brand:#0078D4"></span><span class="db-name">Cosmos DB</span></div><div class="db"><span class="logo-tile" data-icon="amazonrds" style="--brand:#527FFF"></span><span class="db-name">Aurora DSQL</span></div></div>
+        <div class="tag-row"><span class="pill">hidden router</span><span class="pill">multi-region</span><span class="pill">per-request consistency</span></div>
       </div>
       <div class="card" style="border-style:dashed;">
         <span class="num">PLUS · A LAYER ON TOP</span><h3>Cross-region multi-leader</h3>
         <p>Not an archetype of its own: a replication layer added between regions. DynamoDB global tables, Cosmos DB multi-region writes, EDB Postgres Distributed.</p>
       </div>
     </div>
-    <div class="foot">ARCHETYPES / 21</div>
+    <div class="foot">ARCHETYPES / 20</div>
   </section>
 
-  <!-- 22 — TOPOLOGY MATRIX -->
-  <section class="slide" id="s22">
+  <!-- 21 — TOPOLOGY MATRIX -->
+  <section class="slide dense" id="s21">
     <div>
       <p class="eyebrow">One-page cheat sheet</p>
       <h2>The whole tour: topology</h2>
@@ -1027,18 +1082,18 @@
           <tr><td class="name">Aerospike</td><td class="m-lead">master / partition</td><td>4,096 partitions</td><td>smart client</td><td>computed per node</td><td>membership vote</td></tr>
           <tr><td class="name">Redis Cluster</td><td class="m-lead">leader / slots · async</td><td>16,384 slots</td><td>smart client</td><td>gossip bus</td><td>failover vote</td></tr>
           <tr><td class="name">FoundationDB</td><td class="m-lead">all logs + replicas</td><td>range</td><td>smart client</td><td>system keys</td><td>Paxos coordinators</td></tr>
-          <tr><td class="name">Cassandra</td><td class="m-less">leaderless</td><td>hash, vnodes</td><td>any node / driver</td><td>gossip → TCM (6.0)</td><td>LWT only (Paxos)</td></tr>
+          <tr><td class="name">Cassandra</td><td class="m-less">leaderless</td><td>hash, vnodes</td><td>any node / driver</td><td>gossip (TCM: alpha)</td><td>LWT only (Paxos)</td></tr>
           <tr><td class="name">ScyllaDB</td><td class="m-less">leaderless</td><td>hash, tablets</td><td>any node / driver</td><td>Raft group 0</td><td>Raft (metadata)</td></tr>
-          <tr><td class="name">Global tables · Cosmos</td><td class="m-multi">multi-leader</td><td colspan="4">a cross-region layer over one of the rows above</td></tr>
+          <tr><td class="name">Global tables · Cosmos</td><td class="m-multi">multi-leader</td><td colspan="4">MREC · multi-region writes: a cross-region layer over the rows above</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="muted" style="font-size:.78rem;">Colours: <span class="m-lead">single-leader per shard</span> · <span class="m-less">leaderless</span> · <span class="m-multi">multi-leader</span>. Isolation is on slide 17.</p>
-    <div class="foot">CHEAT SHEET / 22</div>
+    <p class="muted" style="font-size:.78rem;">Colours: <span class="m-lead">single-leader per shard</span> · <span class="m-less">leaderless</span> · <span class="m-multi">multi-leader</span>. Cross-shard commit: <a class="go inline" href="#s16">slide 16</a>. Isolation per database: <a href="../database-transactions/index.html#s17">Part 3</a>.</p>
+    <div class="foot">CHEAT SHEET / 21</div>
   </section>
 
-  <!-- 23 — MYTHS + QUESTIONS -->
-  <section class="slide" id="s23">
+  <!-- 22 — MYTHS + QUESTIONS -->
+  <section class="slide dense" id="s22">
     <div>
       <p class="eyebrow">Payoff</p>
       <h2>Myths to drop, questions to ask</h2>
@@ -1051,9 +1106,9 @@
           <li><strong>Single-leader ≠ bottleneck</strong>: one leader per range, spread over every node.</li>
           <li><strong>mongos ≠ the brain</strong>: routers are stateless; the config servers hold the map.</li>
           <li><strong>Gossip ≠ consensus</strong>: gossip converges eventually; Raft and Paxos agree first.</li>
-          <li><strong>RR ≠ RR</strong>: MySQL, PostgreSQL and ANSI mean three different things.</li>
-          <li><strong>Distributed transactions ≠ serializable</strong>: MongoDB, TiDB and Aurora DSQL are snapshot isolation.</li>
-          <li><strong>2PC ≠ isolation</strong>: Vitess and Citus commit atomically, yet readers can see half a transaction.</li>
+          <li><strong>Quorum ≠ linearizable</strong>: even with W + R &gt; N, sloppy quorums, last-writer-wins, or a write racing two reads (new value, then old) break it.</li>
+          <li><strong>Distributed transactions ≠ serializable</strong>: TiDB and Aurora DSQL are snapshot isolation; MongoDB offers snapshot reads with write-conflict aborts, and no serializable level.</li>
+          <li><strong>2PC ≠ isolation</strong>: Citus and Vitess (2PC mode) commit atomically, yet readers can see half a transaction.</li>
           <li><strong>Serializable ≠ strict</strong>: only strict promises real-time order.</li>
         </ul>
       </div>
@@ -1061,27 +1116,28 @@
         <h3 class="accent">Ask any distributed database</h3>
         <ol class="qs" style="margin-top:10px;">
           <li><strong>Who leads my key</strong>, and what happens when it dies?</li>
+          <li><strong>How are keys cut</strong>, and where does a hot or sequential key land?</li>
           <li><strong>Where is the partition map</strong>, and what happens when my router's copy is stale?</li>
           <li><strong>What does a commit wait for</strong>: one node, a majority, every region?</li>
-          <li><strong>Default isolation, maximum isolation</strong>, and what the maximum costs.</li>
-          <li><strong>Can one transaction span shards?</strong> Regions?</li>
+          <li><strong>Can one transaction span shards</strong> or regions, and is it isolated or only atomic?</li>
           <li><strong>Where do timestamps come from</strong>: TrueTime, HLC, an oracle, wall clocks?</li>
           <li><strong>Which reads may be stale</strong>, and can I choose per request?</li>
         </ol>
       </div>
     </div>
-    <div class="foot">PAYOFF / 23</div>
+    <p class="muted" style="font-size:.82rem;">Isolation levels (read committed, snapshot, serializable) and what each one prevents are <a href="../database-transactions/index.html#s9">Part 3</a>.</p>
+    <div class="foot">PAYOFF / 22</div>
   </section>
 
-  <!-- 24 — SOURCES + END -->
-  <section class="slide" id="s24" style="justify-content:center;">
+  <!-- 23 — SOURCES + END -->
+  <section class="slide" id="s23" style="justify-content:center;">
     <div>
       <p class="eyebrow">Further reading</p>
       <h1>Thank you.<br><span class="accent">Questions?</span></h1>
       <div class="grid cols-3" style="margin-top:28px;">
         <div class="card">
           <h3>The book</h3>
-          <p>Kleppmann, <em>Designing Data-Intensive Applications</em>: chapters 5 to 9.</p>
+          <p>Kleppmann, <em>Designing Data-Intensive Applications</em> (1st ed.): chapters 5 to 9.</p>
           <div class="tag-row">
             <a class="pill on" href="../../books/notes/ddia/ch5/">ch 5 Replication</a>
             <a class="pill on" href="../../books/notes/ddia/ch6/">ch 6 Partitioning</a>
@@ -1097,23 +1153,23 @@
         </div>
         <div class="card">
           <h3>The series</h3>
-          <p><a href="../database-guide/index.html">Part 1</a>: how databases are classified. <a href="../database-anatomy-part2/index.html">Part 2</a>: analytics, lakehouses and vectors. Part 3: this deck.</p>
-          <p style="margin-top:8px; font-size:.8rem;">Version-specific facts (Cassandra 6, Spanner RR, YugabyteDB defaults) checked November 2026.</p>
+          <p><a href="../database-guide/index.html">Part 1</a>: data models, storage and architecture. Part 2: this deck. <a href="../database-transactions/index.html">Part 3</a>: transactions. <a href="../database-anatomy-part2/index.html">Part 4</a>: analytical databases.</p>
+          <p style="margin-top:8px; font-size:.8rem;">Version-specific facts, such as Cassandra 6, checked November 2026.</p>
         </div>
       </div>
     </div>
-    <div class="foot">END · PART 3 / 24</div>
+    <div class="foot">END · PART 2 / 23</div>
   </section>
 
 </main>
 
 <div id="hud">
   <button class="hud-btn" id="prev" aria-label="Previous slide" title="Previous (↑)">↑</button>
-  <button type="button" id="counter" title="All slides (G)">1 / 24</button>
+  <button type="button" id="counter" title="All slides (G)">1 / 23</button>
   <button class="hud-btn" id="next" aria-label="Next slide" title="Next (↓ / Space)">↓</button>
 </div>
 
-<script src="../database-guide/icons.js"></script>
+<script src="../../shared/icons.js"></script>
 <script src="../../shared/sitenav.js"></script>
 <script>
 (function(){

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1c">
-  <meta name="description" content="Slide decks and visual guides for system design, starting with a field guide to how databases differ.">
+  <meta name="description" content="Slide decks and visual guides for system design, starting with a four-part field guide to databases.">
   <title>Slides · System Design Notes</title>
   <script src="../shared/looks.js"></script>
   <script src="../shared/sitenav.js"></script>
@@ -160,29 +160,71 @@
       <h1>Visual guides, one deck at a time</h1>
       <p class="lede">Slide decks that walk through a topic visually, with diagrams and animations. Use the arrow keys or swipe to move between slides.</p>
       <div class="totals">
-        <div class="total"><b>3</b><span>decks</span></div>
-        <div class="total"><b data-count="slides" data-src=".">61</b><span>slides</span></div>
+        <div class="total"><b>4</b><span>decks</span></div>
+        <div class="total"><b data-count="slides" data-src=".">82</b><span>slides</span></div>
       </div>
     </section>
 
-    <h2>Decks</h2>
+    <h2>A Field Guide to Databases &middot; four parts</h2>
     <a class="card wide" href="database-guide/index.html" style="--accent:#f59e0b">
       <div class="body">
         <div class="card-head">
-          <div class="mono">DB</div>
-          <div><h3>A Field Guide to Databases</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="database-guide">20</span> slides</div></div>
+          <div class="mono">P1</div>
+          <div><h3>Part 1 &middot; Data Models, Storage &amp; Architecture</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="database-guide">22</span> slides</div></div>
         </div>
-        <p>How databases differ and why: OLTP vs OLAP, four independent design axes, data models, B-Tree vs LSM-Tree (with an animated LSM-Tree), separating compute from storage, and distributed SQL.</p>
-        <div class="chips"><span class="chip">OLTP vs OLAP</span><span class="chip">B-Tree vs LSM</span><span class="chip">Distributed SQL</span><span class="chip">NewSQL</span></div>
+        <p>How databases are classified: start from the workload, then three independent axes (data model and query, storage structure, deployment and architecture), the three cluster architectures (shared-nothing; disaggregated, shared-nothing storage; disaggregated, shared storage), seven recurring archetypes, and an animated LSM-Tree.</p>
+        <div class="chips"><span class="chip">OLTP vs OLAP</span><span class="chip">Three axes</span><span class="chip">B-Tree vs LSM</span><span class="chip">Seven archetypes</span></div>
         <span class="open">Open slides &rarr;</span>
       </div>
       <div class="side">
         <strong style="color:var(--text)">Covers</strong>
         <ol>
-          <li>Key-value, SQL, document and wide-column stores</li>
-          <li>Single-node vs distributed</li>
+          <li>Key-value, relational, document and wide-column stores</li>
+          <li>Embedded, shared-storage and distributed SQL</li>
           <li>Case study: TiDB</li>
-          <li>The whole tour as a matrix</li>
+          <li>Every database as one row of a cheat sheet</li>
+        </ol>
+      </div>
+    </a>
+
+    <a class="card wide" href="distributed-databases/index.html" style="--accent:#22c55e">
+      <div class="body">
+        <div class="card-head">
+          <div class="mono">P2</div>
+          <div><h3>Part 2 &middot; Distributed Databases: Replication, Partitioning &amp; Consensus</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="distributed-databases">23</span> slides</div></div>
+        </div>
+        <p>How distributed databases differ: single-leader, multi-leader and leaderless replication (with an interactive quorum lab), partitioning, request routing, consensus, distributed transactions, and clocks and consistency.</p>
+        <div class="chips"><span class="chip">Replication models</span><span class="chip">Routing &amp; metadata</span><span class="chip">Raft / Paxos / gossip</span><span class="chip">Atomic commit</span></div>
+        <span class="open">Open slides &rarr;</span>
+      </div>
+      <div class="side">
+        <strong style="color:var(--text)">Covers</strong>
+        <ol>
+          <li>Any node vs router vs smart client</li>
+          <li>Committing across partitions</li>
+          <li>TrueTime, HLC and timestamp oracles</li>
+          <li>A topology cheat sheet for five archetypes</li>
+        </ol>
+      </div>
+    </a>
+
+    <a class="card wide" href="database-transactions/index.html" style="--accent:#ec4899">
+      <div class="body">
+        <div class="card-head">
+          <div class="mono">P3</div>
+          <div><h3>Part 3 &middot; Transactions: ACID, Isolation &amp; Concurrency Control</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="database-transactions">20</span> slides</div></div>
+        </div>
+        <p>What a commit promises: ACID unpacked, durability settings, isolation anomalies (with an interactive lab that runs two transactions against each other), MVCC, locking, serializable snapshot isolation, and transactions in NoSQL databases.</p>
+        <div class="chips"><span class="chip">ACID</span><span class="chip">Isolation levels</span><span class="chip">MVCC &amp; locking</span><span class="chip">SSI</span></div>
+        <span class="open">Open slides &rarr;</span>
+      </div>
+      <div class="side">
+        <strong style="color:var(--text)">Covers</strong>
+        <ol>
+          <li>The log, and when &ldquo;OK&rdquo; is actually safe</li>
+          <li>Six anomalies and the levels that prevent them</li>
+          <li>Why REPEATABLE READ differs between databases</li>
+          <li>Default vs strongest isolation per database</li>
         </ol>
       </div>
     </a>
@@ -190,8 +232,8 @@
     <a class="card wide" href="database-anatomy-part2/index.html" style="--accent:#7f9bff">
       <div class="body">
         <div class="card-head">
-          <div class="mono">DB2</div>
-          <div><h3>Database Anatomy, Part 2: Analytics, Lakehouses &amp; Vectors</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="database-anatomy-part2">17</span> slides</div></div>
+          <div class="mono">P4</div>
+          <div><h3>Part 4 &middot; Analytical Databases: Columnar, Lakehouses &amp; Vectors</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="database-anatomy-part2">17</span> slides</div></div>
         </div>
         <p>The workloads that flip the OLTP defaults: columnar storage and OLAP, warehouses and lakehouses on object storage, vector search with an interactive HNSW demo, time-series, graph and search engines.</p>
         <div class="chips"><span class="chip">Columnar &amp; OLAP</span><span class="chip">Lakehouse</span><span class="chip">HNSW</span><span class="chip">Time-series</span></div>
@@ -204,27 +246,6 @@
           <li>Warehouses, lakehouses and table formats</li>
           <li>ANN indexes: pgvector vs dedicated engines</li>
           <li>A decision matrix from workload to engine</li>
-        </ol>
-      </div>
-    </a>
-
-    <a class="card wide" href="distributed-databases/index.html" style="--accent:#22c55e">
-      <div class="body">
-        <div class="card-head">
-          <div class="mono">DB3</div>
-          <div><h3>Distributed OLTP Databases, Classified</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="distributed-databases">24</span> slides</div></div>
-        </div>
-        <p>How distributed OLTP databases differ: single-leader, multi-leader and leaderless replication (with an interactive quorum lab), partitioning, request routing and where the partition map lives, consensus, transaction isolation and clocks.</p>
-        <div class="chips"><span class="chip">Replication models</span><span class="chip">Routing &amp; metadata</span><span class="chip">Raft / Paxos / gossip</span><span class="chip">Isolation levels</span></div>
-        <span class="open">Open slides &rarr;</span>
-      </div>
-      <div class="side">
-        <strong style="color:var(--text)">Covers</strong>
-        <ol>
-          <li>Any node vs router vs smart client</li>
-          <li>Default vs strongest isolation per database</li>
-          <li>TrueTime, HLC and timestamp oracles</li>
-          <li>Topology and transactions cheat sheets</li>
         </ol>
       </div>
     </a>

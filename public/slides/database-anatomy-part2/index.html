@@ -1,15 +1,15 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Database Anatomy, Part 2: Analytics, Lakehouses &amp; Vectors</title>
-<meta name="description" content="Database Anatomy, Part 2: a 17-slide visual guide to the analytical and specialized side of databases: OLAP and columnar storage, warehouses and lakehouses, vector search with HNSW, time-series, graph and search engines.">
+<title>Part 4 · Analytical Databases: Columnar, Lakehouses &amp; Vectors</title>
+<meta name="description" content="Part 4 of A Field Guide to Databases: a 17-slide visual guide to the analytical and specialized side of databases: OLAP and columnar storage, warehouses and lakehouses, vector search with HNSW, time-series, graph and search engines.">
 <link rel="canonical" href="https://gouravb20.github.io/learn/slides/database-anatomy-part2/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="System Design Notes">
-<meta property="og:title" content="Database Anatomy, Part 2: Analytics, Lakehouses &amp; Vectors">
-<meta property="og:description" content="A 17-slide visual guide to OLAP and columnar storage, warehouses and lakehouses, vector search with HNSW and time-series databases.">
+<meta property="og:title" content="Part 4 · Analytical Databases: Columnar, Lakehouses &amp; Vectors">
+<meta property="og:description" content="Part 4 of A Field Guide to Databases: a 17-slide visual guide to OLAP and columnar storage, warehouses and lakehouses, vector search with HNSW, time-series, graph and search engines.">
 <meta property="og:url" content="https://gouravb20.github.io/learn/slides/database-anatomy-part2/">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
@@ -147,6 +147,7 @@
   strong { font-weight: 650; }
   code, .mono { font-family: var(--mono); }
   mark { background: var(--warm-soft); color: var(--warm); padding: 0 .25em; border-radius: 3px; font-weight: 600; }
+  .nw { white-space: nowrap; }
   .accent { color: var(--accent); }
 
   /* ---------- fixed chrome ---------- */
@@ -156,12 +157,12 @@
   #hud { position: fixed; z-index: 50; right: 16px;
     bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     display: flex; align-items: center; gap: 8px; }
-  .hud-btn, #theme-toggle {
+  .hud-btn, #theme-toggle, #home-link {
     width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border-strong);
     background: var(--surface); color: var(--fg); cursor: pointer; font-size: 16px;
     display: grid; place-items: center; box-shadow: var(--shadow); font-family: var(--body);
   }
-  .hud-btn:hover, #theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .hud-btn:hover, #theme-toggle:hover, #home-link:hover { border-color: var(--accent); color: var(--accent); }
   #counter { font-family: var(--mono); font-size: .8rem; color: var(--muted);
     background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
     padding: 0 10px; height: 38px; display: grid; place-items: center; min-width: 58px; box-shadow: var(--shadow);}
@@ -316,6 +317,7 @@
   /* in-deck links */
   .go { font-family: var(--mono); font-size: .8rem; color: var(--accent); text-decoration: none; }
   a.go:hover { text-decoration: underline; }
+  .go.inline { font-family: inherit; font-size: inherit; }
 </style>
 
 <style>
@@ -392,9 +394,24 @@
   .lg-q { background: var(--warm); width: 10px !important; height: 10px !important; clip-path: polygon(40% 0,60% 0,60% 40%,100% 40%,100% 60%,60% 60%,60% 100%,40% 100%,40% 60%,0 60%,0 40%,40% 40%); border-radius: 0 !important; }
 </style>
 
+<style>
+  /* short laptop screens (720–820 px tall): tighten the slide rhythm instead of scrolling */
+  @media (max-height: 820px) and (min-width: 861px){ .slide { gap: 16px; padding-block: 44px 56px; } }
+  /* segmented controls hug their buttons instead of stretching to the column width */
+  .slide > .seg { width: fit-content; }
+  p, .lead, .muted { text-wrap: pretty; }
+  /* home link (top right, next to the theme toggle), same as Parts 1–3 */
+  #home-link { position: fixed; top: calc(14px + env(safe-area-inset-top,0px)); right: 62px; z-index: 50; text-decoration: none; font-size: 19px; }
+  #home-link .site-mark {
+    width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center;
+    background: #dc2626; color: #fff; font-weight: 800; font-size: 14px; line-height: 1;
+  }
+  #home-link:hover .site-mark { color: #fff; }
+</style>
 </head>
 <body>
 <div id="progress"></div>
+<a id="home-link" href="../../index.html" aria-label="Home" title="Home"><span class="site-mark">L</span></a>
 <button id="theme-toggle" aria-label="Toggle light / dark theme" title="Toggle theme">◐</button>
 
 <main id="deck">
@@ -402,15 +419,16 @@
   <!-- 1 — TITLE -->
   <section class="slide" id="s1" style="justify-content:center;">
     <div>
-      <p class="eyebrow">Database Anatomy · Part 2 of 3</p>
+      <p class="eyebrow">A field guide · Part 4 of 4 · analytical databases</p>
       <h1>The <span class="accent">analytical</span> &amp;<br><span class="accent">specialized</span> side.</h1>
       <p class="lead" style="margin-top:18px;">The workloads that flip the OLTP defaults: scanning billions of rows, searching by meaning, and storing data indexed by time.</p>
       <div class="tag-row" style="margin-top:22px;">
         <span class="pill">OLAP &amp; columnar</span><span class="pill">warehouse &amp; lakehouse</span><span class="pill">vectors &amp; HNSW</span><span class="pill">time-series</span><span class="pill">graph &amp; search</span>
       </div>
       <p class="muted" style="margin-top:26px; font-size:.85rem;">Navigate with <span class="kbd">↓</span> <span class="kbd">↑</span> <span class="kbd">Space</span> or the arrows, bottom-right. Press <span class="kbd">G</span> or tap the slide counter to see every slide and jump to one.</p>
+      <p class="muted" style="margin-top:8px; font-size:.85rem;">The rest of the series: <a class="go inline" href="../database-guide/index.html">Part 1 · models, storage, architecture</a> · <a class="go inline" href="../distributed-databases/index.html">Part 2 · distributed databases</a> · <a class="go inline" href="../database-transactions/index.html">Part 3 · transactions</a></p>
     </div>
-    <div class="foot">DATABASES / 01</div>
+    <div class="foot">ANALYTICAL DATABASES / 01</div>
   </section>
   <!-- 2 — OLTP VS OLAP -->
   <section class="slide" id="s2">
@@ -431,7 +449,7 @@
         <tr><td>Typical shape</td><td>Normalized, many small tables</td><td>Denormalized fact tables + dimensions</td></tr>
       </tbody>
     </table></div>
-    <p class="muted" style="font-size:.88rem;">The right-hand column is why the storage layout has to change, not just the query planner.</p>
+    <p class="muted" style="font-size:.88rem;">The right-hand column is why the storage layout has to change, not just the query planner. The split was introduced in <a class="go inline" href="../database-guide/index.html#s2">Part 1</a>.</p>
     <div class="foot">OLTP vs OLAP / 02</div>
   </section>
   <!-- 3 — ROW VS COLUMNAR -->
@@ -458,9 +476,9 @@
       <h2>Three techniques that compound</h2>
     </div>
     <div class="grid cols-3">
-      <div class="card"><h3 class="accent">1 · Compression</h3><p>One column holds one type in a narrow range, so it compresses far better than mixed rows. <strong>Dictionary</strong> (strings → small ints), <strong>RLE</strong> (value, count), <strong>delta / frame-of-reference</strong>, <strong>bit-packing</strong>.</p></div>
+      <div class="card"><h3 class="accent">1 · Compression</h3><p>One column holds one type in a narrow range, so it compresses far better than mixed rows. <strong>Dictionary</strong> (strings → small ints), <strong>RLE</strong> (value, count), <strong>delta / frame-of-reference</strong>, <strong style="white-space:nowrap">bit-packing</strong>.</p></div>
       <div class="card"><h3 class="accent">2 · Vectorized execution</h3><p>Operators process batches (often 1k–4k values) instead of one row at a time: fewer calls per value, <strong>SIMD</strong>-friendly loops, data that stays in CPU cache. Some engines compile the pipeline to machine code instead.</p></div>
-      <div class="card"><h3 class="accent">3 · Data skipping</h3><p>Each file or block keeps <strong>min/max</strong> stats (zone maps). <code>WHERE ts &gt;= '2026-09-01'</code> skips whole blocks unread. A good <strong>sort / clustering key</strong> makes pruning far more effective.</p></div>
+      <div class="card"><h3 class="accent">3 · Data skipping</h3><p>Each file or block keeps <strong>min/max</strong> stats (zone maps). <code style="white-space:nowrap">WHERE ts &gt;= '2026-09-01'</code> skips whole blocks unread. A good <strong>sort / clustering key</strong> makes pruning far more effective.</p></div>
     </div>
     <div class="grid cols-2">
       <div class="card" style="border-color:var(--warm);"><h3 style="color:var(--warm)">What you pay</h3><p><strong>Point updates are expensive</strong> (one row touches every column file), <strong>row reconstruction</strong> costs extra when you select many columns, and single-row inserts are inefficient, so writes are batched.</p></div>
@@ -471,22 +489,22 @@
   <!-- 5 — WAREHOUSE ARCHITECTURE -->
   <section class="slide" id="s5">
     <div>
-      <p class="eyebrow">Architecture · warehouse</p>
-      <h2>Warehouses keep state in object storage and rent compute</h2>
+      <p class="eyebrow">Architecture · warehouse · disaggregated, shared storage</p>
+      <h2>Warehouses keep one shared copy of data and rent compute</h2>
     </div>
     <div class="split">
       <div>
         <ul class="ticks">
-          <li><strong>One copy of data</strong> as immutable columnar files on object storage: cheap, durable, effectively unlimited.</li>
-          <li><strong>Many compute clusters</strong>, stateless and elastic, one per workload, so BI and ELT never fight over the same CPUs. Pause compute and you stop paying for it.</li>
+          <li><strong>One copy of data</strong> as immutable columnar files on object storage that every compute node can read: cheap, durable, effectively unlimited.</li>
+          <li><strong>Many compute clusters</strong>, one per workload, so BI and ELT never fight over the same CPUs. They own no data, only caches, so you can resize them freely, or pause them and stop paying.</li>
           <li><strong>A metadata layer</strong> tracks which files make up each table, per-file stats for pruning, and the transaction log that gives snapshots and time travel.</li>
-          <li><strong>The cost</strong>: cold reads cross the network, so engines lean on local SSD caches, result caches and aggressive pruning.</li>
+          <li><strong>The cost</strong>: cold reads cross the network, so engines lean on local SSD caches, result caches and aggressive pruning. A cache is a disposable copy, not a partition: losing a node loses no data.</li>
         </ul>
-        <p class="muted" style="margin-top:12px; font-size:.88rem;">This is Part 1's Axis 03 (compute ⟂ storage) pushed to its limit.</p>
+        <p class="muted" style="margin-top:12px; font-size:.88rem;">This is Part 1's <a class="go inline" href="../database-guide/index.html#s10">disaggregated, shared storage (C3)</a> pushed to its limit.</p>
       </div>
       <div class="panel-light">
-<svg class="dgm" viewBox="0 0 420 300" role="img" aria-label="Warehouse: several compute clusters share one metadata layer and one copy of columnar files in object storage" style="max-width:460px"><defs><marker id="w1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="w1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker></defs><rect class="cl" x="8" y="6" width="404" height="92" rx="12"/><text class="lbl" x="22" y="26">compute — stateless, elastic, per workload</text><rect class="n-b" x="22" y="40" width="116" height="44" rx="8"/><text x="80.0" y="59.0" text-anchor="middle">cluster A</text><text class="sub" x="80.0" y="74.0" text-anchor="middle">BI dashboards</text><rect class="n-b" x="152" y="40" width="116" height="44" rx="8"/><text x="210.0" y="59.0" text-anchor="middle">cluster B</text><text class="sub" x="210.0" y="74.0" text-anchor="middle">ELT jobs</text><rect class="n-b" x="282" y="40" width="116" height="44" rx="8"/><text x="340.0" y="59.0" text-anchor="middle">cluster C</text><text class="sub" x="340.0" y="74.0" text-anchor="middle">ad hoc</text><path class="ln" d="M80 84 L120 124" marker-end="url(#w1)"/><path class="ln" d="M210 84 L210 124" marker-end="url(#w1)"/><path class="ln" d="M340 84 L300 124" marker-end="url(#w1)"/><rect class="n-g" x="22" y="124" width="376" height="48" rx="8"/><text x="210.0" y="145.0" text-anchor="middle">metadata · catalog · transactions</text><text class="sub" x="210.0" y="160.0" text-anchor="middle">per-file min/max stats → prune before reading</text><path class="ln" d="M120 172 L120 210" marker-end="url(#w1)"/><path class="ln" d="M210 172 L210 210" marker-end="url(#w1)"/><path class="ln" d="M300 172 L300 210" marker-end="url(#w1)"/><rect class="cl" x="8" y="200" width="404" height="92" rx="12"/><text class="lbl" x="22" y="220">object storage — durable, cheap, shared</text><rect class="n-w" x="22" y="232" width="84" height="46" rx="8"/><text x="64.0" y="252.0" text-anchor="middle">file 1</text><text class="sub" x="64.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="118" y="232" width="84" height="46" rx="8"/><text x="160.0" y="252.0" text-anchor="middle">file 2</text><text class="sub" x="160.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="214" y="232" width="84" height="46" rx="8"/><text x="256.0" y="252.0" text-anchor="middle">file 3</text><text class="sub" x="256.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="310" y="232" width="84" height="46" rx="8"/><text x="352.0" y="252.0" text-anchor="middle">file 4</text><text class="sub" x="352.0" y="267.0" text-anchor="middle">columnar</text></svg>
-        <p class="cap">compute ⟂ metadata ⟂ storage</p>
+<svg class="dgm" viewBox="0 0 420 300" role="img" aria-label="Warehouse: several compute clusters share one metadata layer and one copy of columnar files in object storage" style="max-width:460px"><defs><marker id="w1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="w1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker></defs><rect class="cl" x="8" y="6" width="404" height="92" rx="12"/><text class="lbl" x="22" y="26">compute: owns no data, only caches · per workload</text><rect class="n-b" x="22" y="40" width="116" height="44" rx="8"/><text x="80.0" y="59.0" text-anchor="middle">cluster A</text><text class="sub" x="80.0" y="74.0" text-anchor="middle">BI dashboards</text><rect class="n-b" x="152" y="40" width="116" height="44" rx="8"/><text x="210.0" y="59.0" text-anchor="middle">cluster B</text><text class="sub" x="210.0" y="74.0" text-anchor="middle">ELT jobs</text><rect class="n-b" x="282" y="40" width="116" height="44" rx="8"/><text x="340.0" y="59.0" text-anchor="middle">cluster C</text><text class="sub" x="340.0" y="74.0" text-anchor="middle">ad hoc</text><path class="ln" d="M80 84 L120 124" marker-end="url(#w1)"/><path class="ln" d="M210 84 L210 124" marker-end="url(#w1)"/><path class="ln" d="M340 84 L300 124" marker-end="url(#w1)"/><rect class="n-g" x="22" y="124" width="376" height="48" rx="8"/><text x="210.0" y="145.0" text-anchor="middle">metadata · catalog · transactions</text><text class="sub" x="210.0" y="160.0" text-anchor="middle">per-file min/max stats → prune before reading</text><path class="ln" d="M120 172 L120 210" marker-end="url(#w1)"/><path class="ln" d="M210 172 L210 210" marker-end="url(#w1)"/><path class="ln" d="M300 172 L300 210" marker-end="url(#w1)"/><rect class="cl" x="8" y="200" width="404" height="92" rx="12"/><text class="lbl" x="22" y="220">shared storage: one copy, every cluster reads it</text><rect class="n-w" x="22" y="232" width="84" height="46" rx="8"/><text x="64.0" y="252.0" text-anchor="middle">file 1</text><text class="sub" x="64.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="118" y="232" width="84" height="46" rx="8"/><text x="160.0" y="252.0" text-anchor="middle">file 2</text><text class="sub" x="160.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="214" y="232" width="84" height="46" rx="8"/><text x="256.0" y="252.0" text-anchor="middle">file 3</text><text class="sub" x="256.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="310" y="232" width="84" height="46" rx="8"/><text x="352.0" y="252.0" text-anchor="middle">file 4</text><text class="sub" x="352.0" y="267.0" text-anchor="middle">columnar</text></svg>
+        <p class="cap">disaggregated, shared storage · metadata in between</p>
       </div>
     </div>
     <div class="foot">WAREHOUSE / 05</div>
@@ -496,18 +514,18 @@
     <div>
       <p class="eyebrow">Architecture · lakehouse</p>
       <h2>A lakehouse is still a warehouse</h2>
-      <p class="lead" style="margin-top:10px;">Same recipe: columnar files, a metadata layer, elastic compute. Only the files and table format are <strong>open</strong>, and you own them.</p>
+      <p class="lead" style="margin-top:10px;">Same recipe as a warehouse; only the file and table formats are <strong>open</strong>, and you own the files.</p>
     </div>
     <div class="lh-grid" role="table" aria-label="Warehouse and lakehouse compared layer by layer">
       <div class="hd" role="columnheader">Layer</div><div class="hd" role="columnheader">Warehouse</div><div class="hd" role="columnheader">Lakehouse</div>
-      <div class="lab">compute</div><div>The vendor's engine</div><div>Any engine on the same tables: Spark, Trino, Flink, DuckDB, Databricks; Snowflake and BigQuery can read Iceberg too</div>
-      <div class="lab">metadata · transactions</div><div>Internal catalog and transaction log</div><div><strong>Open table format</strong>: Apache Iceberg, Delta Lake, Apache Hudi. ACID commits, schema evolution, time travel, file-level stats</div>
+      <div class="lab">compute</div><div>The vendor's engine</div><div>Any engine: Spark, Trino, Flink, DuckDB; Snowflake and BigQuery read Iceberg too</div>
+      <div class="lab">metadata · transactions</div><div>Internal catalog and transaction log</div><div><strong>Open table format</strong> (Iceberg, Delta Lake, Hudi): ACID commits, schema evolution, time travel</div>
       <div class="lab">file format</div><div>Proprietary columnar files</div><div>Open columnar files: Parquet (or ORC)</div>
       <div class="lab">storage</div><div>Object storage managed by the vendor</div><div>Your own bucket: S3, GCS, ADLS</div>
-      <div class="lab same">same idea</div><div class="same" style="grid-column: span 2;">columnar + immutable files · compute ⟂ storage · metadata-driven pruning · snapshots</div>
+      <div class="lab same">same idea</div><div class="same" style="grid-column: span 2;">immutable columnar files · disaggregated, shared storage · metadata pruning · snapshots</div>
     </div>
     <div class="grid cols-2">
-      <div class="card"><h3>Where it came from</h3><p>A <strong>data lake</strong> was just files in a bucket: cheap and open, but no transactions, no schema enforcement, no reliable concurrent writes. Table formats added the warehouse features on top of those files; the name “lakehouse” was popularized by Databricks.</p></div>
+      <div class="card"><h3>Where it came from</h3><p>A <strong>data lake</strong> was just files in a bucket: cheap and open, but no transactions and no schema enforcement. Table formats added those on top; Databricks popularized the name.</p></div>
       <div class="card" style="border-color:var(--warm);"><h3 style="color:var(--warm)">What you take on</h3><p>Picking and running a <strong>catalog</strong>, compacting <strong>small files</strong>, expiring old snapshots, and accepting that performance features (caching, clustering, indexes) differ per engine.</p></div>
     </div>
     <div class="foot">LAKEHOUSE / 06</div>
@@ -516,21 +534,21 @@
   <section class="slide" id="s7">
     <div>
       <p class="eyebrow">OLAP systems</p>
-      <h2>Seven engines, seven trade-off points</h2>
+      <h2>Seven engines, seven trade-offs</h2>
     </div>
     <div class="matrix-wrap"><table class="dense">
-      <thead><tr><th>System</th><th>Deployment</th><th>Storage</th><th>Compute ⁄ storage</th><th>Sweet spot</th></tr></thead>
+      <thead><tr><th>System</th><th>Deployment</th><th>Storage</th><th>Architecture</th><th>Sweet spot</th></tr></thead>
       <tbody>
-        <tr><td>Snowflake</td><td>Managed SaaS</td><td>Immutable columnar micro-partitions on object storage</td><td>Separated (virtual warehouses)</td><td>Enterprise warehousing, BI, elastic concurrency</td></tr>
-        <tr><td>BigQuery</td><td>Serverless</td><td>Capacitor columnar format on Google's distributed file system</td><td>Separated (slot-based)</td><td>Ad hoc scans over huge datasets, no cluster to run</td></tr>
-        <tr><td>Redshift</td><td>Managed cluster or serverless</td><td>Columnar, sort and distribution keys</td><td>Separated on RA3 / serverless</td><td>AWS-centric warehousing</td></tr>
-        <tr><td>Databricks SQL</td><td>Managed, on your cloud account</td><td>Delta Lake (Parquet + transaction log) in your bucket</td><td>Separated</td><td>Lakehouse: BI, data engineering and ML on one copy of open files</td></tr>
-        <tr><td>ClickHouse</td><td>Self-managed or cloud</td><td>MergeTree parts, sparse primary index</td><td>Coupled by default; separated in ClickHouse Cloud</td><td>Real-time analytics, very high ingest, sub-second aggregates</td></tr>
-        <tr><td>Druid / Pinot</td><td>Self-managed or cloud</td><td>Time-partitioned segments, pre-aggregation, rich indexes</td><td>Separated tiers</td><td>User-facing analytics at high QPS, low latency</td></tr>
-        <tr><td>DuckDB</td><td>Embedded, in-process</td><td>Columnar file; reads Parquet / Iceberg directly</td><td>Single node</td><td>Local analytics, notebooks, small data apps</td></tr>
+        <tr><td>Snowflake</td><td>Managed SaaS</td><td>Immutable columnar micro-partitions on object storage</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Enterprise warehousing, BI, elastic concurrency</td></tr>
+        <tr><td>BigQuery</td><td>Serverless</td><td>Capacitor columnar format on Google's distributed file system</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Ad hoc scans over huge datasets, no cluster to run</td></tr>
+        <tr><td>Redshift</td><td>Managed cluster or serverless</td><td>Columnar, sort and distribution keys</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>AWS-centric warehousing</td></tr>
+        <tr><td>Databricks SQL</td><td>Managed, on your cloud account</td><td>Delta Lake (Parquet + transaction log) in your bucket</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Lakehouse: BI, data engineering and ML on one copy of open files</td></tr>
+        <tr><td>ClickHouse</td><td>Self-managed or cloud</td><td>MergeTree parts, sparse primary index</td><td>Shared-nothing;<br>Cloud: disaggregated, <span class="nw">shared storage</span></td><td>Real-time analytics, very high ingest, sub-second aggregates</td></tr>
+        <tr><td>Druid / Pinot</td><td>Self-managed or cloud</td><td>Time-partitioned segments, pre-aggregation, rich indexes</td><td>Hybrid: servers preload segments</td><td>User-facing analytics at high QPS, low latency</td></tr>
+        <tr><td>DuckDB</td><td>Embedded, in-process</td><td>Columnar file; reads Parquet / Iceberg directly</td><td>Embedded: not a cluster</td><td>Local analytics, notebooks, small data apps</td></tr>
       </tbody>
     </table></div>
-    <p class="muted" style="font-size:.82rem;">Details vary by version and edition. Treat this as orientation and confirm in each vendor's docs.</p>
+    <p class="muted" style="font-size:.82rem;">Labels from <a class="go inline" href="../database-guide/index.html#s10">Part 1's cluster architectures</a>. Redshift: RG, RA3, Serverless (DC2: shared-nothing). Druid / Pinot load segments from deep storage.</p>
     <div class="foot">OLAP ENGINES / 07</div>
   </section>
   <!-- 8 — VECTOR INTRO -->
@@ -561,7 +579,7 @@
   <section class="slide" id="s9">
     <div>
       <p class="eyebrow">Vector databases · 2 of 5</p>
-      <h2>ANN indexes: buy speed with a little recall</h2>
+      <h2>ANN indexes trade recall for speed</h2>
       <p class="lead" style="margin-top:10px;">Every index below has a knob that trades recall (did we find the true nearest neighbours?) against latency and memory.</p>
     </div>
     <div class="matrix-wrap"><table class="dense">
@@ -587,11 +605,11 @@
     <div class="split">
       <div>
         <ul class="ticks">
-          <li><strong>Small-world graph</strong>: each vector links to its nearest neighbours; greedy routing (hop to the neighbour closest to the query) reaches the right region in few hops.</li>
+          <li><strong>Small-world graph</strong>: each vector links to its nearest neighbours, so hopping toward the query reaches the right region in a few steps.</li>
           <li><strong>Layers</strong>: every vector is on L0; each also appears higher up with exponentially falling probability, like a skip list. Upper layers are sparse express lanes.</li>
-          <li><strong>Search</strong>: from the top entry point, hop greedily until no neighbour is closer, drop a layer, repeat. On L0, beam-search keeping the <code>efSearch</code> best candidates; return the top k.</li>
+          <li><strong>Search</strong>: hop greedily from the top entry point until no neighbour is closer, then drop a layer. On L0, keep the <code>efSearch</code> best candidates; return the top k.</li>
           <li><strong>Insert</strong>: draw the vector's top layer at random, find neighbours with the same search (<code>efConstruction</code>), link to <code>M</code> per layer, prune over-full neighbours.</li>
-          <li><strong>Costs</strong>: graph and vectors usually live in RAM; deletes leave tombstones; heavy filters can cut the graph into unreachable pieces.</li>
+          <li><strong>Costs</strong>: graph and vectors usually live in RAM; deletes leave tombstones; heavy filters can disconnect the graph.</li>
         </ul>
       </div>
       <div class="panel-light">
@@ -607,7 +625,7 @@
     <div>
       <p class="eyebrow">Vector databases · 4 of 5 · interactive</p>
       <h2>Watch an HNSW search</h2>
-      <p class="lead" style="margin-top:10px;">A real HNSW graph of 150 2-D vectors, built in your browser. <strong>Click any panel</strong> to place a query.</p>
+      <p class="lead" style="margin-top:10px;">A live HNSW graph of 150 points. <strong>Click a panel</strong> to query it.</p>
     </div>
     <div class="lsm-controls">
       <button class="primary" id="hn-new">New random query</button>
@@ -633,8 +651,8 @@
       <thead><tr><th>System</th><th>Form</th><th>Indexes</th><th>Notable trait</th></tr></thead>
       <tbody>
         <tr><td>pgvector</td><td>PostgreSQL extension</td><td>HNSW, IVFFlat</td><td>Vectors next to relational data: joins, transactions, existing backups and tooling</td></tr>
-        <tr><td>Pinecone</td><td>Managed service</td><td>Proprietary</td><td>Fully managed, serverless-style scaling</td></tr>
-        <tr><td>Milvus</td><td>Distributed, open source</td><td>HNSW, IVF, PQ variants, DiskANN, more</td><td>Separated storage, query and index nodes; built for very large collections</td></tr>
+        <tr><td>Pinecone</td><td>Managed service</td><td>Proprietary</td><td>Fully managed. Serverless indexes are disaggregated, shared storage: executors cache data from object storage</td></tr>
+        <tr><td>Milvus</td><td>Distributed, open source</td><td>HNSW, IVF, PQ variants, DiskANN, more</td><td>Disaggregated, shared storage: query nodes cache segments from object storage (fetched on demand with tiered storage). Built for very large collections</td></tr>
         <tr><td>Qdrant</td><td>Open source (Rust), managed option</td><td>HNSW + quantization</td><td>Strong payload filtering alongside vector search</td></tr>
         <tr><td>Weaviate</td><td>Open source, managed option</td><td>HNSW</td><td>Hybrid keyword + vector search built in</td></tr>
       </tbody>
@@ -669,16 +687,16 @@ v[n] <span class="k">XOR</span> v[n-1]  →  store only the meaningful middle bi
   <section class="slide" id="s14">
     <div>
       <p class="eyebrow">Time-series · landscape</p>
-      <h2>Five engines, three architectural styles</h2>
+      <h2>Five engines, three styles</h2>
     </div>
     <div class="matrix-wrap"><table class="dense">
       <thead><tr><th>System</th><th>Style</th><th>Query language</th><th>Notes</th></tr></thead>
       <tbody>
-        <tr><td>Prometheus</td><td>Purpose-built, local TSDB, pull-based scraping</td><td>PromQL</td><td>The standard for infrastructure metrics. Single-node storage; long-term and clustered setups use remote write or companion systems.</td></tr>
-        <tr><td>VictoriaMetrics</td><td>Purpose-built, Prometheus-compatible</td><td>MetricsQL (PromQL superset)</td><td>Often used as long-term, horizontally scalable Prometheus storage.</td></tr>
-        <tr><td>InfluxDB</td><td>Purpose-built</td><td>SQL (v3), InfluxQL, Flux (v2)</td><td>Version 3 is built on Apache Arrow, DataFusion and Parquet; check which major version you run.</td></tr>
+        <tr><td>Prometheus</td><td>Metrics TSDB, pull-based scraping</td><td>PromQL</td><td>The standard for infrastructure metrics. Single server: local storage is not clustered or replicated; long-term and clustered setups use remote write or companion systems.</td></tr>
+        <tr><td>VictoriaMetrics</td><td>Metrics TSDB, Prometheus-compatible</td><td>MetricsQL (PromQL superset)</td><td>Often used as long-term Prometheus storage. The cluster version is disaggregated, shared-nothing storage: vmselect runs queries, and each vmstorage node owns its share of the series.</td></tr>
+        <tr><td>InfluxDB</td><td>Columnar engine</td><td>SQL (v3), InfluxQL, Flux (v2)</td><td>Version 3 is built on Apache Arrow, DataFusion and Parquet; check which major version you run.</td></tr>
         <tr><td>TimescaleDB</td><td>PostgreSQL extension</td><td>SQL</td><td>Hypertables auto-partitioned into time chunks, with columnar compression and the full Postgres ecosystem.</td></tr>
-        <tr><td>QuestDB</td><td>Columnar, purpose-built</td><td>SQL + time extensions</td><td>Aimed at very high ingest rates and fast time-window queries.</td></tr>
+        <tr><td>QuestDB</td><td>Columnar engine</td><td>SQL + time extensions</td><td>Aimed at very high ingest rates and fast time-window queries.</td></tr>
       </tbody>
     </table></div>
     <p class="muted" style="font-size:.85rem;">ClickHouse and Druid handle time-series well too: the line between “time-series DB” and “real-time OLAP” is blurry by design.</p>
@@ -709,16 +727,16 @@ v[n] <span class="k">XOR</span> v[n-1]  →  store only the meaningful middle bi
     <div class="matrix-wrap"><table class="dense" id="mx">
       <thead><tr><th>Workload</th><th>First candidates</th><th>Why</th><th>Watch out for</th></tr></thead>
       <tbody>
-        <tr data-c="olap"><td>Ad hoc analytics on TBs</td><td>BigQuery, Snowflake, Redshift</td><td>Elastic compute over columnar data in object storage</td><td>Cost per byte scanned or per compute-second</td></tr>
-        <tr data-c="olap"><td>One copy of data, many engines</td><td>Lakehouse: Iceberg or Delta Lake + Spark, Trino, Databricks</td><td>Open table format in your bucket, ACID and time travel</td><td>Catalog choice, small-file compaction</td></tr>
-        <tr data-c="olap"><td>Real-time, user-facing dashboards</td><td>ClickHouse, Druid, Pinot</td><td>Fast ingest plus sub-second aggregates at high QPS</td><td>Joins and updates more limited than a warehouse</td></tr>
-        <tr data-c="olap"><td>Local / embedded analytics</td><td>DuckDB</td><td>In-process columnar engine, reads Parquet directly</td><td>Single node</td></tr>
-        <tr data-c="vec"><td>Semantic search / RAG, moderate scale</td><td>pgvector (HNSW)</td><td>Vectors beside relational data, familiar ops</td><td>Index build time and RAM as it grows</td></tr>
-        <tr data-c="vec"><td>Large-scale vector search with filters</td><td>Milvus, Qdrant, Pinecone, Weaviate</td><td>Purpose-built ANN, distributed indexes, filtering</td><td>Filtered recall; keeping embeddings in sync</td></tr>
-        <tr data-c="ts"><td>Infrastructure metrics</td><td>Prometheus (+ VictoriaMetrics long-term)</td><td>Label model, PromQL, exporter ecosystem</td><td>Label cardinality</td></tr>
-        <tr data-c="ts"><td>IoT / sensor data with SQL</td><td>TimescaleDB, QuestDB, InfluxDB 3</td><td>Time chunks, compression, SQL access</td><td>Late or out-of-order data</td></tr>
-        <tr data-c="oth"><td>Multi-hop relationship queries</td><td>Neo4j, Neptune</td><td>Traversal-first storage and query languages</td><td>Supernodes, sharding</td></tr>
-        <tr data-c="oth"><td>Full-text relevance search</td><td>Elasticsearch, OpenSearch</td><td>Inverted index, BM25, faceting</td><td>Not a system of record</td></tr>
+        <tr data-c="olap"><td>Ad hoc analytics on TBs</td><td>BigQuery, Snowflake, Redshift</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Cost per byte or per compute-second</td></tr>
+        <tr data-c="olap"><td>One copy, many engines</td><td>Iceberg or Delta Lake + Spark, Trino</td><td>Open table format, ACID, time travel</td><td>Catalog choice, small files</td></tr>
+        <tr data-c="olap"><td>Real-time dashboards</td><td>ClickHouse, Druid, Pinot</td><td>Fast ingest, sub-second aggregates</td><td>Weaker joins and updates</td></tr>
+        <tr data-c="olap"><td>Embedded analytics</td><td>DuckDB</td><td>In-process, reads Parquet directly</td><td>Embedded: one process, one machine</td></tr>
+        <tr data-c="vec"><td>RAG, moderate scale</td><td>pgvector (HNSW)</td><td>Vectors beside relational data</td><td>Index build time, RAM</td></tr>
+        <tr data-c="vec"><td>Vector search at scale</td><td>Milvus, Qdrant, Pinecone, Weaviate</td><td>Distributed ANN, filtering</td><td>Filtered recall, embedding sync</td></tr>
+        <tr data-c="ts"><td>Infrastructure metrics</td><td>Prometheus (+ VictoriaMetrics)</td><td>Labels, PromQL, exporters</td><td>Label cardinality</td></tr>
+        <tr data-c="ts"><td>IoT / sensors with SQL</td><td>TimescaleDB, QuestDB, InfluxDB 3</td><td>Time chunks, compression, SQL</td><td>Late, out-of-order data</td></tr>
+        <tr data-c="oth"><td>Multi-hop relationships</td><td>Neo4j, Neptune</td><td>Traversal-first storage</td><td>Supernodes, sharding</td></tr>
+        <tr data-c="oth"><td>Full-text search</td><td>Elasticsearch, OpenSearch</td><td>Inverted index, BM25, facets</td><td>Not a system of record</td></tr>
       </tbody>
     </table></div>
     <div class="foot">CHEAT SHEET / 16</div>
@@ -726,18 +744,18 @@ v[n] <span class="k">XOR</span> v[n-1]  →  store only the meaningful middle bi
   <!-- 17 — SUMMARY -->
   <section class="slide" id="s17" style="justify-content:center;">
     <div>
-      <p class="eyebrow">Summary · end of Part 2</p>
+      <p class="eyebrow">Summary · end of Part 4</p>
       <h1>What to <span class="accent">remember</span>.</h1>
       <div class="grid cols-4" style="margin-top:28px;">
         <div class="card"><h3>Layout follows access</h3><p>Scans over few columns favour columnar storage, compression, vectorization and data skipping.</p></div>
-        <div class="card"><h3>Lakehouse = warehouse</h3><p>Same architecture: columnar files, metadata, elastic compute. Only the format and ownership are open.</p></div>
+        <div class="card"><h3>Lakehouse = warehouse</h3><p>Same architecture: disaggregated, shared storage with columnar files and metadata. Only the format and ownership are open.</p></div>
         <div class="card"><h3>Vectors need ANN</h3><p>HNSW is a skip list of graphs; <code>efSearch</code> trades recall for latency.</p></div>
         <div class="card"><h3>Specialize deliberately</h3><p>Start from the dominant query, then check what the specialized engine makes you give up.</p></div>
       </div>
-      <p class="lead" style="margin-top:28px;">Thank you — questions?</p>
-      <p style="margin-top:14px;"><a class="go" href="../database-guide/index.html">← Part 1: how databases are classified</a> &nbsp;·&nbsp; <a class="go" href="../distributed-databases/index.html">Part 3: distributed OLTP databases →</a></p>
+      <p class="lead" style="margin-top:28px;">Thank you. Questions?</p>
+      <p style="margin-top:14px;"><a class="go" href="../database-guide/index.html">← Part 1: data models, storage &amp; architecture</a> &nbsp;·&nbsp; <a class="go" href="../distributed-databases/index.html">← Part 2: distributed databases</a> &nbsp;·&nbsp; <a class="go" href="../database-transactions/index.html">← Part 3: transactions</a></p>
     </div>
-    <div class="foot">END · PART 2 / 17</div>
+    <div class="foot">END · PART 4 / 17</div>
   </section>
 
 </main>
@@ -822,11 +840,9 @@ v[n] <span class="k">XOR</span> v[n-1]  →  store only the meaningful middle bi
 
   /* ---------- theme toggle ---------- */
   var tg = document.getElementById("theme-toggle");
-  function prefersDark(){ return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
-  var themed = null; // null = follow system
+  var themed = "dark";
   tg.addEventListener("click", function(){
-    var isDark = themed ? themed === "dark" : prefersDark();
-    themed = isDark ? "light" : "dark";
+    themed = themed === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", themed);
   });
 
