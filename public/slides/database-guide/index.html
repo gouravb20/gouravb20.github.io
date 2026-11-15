@@ -499,7 +499,7 @@
       </div>
       <div class="map-layer one">
         <div class="lname">System<span>where it runs, what's shared</span></div>
-        <div class="card axis"><h3><span class="num">03</span>Deployment &amp; architecture</h3><p>Embedded, single server or cluster. A cluster is <span class="nw">shared-nothing</span>, compute over storage nodes, or compute over a storage service.</p><a class="go" href="#s9">Slides 09–10 →</a></div>
+        <div class="card axis"><h3><span class="num">03</span>Deployment &amp; architecture</h3><p>Embedded, single server or cluster. Clusters: <span class="nw">shared-nothing</span>, compute over storage nodes, or compute over a storage service.</p><a class="go" href="#s9">Slides 09–10 →</a></div>
       </div>
       <div class="series">
         <div class="lname">The rest of the series<span>each part is its own deck</span></div>
@@ -745,7 +745,7 @@
     <div>
       <p class="eyebrow">Axis 03 · system · cluster architecture</p>
       <h2>In a cluster, what do compute and storage share?</h2>
-      <p class="ask"><span>Find the server that serves a key range. C1: it stores the range and runs the queries. C2: it stores the range; SQL runs on a separate tier. C3: it stores nothing; the range lives in a storage service.</span></p>
+      <p class="ask"><span>Find the server that owns a key range. C1: it stores the range and runs the queries. C2: it stores the range; queries run on a separate tier. C3: it keeps only a cache; the range lives in a storage service.</span></p>
     </div>
     <div class="grid cols-3 arch">
       <div class="card tight">
@@ -779,8 +779,8 @@
         <span class="ex">Aurora&nbsp;· Bigtable&nbsp;· HBase&nbsp;· Neon&nbsp;· AlloyDB&nbsp;· <span class="nw">Azure SQL Hyperscale</span></span>
       </div>
     </div>
-    <p class="note"><b>“Shared” means one logical storage system, not one machine:</b> Google's Colossus partitions and replicates data across many machines (shared-nothing underneath). In C2 the database places every replica itself; in C3 the storage service does. On Colossus, <strong>Bigtable</strong> is C3 and <strong>Spanner</strong> is a hybrid: C3 inside a zone, shared-nothing across zones (each read-write or read-only replica keeps a full copy).</p>
-    <p class="read">Patterns, not a standard taxonomy. TiKV can serve other apps too; here TiDB runs it as its own storage nodes.<br>Landmarks: <span class="nw">Stonebraker, “The Case for Shared Nothing” (1986)</span> · <span class="nw">Aurora (SIGMOD 2017)</span> · <span class="nw">TiDB (VLDB 2020)</span></p>
+    <p class="note"><b>“Shared” means one logical storage system, not one machine:</b> Google's Colossus partitions and replicates data across many machines (shared-nothing underneath). In C2 storage nodes answer reads by key; in C3 the storage service only returns pages or files. On Colossus, <strong>Bigtable</strong> is C3 and <strong>Spanner</strong> is a hybrid: C3 inside a zone, shared-nothing across zones (each read-write or read-only replica keeps a full copy).</p>
+    <p class="read">Patterns, not a standard taxonomy. TiKV also runs alone, but under TiDB its nodes still own the ranges they store.<br>Landmarks: <span class="nw">Stonebraker, “The Case for Shared Nothing” (1986)</span> · <span class="nw">Aurora (SIGMOD 2017)</span> · <span class="nw">TiDB (VLDB 2020)</span></p>
     <div class="foot">CLUSTER ARCHITECTURE / 10</div>
   </section>
 
@@ -986,7 +986,7 @@
     <div>
       <p class="eyebrow">Archetype A7 · case study</p>
       <h2>Case study: TiDB</h2>
-      <p class="lead" style="margin-top:10px;">One system where the axes are separate parts you can point at: SQL, storage engine, placement and an analytics copy. It is the canonical design with <a class="go inline" href="#s10">compute over storage nodes</a> (classic TiDB): stateless TiDB servers over TiKV nodes that each hold replicas of their Regions.</p>
+      <p class="lead" style="margin-top:10px;">One system where the axes are separate parts you can point at: SQL, storage engine, placement and an analytics copy. It is the canonical case of <a class="go inline" href="#s10">compute over storage nodes</a> (classic TiDB): stateless TiDB servers over TiKV nodes that each hold replicas of their Regions.</p>
     </div>
     <div class="split">
       <div>
@@ -1069,7 +1069,7 @@
           <tr><td class="name">Aurora<span class="an">A6</span></td><td>Relational</td><td>SQL</td><td class="m-eng-btree">B-tree pages</td><td>compute over a storage service, one writer</td></tr>
           <tr><td class="name">Spanner<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM-style</td><td>hybrid: compute over a storage service per zone, shared-nothing across zones</td></tr>
           <tr><td class="name">CockroachDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (Pebble)</td><td>shared-nothing (Raft per range); multi-tenant cloud: compute over storage nodes</td></tr>
-          <tr><td class="name">TiDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (RocksDB)</td><td>compute over storage nodes (TiKV); TiDB X: compute over a storage service</td></tr>
+          <tr><td class="name">TiDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (RocksDB)</td><td>compute over storage nodes (TiKV); TiDB X: mostly compute over a storage service</td></tr>
         </tbody>
       </table>
     </div>
