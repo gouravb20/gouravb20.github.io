@@ -62,7 +62,8 @@
       { path: "slides/database-guide/", icon: "deck", title: "Part 1 · Models, Storage & Architecture" },
       { path: "slides/distributed-databases/", icon: "deck", title: "Part 2 · Distributed Databases" },
       { path: "slides/database-transactions/", icon: "deck", title: "Part 3 · Transactions" },
-      { path: "slides/database-anatomy-part2/", icon: "deck", title: "Part 4 · Analytical Databases" }
+      { path: "slides/database-anatomy-part2/", icon: "deck", title: "Part 4 · OLAP Databases" },
+      { path: "slides/specialized-databases/", icon: "deck", title: "Part 5 · Specialized Databases" }
     ] }
   ];
 

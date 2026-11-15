@@ -1,4 +1,4 @@
-<!doctype html><html lang="en" data-theme="dark"><head><meta charset=utf8><meta name="description" content="Part 1 of A Field Guide to Databases: a 22-slide visual guide to how databases are classified: the workload, then three axes in three layers (data model &amp; query, storage structure, deployment &amp; architecture), the three cluster architectures (shared-nothing; disaggregated, shared-nothing storage; disaggregated, shared storage), and seven recurring archetypes."><link rel="canonical" href="https://gouravb20.github.io/learn/slides/database-guide/"><meta property="og:type" content="article"><meta property="og:site_name" content="System Design Notes"><meta property="og:title" content="Part 1 · Data Models, Storage &amp; Architecture"><meta property="og:description" content="Part 1 of A Field Guide to Databases: a 22-slide visual guide to how databases are classified: the workload, then three axes in three layers (data model &amp; query, storage structure, deployment &amp; architecture), the three cluster architectures (shared-nothing; disaggregated, shared-nothing storage; disaggregated, shared storage), and seven recurring archetypes."><meta property="og:url" content="https://gouravb20.github.io/learn/slides/database-guide/"><meta name="twitter:card" content="summary"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><link rel="icon" href="../../favicon.svg" type="image/svg+xml"></head><body>
+<!doctype html><html lang="en" data-theme="dark"><head><meta charset=utf8><meta name="description" content="Part 1 of A Field Guide to Databases: a 22-slide visual guide to how databases are classified: the workload, then three axes in three layers (data model &amp; query, storage structure, deployment &amp; architecture), the three cluster architectures (shared-nothing; disaggregated, storage nodes; disaggregated, shared storage), and seven recurring archetypes."><link rel="canonical" href="https://gouravb20.github.io/learn/slides/database-guide/"><meta property="og:type" content="article"><meta property="og:site_name" content="System Design Notes"><meta property="og:title" content="Part 1 · Data Models, Storage &amp; Architecture"><meta property="og:description" content="Part 1 of A Field Guide to Databases: a 22-slide visual guide to how databases are classified: the workload, then three axes in three layers (data model &amp; query, storage structure, deployment &amp; architecture), the three cluster architectures (shared-nothing; disaggregated, storage nodes; disaggregated, shared storage), and seven recurring archetypes."><meta property="og:url" content="https://gouravb20.github.io/learn/slides/database-guide/"><meta name="twitter:card" content="summary"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><link rel="icon" href="../../favicon.svg" type="image/svg+xml"></head><body>
 <title>Part 1 · Data Models, Storage &amp; Architecture</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -353,13 +353,18 @@
   .card .ex { display: block; margin-top: 8px; font-family: var(--mono); font-size: .7rem; color: var(--faint); }
   /* ---------- cluster architectures (C1 · C2 · C3 cards) ---------- */
   .arch .card h3 { margin-top: 8px; text-wrap: balance; }
+  @media (min-width: 861px){ .arch .card h3 { min-height: 2lh; } }
   .arch .card h3 .num { margin-right: 7px; font-weight: 400; }
   .arch .dgm .sub { font-size: 9.5px; }
   .arch .card p + p { margin-top: 4px; }
   .arch .card p strong { color: var(--fg); }
   @media (max-height: 760px) and (min-width: 861px){
     .arch .dgm { max-width: 160px !important; }
-    .arch .card h3 { font-size: .95rem; margin-top: 6px; }
+    .arch .card h3 { font-size: .95rem; margin-top: 4px; }
+    .arch .card.tight { padding: 10px 13px; }
+    .arch .card .panel-light { padding: 4px !important; }
+    .arch .card p + p { margin-top: 2px; }
+    .arch .card .ex { margin-top: 5px; }
     .arch + .note { font-size: .84rem; padding: 7px 12px; }
   }
 
@@ -400,12 +405,13 @@
   .card.exc h3 { color: var(--warm); }
 
   /* ---------- the rest of the series (map + title slide) ---------- */
-  .series { display: grid; grid-template-columns: 170px repeat(3, 1fr); gap: 10px; align-items: stretch; }
+  .series { display: grid; grid-template-columns: 170px repeat(4, 1fr); gap: 10px; align-items: stretch; }
   .series .lname { color: var(--muted); border-left-color: var(--border-strong); }
   .series a.card.part { padding: 9px 13px; }
   .series a.card.part .num { display: block; }
   .series a.card.part p { font-size: .82rem; }
-  @media (max-width: 860px){ .series { grid-template-columns: 1fr 1fr 1fr; } .series .lname { grid-column: 1 / -1; } }
+  @media (min-width: 861px){ .series a.card.part h3 { min-height: 2lh; } }
+  @media (max-width: 860px){ .series { grid-template-columns: 1fr 1fr; } .series .lname { grid-column: 1 / -1; } }
   @media (max-width: 640px){ .series { grid-template-columns: 1fr; } }
 
   /* ---------- archetype index + cheat-sheet tags ---------- */
@@ -419,6 +425,7 @@
   table.matrix.wrap th, table.matrix.wrap td { padding: 4px 9px; }
   table.matrix.wrap td { white-space: normal; vertical-align: top; }
   table.matrix.wrap th { white-space: normal; vertical-align: bottom; }
+  table.matrix.wrap th:nth-child(4) { white-space: nowrap; }
   table.matrix.wrap td.name, table.matrix.wrap td:nth-child(2), table.matrix.wrap td:nth-child(4) { white-space: nowrap; }
 </style>
 
@@ -431,7 +438,7 @@
   <!-- 1 — TITLE -->
   <section class="slide" id="s1" style="justify-content:center;">
     <div>
-      <p class="eyebrow">A field guide · Part 1 of 4 · models, storage, architecture</p>
+      <p class="eyebrow">A field guide · Part 1 of 5 · models, storage, architecture</p>
       <h1>How databases<br>are <span class="accent">classified</span>.</h1>
       <p class="lead" style="margin-top:18px; max-width:56ch;">A database isn't one “type”. It's a set of answers to a few independent questions: what workload it serves, what the application sees, how one machine stores the data, and where it runs. Learn the questions, and any new database becomes one row in a table.</p>
       <div class="tag-row" style="margin-top:22px;">
@@ -441,7 +448,7 @@
         <span class="pill on">system · deployment &amp; architecture</span>
       </div>
       <p class="muted" style="margin-top:26px; font-size:.85rem;">Navigate with <span class="kbd">↓</span> <span class="kbd">↑</span> <span class="kbd">Space</span> or the arrows, bottom-right. Press <span class="kbd">G</span> or tap the slide counter to see every slide and jump to one.</p>
-      <p class="muted" style="margin-top:8px; font-size:.85rem;">The rest of the series: <a class="go inline" href="../distributed-databases/index.html">Part 2 · distributed databases</a> · <a class="go inline" href="../database-transactions/index.html">Part 3 · transactions</a> · <a class="go inline" href="../database-anatomy-part2/index.html">Part 4 · analytical databases</a></p>
+      <p class="muted" style="margin-top:8px; font-size:.85rem;">The rest of the series: <a class="go inline" href="../distributed-databases/index.html">Part 2 · distributed databases</a> · <a class="go inline" href="../database-transactions/index.html">Part 3 · transactions</a> · <a class="go inline" href="../database-anatomy-part2/index.html">Part 4 · OLAP databases</a> · <a class="go inline" href="../specialized-databases/index.html">Part 5 · specialized databases</a></p>
     </div>
     <div class="foot">DATABASES / 01</div>
   </section>
@@ -467,7 +474,7 @@
         <div class="tag-row"><span class="pill warm">column layout · Part 4</span></div>
       </div>
     </div>
-    <p class="muted" style="font-size:.88rem;"><strong>HTAP</strong> systems serve both, usually as a row store plus a columnar copy (TiDB with TiFlash). <strong>Specialized</strong> workloads (search, time-series, vectors, graphs) get their own engines in Part 4.</p>
+    <p class="muted" style="font-size:.88rem;"><strong>HTAP</strong> systems serve both, usually as a row store plus a columnar copy (TiDB with TiFlash). <strong>Specialized</strong> workloads (search, time-series, vectors, graphs) get their own engines in <a class="go inline" href="../specialized-databases/index.html#s2">Part 5</a>.</p>
     <p class="note"><b>Watch the wording:</b> “<strong>wide-column</strong>” (Cassandra, Bigtable) is <strong>not</strong> “columnar”. Wide-column stores keep a row's cells together (Bigtable and HBase per column family), so they use a row layout with a flexible set of columns.</p>
     <p class="read">Read more: <a href="../../books/notes/ddia/ch3/">DDIA ch. 3, Storage and Retrieval</a> · <a href="../../books/notes/database-internals/ch1/">Database Internals ch. 1</a></p>
     <div class="foot">WORKLOAD / 02</div>
@@ -492,13 +499,14 @@
       </div>
       <div class="map-layer one">
         <div class="lname">System<span>where it runs, what's shared</span></div>
-        <div class="card axis"><h3><span class="num">03</span>Deployment &amp; architecture</h3><p>Embedded, single server or cluster: <span class="nw">shared-nothing</span>; disaggregated, <span class="nw">shared-nothing</span> storage; or disaggregated, shared storage.</p><a class="go" href="#s9">Slides 09–10 →</a></div>
+        <div class="card axis"><h3><span class="num">03</span>Deployment &amp; architecture</h3><p>Embedded, single server or cluster: <span class="nw">shared-nothing</span>; disaggregated, <span class="nw">storage nodes</span>; or disaggregated, shared storage.</p><a class="go" href="#s9">Slides 09–10 →</a></div>
       </div>
       <div class="series">
         <div class="lname">The rest of the series<span>each part is its own deck</span></div>
         <a class="card part" href="../distributed-databases/index.html#s4"><span class="num">PART 2 →</span><h3>Distributed databases</h3><p>Replication, partitioning, consensus</p></a>
         <a class="card part" href="../database-transactions/index.html#s4"><span class="num">PART 3 →</span><h3>Transactions</h3><p>Scope, durability, isolation</p></a>
-        <a class="card part" href="../database-anatomy-part2/index.html"><span class="num">PART 4 →</span><h3>Analytical databases</h3><p>Columnar, lakehouses, vectors</p></a>
+        <a class="card part" href="../database-anatomy-part2/index.html#s2"><span class="num">PART 4 →</span><h3>OLAP databases</h3><p>Columnar, warehouses, lakehouses</p></a>
+        <a class="card part" href="../specialized-databases/index.html#s2"><span class="num">PART 5 →</span><h3>Specialized databases</h3><p>Vectors, time-series, graphs, search</p></a>
       </div>
     </div>
     <p class="muted" style="font-size:.85rem;">Then the seven <a class="go inline" href="#s11">archetypes</a> that recur (slides 11–19), <a class="go inline" href="#s20">what really relates</a>, and a one-page <a class="go inline" href="#s21">cheat sheet</a>.</p>
@@ -571,7 +579,7 @@
       </div>
       <div class="card tight">
         <h3>Graph</h3>
-        <p>Vertices and edges with properties; queries walk paths (Cypher, Gremlin). Covered in <a class="go inline" href="../database-anatomy-part2/index.html#s15">Part 4</a>.</p>
+        <p>Vertices and edges with properties; queries walk paths (Cypher, Gremlin). Covered in <a class="go inline" href="../specialized-databases/index.html#s10">Part 5</a>.</p>
         <div class="model-box">(<span class="k">Ana</span>)-[<span class="c">:FOLLOWS</span>]-&gt;(<span class="k">Bo</span>)</div>
       </div>
       <div class="card tight" style="border-color:var(--accent);">
@@ -737,42 +745,42 @@
     <div>
       <p class="eyebrow">Axis 03 · system · cluster architecture</p>
       <h2>In a cluster, what do compute and storage share?</h2>
-      <p class="ask">Does the tier that runs the queries also hold a slice of the data? If yes, it's shared-nothing. If no, compute is disaggregated: over storage nodes that each own a slice, or over one shared storage pool.</p>
+      <p class="ask"><span>1 · Does the query tier own a partition of the data? Then C1. 2 · If not, does moving work copy persistent data between the database's own storage nodes (C2), or only change ownership, since a storage service holds the bytes (C3)?</span></p>
     </div>
     <div class="grid cols-3 arch">
       <div class="card tight">
         <div class="panel-light" style="padding:6px;">
-<svg class="dgm" viewBox="0 0 200 84" role="img" aria-label="Shared-nothing: three machines, each a node that runs queries over its own disk holding one slice of the data" style="max-width:200px"><defs><marker id="ab9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="cl" x="2" y="1" width="60" height="82" rx="9"/><rect class="cl" x="70" y="1" width="60" height="82" rx="9"/><rect class="cl" x="138" y="1" width="60" height="82" rx="9"/><rect class="n-b" x="6" y="5" width="52" height="24" rx="7"/><text x="32" y="21.5" text-anchor="middle">node</text><rect class="n-b" x="74" y="5" width="52" height="24" rx="7"/><text x="100" y="21.5" text-anchor="middle">node</text><rect class="n-b" x="142" y="5" width="52" height="24" rx="7"/><text x="168" y="21.5" text-anchor="middle">node</text><path class="ln" d="M58 17 L74 17"/><path class="ln" d="M126 17 L142 17"/><path class="ln" d="M32 29 L32 43" marker-end="url(#ab9)"/><path class="ln" d="M100 29 L100 43" marker-end="url(#ab9)"/><path class="ln" d="M168 29 L168 43" marker-end="url(#ab9)"/><rect class="n-w" x="6" y="43" width="52" height="36" rx="6"/><text x="32" y="58" text-anchor="middle">disk</text><text class="sub" x="32" y="72" text-anchor="middle">slice A</text><rect class="n-w" x="74" y="43" width="52" height="36" rx="6"/><text x="100" y="58" text-anchor="middle">disk</text><text class="sub" x="100" y="72" text-anchor="middle">slice B</text><rect class="n-w" x="142" y="43" width="52" height="36" rx="6"/><text x="168" y="58" text-anchor="middle">disk</text><text class="sub" x="168" y="72" text-anchor="middle">slice C</text></svg>
+<svg class="dgm" viewBox="0 0 200 84" role="img" aria-label="Integrated shared-nothing: three machines, each a node that runs queries over its own disk holding one partition of the data" style="max-width:200px"><defs><marker id="ab9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="cl" x="2" y="1" width="60" height="82" rx="9"/><rect class="cl" x="70" y="1" width="60" height="82" rx="9"/><rect class="cl" x="138" y="1" width="60" height="82" rx="9"/><rect class="n-b" x="6" y="5" width="52" height="24" rx="7"/><text x="32" y="21.5" text-anchor="middle">node</text><rect class="n-b" x="74" y="5" width="52" height="24" rx="7"/><text x="100" y="21.5" text-anchor="middle">node</text><rect class="n-b" x="142" y="5" width="52" height="24" rx="7"/><text x="168" y="21.5" text-anchor="middle">node</text><path class="ln" d="M58 17 L74 17"/><path class="ln" d="M126 17 L142 17"/><path class="ln" d="M32 29 L32 43" marker-end="url(#ab9)"/><path class="ln" d="M100 29 L100 43" marker-end="url(#ab9)"/><path class="ln" d="M168 29 L168 43" marker-end="url(#ab9)"/><rect class="n-w" x="6" y="43" width="52" height="36" rx="6"/><text x="32" y="58" text-anchor="middle">disk</text><text class="sub" x="32" y="72" text-anchor="middle">slice A</text><rect class="n-w" x="74" y="43" width="52" height="36" rx="6"/><text x="100" y="58" text-anchor="middle">disk</text><text class="sub" x="100" y="72" text-anchor="middle">slice B</text><rect class="n-w" x="142" y="43" width="52" height="36" rx="6"/><text x="168" y="58" text-anchor="middle">disk</text><text class="sub" x="168" y="72" text-anchor="middle">slice C</text></svg>
         </div>
-        <h3><span class="num">C1</span>Shared-nothing (integrated compute and storage)</h3>
-        <p>Every node keeps a slice of the data on its own disk and runs the queries on it. A router in front (mongos) doesn't change that.</p>
+        <h3><span class="num">C1</span>Integrated shared-nothing</h3>
+        <p>Every node owns a partition of the data on its own disk and runs the queries on it. A router in front (mongos) doesn't change that.</p>
         <p><strong>Buys:</strong> work on local data needs no extra hop; one kind of node to deploy.</p>
-        <p><strong>Costs:</strong> compute and storage grow together; rebalancing moves data.</p>
+        <p><strong>Costs:</strong> compute and storage grow together; rebalancing copies data.</p>
         <span class="ex">Cassandra&nbsp;· ScyllaDB&nbsp;· MongoDB&nbsp;· CockroachDB&nbsp;· YugabyteDB</span>
       </div>
       <div class="card tight">
         <div class="panel-light" style="padding:6px;">
-<svg class="dgm" viewBox="0 0 200 84" role="img" aria-label="Disaggregated compute over shared-nothing storage: stateless SQL nodes on top read from storage nodes that each own one slice of the data" style="max-width:200px"><defs><marker id="ab12" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-b" x="6" y="5" width="52" height="24" rx="7"/><text x="32" y="21.5" text-anchor="middle">SQL</text><rect class="n-b" x="74" y="5" width="52" height="24" rx="7"/><text x="100" y="21.5" text-anchor="middle">SQL</text><rect class="n-b" x="142" y="5" width="52" height="24" rx="7"/><text x="168" y="21.5" text-anchor="middle">SQL</text><path class="ln" d="M32 29 L32 43" marker-end="url(#ab12)"/><path class="ln" d="M100 29 L100 43" marker-end="url(#ab12)"/><path class="ln" d="M168 29 L168 43" marker-end="url(#ab12)"/><path class="lnd" d="M46 29 L86 43" marker-end="url(#ab12)"/><path class="lnd" d="M154 29 L114 43" marker-end="url(#ab12)"/><rect class="n-w" x="6" y="43" width="52" height="36" rx="6"/><text x="32" y="58" text-anchor="middle">store</text><text class="sub" x="32" y="72" text-anchor="middle">slice A</text><rect class="n-w" x="74" y="43" width="52" height="36" rx="6"/><text x="100" y="58" text-anchor="middle">store</text><text class="sub" x="100" y="72" text-anchor="middle">slice B</text><rect class="n-w" x="142" y="43" width="52" height="36" rx="6"/><text x="168" y="58" text-anchor="middle">store</text><text class="sub" x="168" y="72" text-anchor="middle">slice C</text></svg>
+<svg class="dgm" viewBox="0 0 200 84" role="img" aria-label="Disaggregated compute + distributed storage nodes: stateless SQL nodes over three storage nodes that each hold replicas A, B or C on their own disk; replica A moving from one storage node to the next is copied" style="max-width:200px"><defs><marker id="ab12" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="ab13" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#d9480f"/></marker></defs><rect class="n-b" x="4" y="3" width="46" height="21" rx="7"/><text x="27" y="17.5" text-anchor="middle">SQL</text><rect class="n-b" x="77" y="3" width="46" height="21" rx="7"/><text x="100" y="17.5" text-anchor="middle">SQL</text><rect class="n-b" x="150" y="3" width="46" height="21" rx="7"/><text x="173" y="17.5" text-anchor="middle">SQL</text><path class="ln" d="M27 24 L27 40" marker-end="url(#ab12)"/><path class="ln" d="M100 24 L100 40" marker-end="url(#ab12)"/><path class="ln" d="M173 24 L173 40" marker-end="url(#ab12)"/><rect class="n-w" x="4" y="40" width="46" height="41" rx="6"/><text x="27" y="53" text-anchor="middle">store</text><rect class="n-b" x="9" y="59" width="15" height="15" rx="3"/><text class="sub" x="16.5" y="70" text-anchor="middle">B</text><rect class="n-b" x="29" y="59" width="15" height="15" rx="3"/><text class="sub" x="36.5" y="70" text-anchor="middle">A</text><rect class="n-w" x="77" y="40" width="46" height="41" rx="6"/><text x="100" y="53" text-anchor="middle">store</text><rect class="n-b" x="83" y="59" width="15" height="15" rx="3" style="stroke-dasharray:3 2"/><text class="sub" x="90.5" y="70" text-anchor="middle">A</text><rect class="n-b" x="102" y="59" width="15" height="15" rx="3"/><text class="sub" x="109.5" y="70" text-anchor="middle">C</text><rect class="n-w" x="150" y="40" width="46" height="41" rx="6"/><text x="173" y="53" text-anchor="middle">store</text><rect class="n-b" x="156" y="59" width="15" height="15" rx="3"/><text class="sub" x="163.5" y="70" text-anchor="middle">B</text><rect class="n-b" x="175" y="59" width="15" height="15" rx="3"/><text class="sub" x="182.5" y="70" text-anchor="middle">C</text><path d="M45 66.5 L81 66.5" fill="none" stroke="#d9480f" stroke-width="1.6" marker-end="url(#ab13)"/><text class="sub" x="63.5" y="61" text-anchor="middle" style="fill:#d9480f">copy</text></svg>
         </div>
-        <h3><span class="num">C2</span>Disaggregated compute + <span class="nw">shared-nothing storage</span></h3>
-        <p>Stateless query nodes run the queries; separate storage nodes each own a slice of the data.</p>
-        <p><strong>Buys:</strong> query nodes scale apart from storage; workloads can get their own nodes.</p>
-        <p><strong>Costs:</strong> reads cross to storage (pushdown trims them); moving a slice copies it.</p>
+        <h3><span class="num">C2</span>Disaggregated compute + distributed storage nodes</h3>
+        <p>Stateless query nodes over the database's own storage nodes, which each own replicas of key ranges on their own disk.</p>
+        <p><strong>Buys:</strong> query nodes scale apart from storage; each workload can get its own.</p>
+        <p><strong>Costs:</strong> reads cross the network (pushdown trims them); moving a replica copies it (TiKV: a Raft snapshot).</p>
         <span class="ex"><span class="nw">TiDB over TiKV (classic)</span>&nbsp;· <span class="nw">VictoriaMetrics cluster</span></span>
       </div>
       <div class="card tight">
         <div class="panel-light" style="padding:6px;">
-<svg class="dgm" viewBox="0 0 200 84" role="img" aria-label="Disaggregated compute over shared storage: stateless SQL nodes all read one shared, self-replicating storage pool" style="max-width:200px"><defs><marker id="ab10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs><rect class="n-b" x="6" y="5" width="52" height="24" rx="7"/><text x="32" y="21.5" text-anchor="middle">SQL</text><rect class="n-b" x="74" y="5" width="52" height="24" rx="7"/><text x="100" y="21.5" text-anchor="middle">SQL</text><rect class="n-b" x="142" y="5" width="52" height="24" rx="7"/><text x="168" y="21.5" text-anchor="middle">SQL</text><path class="ln" d="M32 29 L56 43" marker-end="url(#ab10)"/><path class="ln" d="M100 29 L100 43" marker-end="url(#ab10)"/><path class="ln" d="M168 29 L144 43" marker-end="url(#ab10)"/><rect class="n-w" x="6" y="43" width="188" height="36" rx="7"/><text x="100" y="58" text-anchor="middle">shared storage</text><text class="sub" x="100" y="72" text-anchor="middle">one replicated pool</text></svg>
+<svg class="dgm" viewBox="0 0 200 84" role="img" aria-label="Disaggregated compute + shared storage service: compute nodes over one storage service that is itself several servers; reassigning work from one compute node to another copies no data" style="max-width:200px"><defs><marker id="ab10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="ab14" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker></defs><rect class="n-b" x="4" y="3" width="46" height="21" rx="7"/><text x="27" y="17.5" text-anchor="middle">node</text><rect class="n-b" x="77" y="3" width="46" height="21" rx="7"/><text x="100" y="17.5" text-anchor="middle">node</text><rect class="n-b" x="150" y="3" width="46" height="21" rx="7"/><text x="173" y="17.5" text-anchor="middle">node</text><path d="M51 13.5 L75 13.5" fill="none" stroke="#2f54eb" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#ab14)"/><text class="sub" x="63.5" y="33.5" text-anchor="middle" style="fill:#2f54eb">no copy</text><path class="ln" d="M27 24 L27 41" marker-end="url(#ab10)"/><path class="ln" d="M100 24 L100 41" marker-end="url(#ab10)"/><path class="ln" d="M173 24 L173 41" marker-end="url(#ab10)"/><rect class="n-w" x="4" y="41" width="192" height="40" rx="7"/><text x="100" y="53.5" text-anchor="middle">storage service</text><rect class="n-g" x="8" y="59" width="42" height="16" rx="3"/><text class="sub" x="29" y="70.5" text-anchor="middle">server</text><rect class="n-g" x="55" y="59" width="42" height="16" rx="3"/><text class="sub" x="76" y="70.5" text-anchor="middle">server</text><rect class="n-g" x="102" y="59" width="42" height="16" rx="3"/><text class="sub" x="123" y="70.5" text-anchor="middle">server</text><rect class="n-g" x="149" y="59" width="42" height="16" rx="3"/><text class="sub" x="170" y="70.5" text-anchor="middle">server</text></svg>
         </div>
-        <h3><span class="num">C3</span>Disaggregated compute + shared distributed storage</h3>
-        <p>Stateless compute nodes all read one pool of storage that replicates itself.</p>
-        <p><strong>Buys:</strong> new replicas, failover and rebalancing copy no data; compute scales on its own.</p>
+        <h3><span class="num">C3</span>Disaggregated compute + shared storage service</h3>
+        <p>Compute sees one logical storage namespace; the service hides placement and replication across its many machines.</p>
+        <p><strong>Buys:</strong> reassigning a tablet or volume copies no data; only ownership moves.</p>
         <p><strong>Costs:</strong> the network to storage is the bottleneck; one writer per volume (Aurora) or synced caches (Oracle RAC).</p>
         <span class="ex">Aurora&nbsp;· Bigtable&nbsp;· HBase&nbsp;· Neon&nbsp;· AlloyDB&nbsp;· <span class="nw">Azure SQL Hyperscale</span></span>
       </div>
     </div>
-    <p class="note"><b>Where do Spanner and Bigtable go?</b> Both keep their files on Google’s Colossus. <strong>Bigtable</strong> is disaggregated, shared storage: nodes hold only pointers to tablets, so rebalancing copies no data; a cluster in another zone is a separate, eventually consistent copy. <strong>Spanner</strong> is a hybrid: shared storage inside a zone (moving a split copies nothing) and shared-nothing across zones (each read-write or read-only replica keeps a full copy). Google’s docs say “shared nothing”: each split has one server per zone.</p>
-    <p class="read">Landmarks: <span class="nw">Stonebraker, “The Case for Shared Nothing” (1986)</span> · <span class="nw">Oracle RAC: older shared disk</span> · <span class="nw">Aurora (2017)</span> · <span class="nw">TiDB (2020)</span></p>
+    <p class="note"><b>“Shared” means one logical storage system, not one machine:</b> Google's Colossus partitions and replicates data across many machines (shared-nothing underneath). C2 and C3 differ in the contract between compute and storage. On Colossus, <strong>Bigtable</strong> is C3 and <strong>Spanner</strong> is a hybrid: C3 inside a zone, shared-nothing across zones (each read-write or read-only replica keeps a full copy).</p>
+    <p class="read">A classification of architectural patterns, not a standard taxonomy: seen from afar, TiKV is a storage service too.<br>Landmarks: <span class="nw">Stonebraker, “The Case for Shared Nothing” (1986)</span> · <span class="nw">Aurora (SIGMOD 2017)</span> · <span class="nw">TiDB (VLDB 2020)</span></p>
     <div class="foot">CLUSTER ARCHITECTURE / 10</div>
   </section>
 
@@ -787,10 +795,10 @@
       <a class="card part tight" href="#s12"><span class="num">A1</span><h3>Embedded engine</h3><span class="sigline">library · <span class="nw">B-tree</span> or LSM · embedded, no network</span><p>SQLite, RocksDB, LMDB</p><span class="go">Slide 12 →</span></a>
       <a class="card part tight" href="#s13"><span class="num">A2</span><h3>Classic relational</h3><span class="sigline">SQL · <span class="nw">B-tree</span> · one server + replicas</span><p>Postgres, MySQL, SQL&nbsp;Server, Oracle</p><span class="go">Slide 13 →</span></a>
       <a class="card part tight" href="#s14"><span class="num">A3</span><h3>Key–value store</h3><span class="sigline">key → value · hash tables or <span class="nw">log-structured</span> · single server or <span class="nw">shared-nothing</span></span><p>Redis, Valkey, Memcached, Aerospike</p><span class="go">Slide 14 →</span></a>
-      <a class="card part tight" href="#s15"><span class="num">A4</span><h3>Document store</h3><span class="sigline">JSON documents · <span class="nw">B-tree</span> (MongoDB, DynamoDB) · <span class="nw">shared-nothing</span> (Firestore: on Spanner)</span><p>MongoDB, Couchbase, DynamoDB, Firestore</p><span class="go">Slide 15 →</span></a>
+      <a class="card part tight" href="#s15"><span class="num">A4</span><h3>Document store</h3><span class="sigline">JSON documents · <span class="nw">B-tree</span> (MongoDB, DynamoDB) · <span class="nw">shared-nothing</span> (Firestore: hybrid, on Spanner)</span><p>MongoDB, Couchbase, DynamoDB, Firestore</p><span class="go">Slide 15 →</span></a>
       <a class="card part tight" href="#s16"><span class="num">A5</span><h3>Wide-column store</h3><span class="sigline">sorted rows per partition · LSM · <span class="nw">shared-nothing</span> or disaggregated, shared storage</span><p>Cassandra, ScyllaDB, Bigtable, HBase</p><span class="go">Slide 16 →</span></a>
       <a class="card part tight" href="#s17"><span class="num">A6</span><h3>Shared-storage SQL</h3><span class="sigline">SQL · <span class="nw">B-tree</span> pages · disaggregated, shared storage</span><p>Aurora, Neon, AlloyDB</p><span class="go">Slide 17 →</span></a>
-      <a class="card part tight" href="#s18"><span class="num">A7</span><h3>Distributed SQL</h3><span class="sigline">SQL · LSM · <span class="nw">shared-nothing</span> or disaggregated, <span class="nw">shared-nothing storage</span> (Spanner: hybrid)</span><p>Spanner, CockroachDB, TiDB, YugabyteDB</p><span class="go">Slides 18–19 →</span></a>
+      <a class="card part tight" href="#s18"><span class="num">A7</span><h3>Distributed SQL</h3><span class="sigline">SQL · LSM · <span class="nw">shared-nothing</span> or disaggregated, <span class="nw">storage nodes</span> (Spanner: hybrid)</span><p>Spanner, CockroachDB, TiDB, YugabyteDB</p><span class="go">Slides 18–19 →</span></a>
       <a class="card part tight" href="../distributed-databases/index.html#s20" style="border-color:var(--accent); background:var(--accent-soft);"><span class="num">ANOTHER CUT</span><h3 class="accent">By how they distribute</h3><p>These are grouped by what the app sees and how a node stores data. Part 2 regroups the distributed ones by replication and routing.</p><span class="go">Part 2, slide 20 →</span></a>
     </div>
     <div class="foot">ARCHETYPES / 11</div>
@@ -888,7 +896,7 @@
     <dl class="sig">
       <div><dt><i>01</i>Model</dt><dd>JSON-like documents, flexible schema. MongoDB and Firestore query any indexed field; DynamoDB goes by partition + sort key, plus secondary indexes</dd></div>
       <div><dt><i>02</i>Structure</dt><dd>B-tree: MongoDB's WiredTiger, and DynamoDB's storage nodes (a B-tree plus a write-ahead log). Firestore sits on Spanner</dd></div>
-      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing: each MongoDB shard and DynamoDB storage node serves the data it holds; mongos and DynamoDB's request routers only route. Couchbase splits by service: key–value calls go to the Data node that owns the vBucket; SQL++ runs in the Query service, which fetches from Data nodes (disaggregated, shared-nothing storage). Firestore runs on Spanner (per Google's ICDE 2023 paper), so it inherits Spanner's hybrid</dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing: each MongoDB shard and DynamoDB storage node serves the data it holds; mongos and DynamoDB's request routers only route. Couchbase splits by service: key–value calls go to the Data node that owns the vBucket; SQL++ runs in the Query service, which fetches from Data nodes (disaggregated, storage nodes). Firestore runs on Spanner (per Google's ICDE 2023 paper), so it inherits Spanner's hybrid</dd></div>
     </dl>
     <div class="grid cols-2">
       <div class="card why"><h3>Why these answers travel together</h3><p>If one request's data lives in one document, the document is the natural unit for everything: written atomically, stored on one partition, loaded in one read. DynamoDB takes it furthest: related items share a partition key and come back in one query. Joins and <a class="go inline" href="../database-transactions/index.html#s16">multi-document transactions</a> exist, but cost more, so you shape the data around the reads.</p></div>
@@ -964,7 +972,7 @@
     <dl class="sig">
       <div><dt><i>01</i>Model</dt><dd>Relational; Postgres- or MySQL-compatible SQL</dd></div>
       <div><dt><i>02</i>Structure</dt><dd>LSM: Pebble, RocksDB; Spanner's Ressi format is LSM-style</dd></div>
-      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing: every node of a single-tenant CockroachDB cluster, and every YugabyteDB node, runs SQL and stores Raft-replicated ranges. Disaggregated, shared-nothing storage: stateless TiDB servers over TiKV (classic TiDB); Aurora DSQL is similar, plus a shared commit journal. Spanner is a hybrid <span class="nw">(<a class="go inline" href="#s10">slide 10</a>)</span></dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing: every node of a single-tenant CockroachDB cluster, and every YugabyteDB node, runs SQL and stores Raft-replicated ranges. Disaggregated, storage nodes: stateless TiDB servers over TiKV (classic TiDB); Aurora DSQL is similar, plus a shared commit journal. Spanner is a hybrid <span class="nw">(<a class="go inline" href="#s10">slide 10</a>)</span></dd></div>
     </dl>
     <div class="grid cols-2">
       <div class="card why"><h3>Why these answers travel together</h3><p>Transactions across ranges need <a class="go inline" href="../distributed-databases/index.html#s14">consensus per range</a> (one agreed history each) and a <a class="go inline" href="../distributed-databases/index.html#s18">shared clock</a> (TrueTime, hybrid clocks, a timestamp oracle) so ranges agree on commit order. Ranges are slices of one sorted key space, so an ordered key–value engine below makes them cheap to split and move.</p></div>
@@ -978,7 +986,7 @@
     <div>
       <p class="eyebrow">Archetype A7 · case study</p>
       <h2>Case study: TiDB</h2>
-      <p class="lead" style="margin-top:10px;">One system where the axes are separate parts you can point at: SQL, storage engine, placement and an analytics copy. It is the canonical <a class="go inline" href="#s10">disaggregated, shared-nothing storage</a> design (classic TiDB): stateless TiDB servers over TiKV nodes that each own their Regions.</p>
+      <p class="lead" style="margin-top:10px;">One system where the axes are separate parts you can point at: SQL, storage engine, placement and an analytics copy. It is the canonical <a class="go inline" href="#s10">disaggregated, storage nodes</a> design (classic TiDB): stateless TiDB servers over TiKV nodes that each hold replicas of their Regions.</p>
     </div>
     <div class="split">
       <div>
@@ -986,10 +994,10 @@
           <li><strong>TiDB</strong>: stateless SQL layer (MySQL-compatible). Pure <em>compute</em>; scale it out freely.</li>
           <li><strong>TiKV</strong>: distributed KV <em>storage</em> on <strong>RocksDB (LSM)</strong>. Each node owns Regions (key ranges), each a Raft group; moving a Region copies its data (classic TiDB; TiDB Cloud's TiDB X keeps the data in object storage, so adding a TiKV node moves no data).</li>
           <li><strong>PD</strong> (Placement Driver): the brain, holding metadata, data placement and timestamps.</li>
-          <li><strong>TiFlash</strong>: a columnar replica for analytics → <strong>HTAP</strong> in one system (the bridge to <a class="go inline" href="../database-anatomy-part2/index.html">Part 4</a>).</li>
+          <li><strong>TiFlash</strong>: a columnar replica for analytics → <strong>HTAP</strong> in one system (the bridge to <a class="go inline" href="../database-anatomy-part2/index.html#s14">Part 4</a>).</li>
         </ul>
         <div class="tag-row" style="margin-top:12px;">
-          <span class="pill on">SQL</span><span class="pill warm">LSM</span><span class="pill on">distributed</span><span class="pill on">disaggregated, shared-nothing storage</span>
+          <span class="pill on">SQL</span><span class="pill warm">LSM</span><span class="pill on">distributed</span><span class="pill on">disaggregated, storage nodes</span>
         </div>
       </div>
       <div class="panel-light">
@@ -1013,20 +1021,20 @@
         <ul class="ticks" style="margin-top:8px;">
           <li><strong>OLTP ⇒ rows, OLAP ⇒ columns</strong>: a query reads whole records or a few columns.</li>
           <li><strong>Write-heavy ingest ⇒ LSM</strong>: sequential appends beat random page writes.</li>
-          <li><strong>Shared-nothing storage (C1 and C2) ⇒ partition by key</strong>: a query without the key asks every storage node.</li>
+          <li><strong>Data on the database's own storage nodes (C1 and C2) ⇒ partition by key</strong>: a query without the key asks every storage node.</li>
           <li><strong>Ranges that split and move ⇒ an ordered key–value engine underneath</strong>: a range is a slice of one sorted key space, so splitting it is cheap.</li>
-          <li><strong>Shared storage (C3) ⇒ writers must coordinate</strong>: most designs give each piece of data one owner (Aurora: one writer for the whole volume, so writes scale up, not out; Bigtable: one server per tablet). Oracle RAC lets every instance write and keeps their caches in sync with Cache Fusion.</li>
+          <li><strong>Disaggregated, shared storage (C3) ⇒ writers must coordinate</strong>: most designs give each piece of data one owner (Aurora: one writer for the whole volume, so writes scale up, not out; Bigtable: one server per tablet). Oracle RAC lets every instance write and keeps their caches in sync with Cache Fusion.</li>
           <li><strong>Disaggregated compute ⇒ query nodes scale apart from storage</strong>, but data they don't cache crosses the network.</li>
         </ul>
       </div>
-      <div class="card" style="border-color:var(--accent);">
+      <div class="card" style="border-color:var(--accent); align-self:start;">
         <h3 class="accent">Independent (the myths)</h3>
         <ul class="ticks" style="margin-top:8px;">
           <li><strong>Relational ≠ B-tree</strong>: CockroachDB and TiDB are SQL on LSM.</li>
           <li><strong>SQL ≠ single node</strong>: Spanner and CockroachDB spread SQL across many nodes.</li>
           <li><strong>NoSQL ≠ LSM</strong>: MongoDB and DynamoDB use B-trees.</li>
           <li><strong>Wide-column ≠ columnar</strong>: it's a row layout.</li>
-          <li><strong>Shared storage ≠ new engine</strong>: Aurora still uses B-tree pages.</li>
+          <li><strong>Disaggregated, shared storage ≠ new engine</strong>: Aurora still uses B-tree pages.</li>
           <li><strong>NoSQL ≠ shared-nothing</strong>: Bigtable runs on <span class="nw">disaggregated, shared storage</span>.</li>
         </ul>
       </div>
@@ -1055,13 +1063,13 @@
           <tr><td class="name">Aerospike<span class="an">A3</span></td><td>Key → record</td><td>get/put API + index queries</td><td>log-structured</td><td>shared-nothing</td></tr>
           <tr><td class="name">MongoDB<span class="an">A4</span></td><td>Document</td><td>MQL</td><td class="m-eng-btree">B-tree</td><td>shared-nothing</td></tr>
           <tr><td class="name">DynamoDB<span class="an">A4</span></td><td>Document, key-first</td><td>DynamoDB API / PartiQL</td><td class="m-eng-btree">B-tree + WAL</td><td>shared-nothing, serverless</td></tr>
-          <tr><td class="name">Firestore<span class="an">A4</span></td><td>Document</td><td>Firestore SDK queries</td><td class="m-eng-lsm">on Spanner</td><td>serverless; on Spanner</td></tr>
+          <tr><td class="name">Firestore<span class="an">A4</span></td><td>Document</td><td>Firestore SDK queries</td><td class="m-eng-lsm">on Spanner</td><td>serverless; hybrid (on Spanner)</td></tr>
           <tr><td class="name">Cassandra · Scylla<span class="an">A5</span></td><td>Wide-column</td><td>CQL</td><td class="m-eng-lsm">LSM</td><td>shared-nothing</td></tr>
           <tr><td class="name">Bigtable / HBase<span class="an">A5</span></td><td>Wide-column</td><td>Bigtable API / HBase API</td><td class="m-eng-lsm">LSM</td><td>disaggregated, shared storage (Colossus / HDFS)</td></tr>
           <tr><td class="name">Aurora<span class="an">A6</span></td><td>Relational</td><td>SQL</td><td class="m-eng-btree">B-tree pages</td><td>disaggregated, shared storage, one writer</td></tr>
-          <tr><td class="name">Spanner<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM-style</td><td>hybrid: shared storage per zone, shared-nothing across zones</td></tr>
-          <tr><td class="name">CockroachDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (Pebble)</td><td>shared-nothing (Raft per range); multi-tenant cloud: SQL split off</td></tr>
-          <tr><td class="name">TiDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (RocksDB)</td><td>disaggregated, shared-nothing storage (TiKV); TiDB X: disaggregated, shared storage</td></tr>
+          <tr><td class="name">Spanner<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM-style</td><td>hybrid: disaggregated, shared storage per zone, shared-nothing across zones</td></tr>
+          <tr><td class="name">CockroachDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (Pebble)</td><td>shared-nothing (Raft per range); multi-tenant cloud: disaggregated, storage nodes</td></tr>
+          <tr><td class="name">TiDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (RocksDB)</td><td>disaggregated, storage nodes (TiKV); TiDB X: disaggregated, shared storage</td></tr>
         </tbody>
       </table>
     </div>
@@ -1073,11 +1081,12 @@
   <section class="slide dense" id="s22" style="justify-content:center;">
     <div>
       <p class="eyebrow">End of Part 1 · keep going</p>
-      <h1>Next: <span class="accent">distributed</span>, <span class="accent">transactional</span>, <span class="accent">analytical</span>.</h1>
-      <div class="grid cols-3" style="margin-top:28px;">
+      <h1>Next: <span class="accent">distributed</span>, <span class="accent">transactional</span>, <span class="accent">OLAP</span>, <span class="accent">specialized</span>.</h1>
+      <div class="grid cols-4" style="margin-top:28px;">
         <a class="card part" href="../distributed-databases/index.html"><span class="num">PART 2</span><h3>Distributed databases</h3><p>Replication, partitioning, consensus, distributed transactions, clocks: how a cluster copies and splits the data, and keeps the copies in agreement.</p><span class="go">Open Part 2 →</span></a>
         <a class="card part" href="../database-transactions/index.html"><span class="num">PART 3</span><h3>Transactions</h3><p>ACID, durability, isolation levels, MVCC, locks, SSI: what a commit promises, and what concurrent transactions can see.</p><span class="go">Open Part 3 →</span></a>
-        <a class="card part" href="../database-anatomy-part2/index.html"><span class="num">PART 4</span><h3>Analytical databases</h3><p>Columnar storage, warehouses and lakehouses, vectors, time-series: the other branch of the root, where OLAP wins.</p><span class="go">Open Part 4 →</span></a>
+        <a class="card part" href="../database-anatomy-part2/index.html"><span class="num">PART 4</span><h3>OLAP databases</h3><p>Columnar storage, data skipping, MPP execution, warehouses, lakehouses and HTAP: the other branch of the root, where OLAP wins.</p><span class="go">Open Part 4 →</span></a>
+        <a class="card part" href="../specialized-databases/index.html"><span class="num">PART 5</span><h3>Specialized databases</h3><p>Vector search (with an HNSW lab), time-series, graph and search engines: when the shape of the query picks the engine.</p><span class="go">Open Part 5 →</span></a>
       </div>
       <p class="lead" style="margin-top:28px;">Thank you. Questions?</p>
     </div>

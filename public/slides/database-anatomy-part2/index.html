@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Part 4 · Analytical Databases: Columnar, Lakehouses &amp; Vectors</title>
-<meta name="description" content="Part 4 of A Field Guide to Databases: a 17-slide visual guide to the analytical and specialized side of databases: OLAP and columnar storage, warehouses and lakehouses, vector search with HNSW, time-series, graph and search engines.">
+<title>Part 4 · OLAP Databases: Columnar Storage, Warehouses &amp; Lakehouses</title>
+<meta name="description" content="Part 4 of A Field Guide to Databases: a 16-slide visual guide to OLAP databases: columnar storage, data skipping, vectorized and compiled execution, MPP shuffles and joins, star schemas, warehouses, lakehouses and open table formats, real-time OLAP and HTAP.">
 <link rel="canonical" href="https://gouravb20.github.io/learn/slides/database-anatomy-part2/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="System Design Notes">
-<meta property="og:title" content="Part 4 · Analytical Databases: Columnar, Lakehouses &amp; Vectors">
-<meta property="og:description" content="Part 4 of A Field Guide to Databases: a 17-slide visual guide to OLAP and columnar storage, warehouses and lakehouses, vector search with HNSW, time-series, graph and search engines.">
+<meta property="og:title" content="Part 4 · OLAP Databases: Columnar Storage, Warehouses &amp; Lakehouses">
+<meta property="og:description" content="Part 4 of A Field Guide to Databases: a 16-slide visual guide to OLAP databases: columnar storage, data skipping, vectorized execution, MPP joins, star schemas, warehouses, lakehouses, real-time OLAP and HTAP.">
 <meta property="og:url" content="https://gouravb20.github.io/learn/slides/database-anatomy-part2/">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
@@ -220,13 +220,6 @@
   .mermaid svg { max-width: 100%; height: auto; }
   .cap { font-family: var(--mono); font-size: .72rem; color: var(--faint); text-align: center; margin-top: 8px; letter-spacing: .04em; }
 
-  /* ---------- data model mini-visuals ---------- */
-  .model-box { background: var(--code-bg); color: var(--code-fg); border-radius: 10px;
-    font-family: var(--mono); font-size: .76rem; padding: 12px; overflow-x: auto; line-height: 1.55; }
-  .model-box .k { color: #7f9bff; } .model-box .s { color: #a5d6a7; } .model-box .c { color: #ffcc80; }
-  table.mini { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: .74rem; color: var(--code-fg); }
-  table.mini th, table.mini td { border: 1px solid #2a3344; padding: 4px 8px; text-align: left; }
-  table.mini th { color: #7f9bff; background: #10151f; }
 
   /* ---------- big comparison matrix ---------- */
   .matrix-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
@@ -237,38 +230,6 @@
   table.matrix tbody tr:hover { background: var(--surface-2); }
   table.matrix td.name { font-weight: 600; font-family: var(--display); }
   .m-eng-btree { color: var(--accent); } .m-eng-lsm { color: var(--warm); } .m-eng-mem { color: var(--good); }
-
-  /* ---------- LSM animation ---------- */
-  .lsm { display: grid; grid-template-columns: 1fr; gap: 14px; }
-  .lsm-stage { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
-  .lsm-flow { display: grid; grid-template-columns: 1.1fr 1.1fr 2fr; gap: 12px; align-items: stretch; }
-  @media (max-width: 760px){ .lsm-flow { grid-template-columns: 1fr; } }
-  .zone { border: 1.5px dashed var(--border-strong); border-radius: 12px; padding: 10px; min-height: 92px; position: relative; transition: border-color .3s, background .3s; }
-  .zone.ram { background: var(--accent-soft); }
-  .zone.disk { background: var(--surface-2); }
-  .zone-label { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
-  .zone.hl { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .zone.hl-warm { border-color: var(--warm); box-shadow: 0 0 0 3px var(--warm-soft); }
-  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
-  .chip { font-family: var(--mono); font-size: .72rem; padding: 3px 7px; border-radius: 6px;
-    background: var(--surface); border: 1px solid var(--border-strong); transition: all .35s ease; }
-  @media (prefers-reduced-motion: reduce){ .chip, .zone { transition: none; } }
-  .chip.k { border-color: var(--accent); color: var(--accent); }
-  .chip.tomb { border-color: var(--warm); color: var(--warm); text-decoration: line-through; }
-  .chip.new { animation: pop .4s ease; }
-  @keyframes pop { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  .sst { border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px; background: var(--surface); margin-bottom: 7px; }
-  .sst-lv { font-family: var(--mono); font-size: .6rem; color: var(--faint); letter-spacing: .1em; margin-bottom: 4px; }
-  .lsm-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .lsm-controls button { font-family: var(--body); font-weight: 600; font-size: .85rem; cursor: pointer;
-    border-radius: 9px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--fg); padding: 8px 13px; }
-  .lsm-controls button:hover { border-color: var(--accent); color: var(--accent); }
-  .lsm-controls button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .lsm-controls button.warm { background: var(--warm); color: var(--on-accent); border-color: var(--warm); }
-  .lsm-log { font-family: var(--mono); font-size: .82rem; color: var(--muted); background: var(--surface-2);
-    border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; min-height: 42px; }
-  .lsm-log b { color: var(--fg); }
-  .wal { font-family: var(--mono); font-size: .68rem; color: var(--good); }
 
   .arrow { color: var(--faint); font-family: var(--mono); align-self: center; text-align: center; }
   .foot { position: absolute; left: clamp(28px,5vw,72px); bottom: 26px; font-family: var(--mono);
@@ -295,23 +256,12 @@
   .dgm .lnd { stroke: #8b94a3; stroke-width: 1.4; fill: none; stroke-dasharray: 4 4; }
   .dgm .cl  { fill: none; stroke: #c6ccd6; stroke-width: 1.4; stroke-dasharray: 5 4; }
 
-  /* ---------- Bigtable row-key demo ---------- */
-  .bt-controls { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: center; }
-  .bt-ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .bt-lab { font-family: var(--mono); font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+  /* ---------- segmented filter buttons (cheat sheet, slide 15) ---------- */
   .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; background: var(--surface); }
   .seg button { font-family: var(--mono); font-size: .78rem; padding: 8px 13px; border: 0; background: transparent; color: var(--fg); cursor: pointer; }
   .seg button + button { border-left: 1px solid var(--border-strong); }
   .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
   .seg button:hover:not([aria-pressed="true"]) { color: var(--accent); }
-  .bt-tablets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  @media (max-width: 760px) { .bt-tablets { grid-template-columns: 1fr; } }
-  .bt-tab { border: 1.5px dashed var(--border-strong); border-radius: 12px; padding: 10px; background: var(--surface-2); transition: border-color .25s, background .25s; }
-  .bt-tab.touch { border: 1.5px solid var(--accent); background: var(--accent-soft); }
-  .bt-tab h4 { margin: 0 0 6px; font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; font-weight: 600; }
-  .bt-key { font-family: var(--mono); font-size: .74rem; line-height: 1.4; padding: 2px 7px; margin: 1px 0; border-radius: 5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bt-key.hit { background: var(--accent); color: var(--on-accent); font-weight: 600; }
-  @media (prefers-reduced-motion: reduce) { .bt-tab { transition: none; } }
   /* footer label is absolutely positioned; don't let the generic .slide > * width:100% push it past the edge */
   .slide > .foot { width: auto; max-width: none; margin-inline: 0; }
   /* in-deck links */
@@ -327,12 +277,6 @@
   .slide > .foot { width: auto; max-width: none; margin-inline: 0; }
   .dgm .lbl.dark { fill: #14171d; font-size: 11px; }
   .dgm .lbl.warm { fill: #d9480f; font-size: 11px; font-weight: 600; }
-  .dgm .hn-band { fill: #eef2f7; stroke: #dfe3ea; }
-  .dgm .hn-e { stroke: #c6ccd6; stroke-width: 1.2; }
-  .dgm .hn-v { stroke: #c6ccd6; stroke-width: 1; stroke-dasharray: 3 3; }
-  .dgm .hn-n { fill: #8b94a3; }
-  .dgm .hn-on { fill: #2f54eb; }
-  .dgm .hn-p { stroke: #2f54eb; stroke-width: 2.2; fill: none; }
 
   table.dense { border-collapse: collapse; width: 100%; font-size: .82rem; min-width: 680px; background: var(--surface); }
   table.dense th, table.dense td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -341,7 +285,7 @@
   table.dense tbody tr:hover { background: var(--surface-2); }
   table.dense td:first-child { font-weight: 600; font-family: var(--display); white-space: nowrap; }
   code { font-size: .88em; }
-  .card code, table.dense code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+  .card code, table.dense code { background: var(--surface-2); padding: 0 3px; border-radius: 4px; }
 
   /* row vs column widget */
   .rc-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -361,37 +305,7 @@
   .lh-grid .same { background: var(--accent-soft); color: var(--accent); font-family: var(--mono); font-size: .78rem; font-weight: 600; }
   @media (max-width: 640px) { .lh-grid { grid-template-columns: 1fr; } .lh-grid .hd:first-child { display: none; } }
 
-  .knobs { display: flex; flex-wrap: wrap; gap: 8px 22px; font-family: var(--mono); font-size: .78rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow); }
-  .knobs code { color: var(--accent); background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; }
   #mx td, #mx th { padding-top: 5px; padding-bottom: 5px; }
-  /* HNSW live */
-  .hn-ef { display: inline-flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: .8rem; color: var(--muted); }
-  .hn-ef input { width: 160px; accent-color: var(--accent); }
-  .hn-ef b { color: var(--accent); min-width: 2ch; }
-  .hn-panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  @media (max-width: 760px) { .hn-panels { grid-template-columns: 1fr; } }
-  .hn-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px; box-shadow: var(--shadow); min-width: 0; }
-  .hn-panel h4 { margin: 0 0 6px; display: flex; justify-content: space-between; font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
-  .hn-svg { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; cursor: crosshair; border-radius: 8px; background: var(--surface-2); max-height: 270px; margin: 0 auto; }
-  .hn-svg .e { stroke: var(--border-strong); stroke-width: .25; }
-  .hn-svg .gh { fill: var(--border-strong); }
-  .hn-svg .n { fill: var(--faint); }
-  .hn-svg .vis { fill: var(--accent); }
-  .hn-svg .hop { stroke: var(--accent); stroke-width: .9; fill: none; }
-  .hn-svg .mk { fill: var(--accent); }
-  .hn-svg .ent { fill: none; stroke: var(--accent); stroke-width: .7; }
-  .hn-svg .res { fill: none; stroke: var(--warm); stroke-width: .8; }
-  .hn-svg .tru { fill: none; stroke: var(--good); stroke-width: .5; stroke-dasharray: 1 .8; }
-  .hn-svg .q { stroke: var(--warm); stroke-width: 1; }
-  .hn-svg .t { font-family: var(--mono); font-size: 3.2px; fill: var(--accent); }
-  .hn-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--mono); font-size: .72rem; color: var(--muted); }
-  .hn-legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .hn-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
-  .lg-hop { height: 3px !important; border-radius: 2px !important; width: 16px !important; background: var(--accent); }
-  .lg-vis { background: var(--accent); width: 8px !important; height: 8px !important; }
-  .lg-res { border: 2px solid var(--warm); }
-  .lg-tru { border: 2px dashed var(--good); }
-  .lg-q { background: var(--warm); width: 10px !important; height: 10px !important; clip-path: polygon(40% 0,60% 0,60% 40%,100% 40%,100% 60%,60% 60%,60% 100%,40% 100%,40% 60%,0 60%,0 40%,40% 40%); border-radius: 0 !important; }
 </style>
 
 <style>
@@ -407,6 +321,36 @@
     background: #dc2626; color: #fff; font-weight: 800; font-size: 14px; line-height: 1;
   }
   #home-link:hover .site-mark { color: #fff; }
+
+  /* ---------- ported from Parts 2–3: landmark reading lines (paper, venue, year) ---------- */
+  .read { font-family: var(--mono); font-size: .74rem; color: var(--faint); }
+  .read a { color: var(--accent); text-decoration: none; }
+  .read a:hover { text-decoration: underline; }
+
+  /* ---------- OLAP slides: diagram extras (always on the light panel) ---------- */
+  .dgm .skip { fill: #f4f6f9; stroke: #c6ccd6; stroke-width: 1.2; stroke-dasharray: 4 3; }
+  .dgm text.skt, .dgm .skt { fill: #8b94a3; }
+  .dgm .b { font-weight: 600; }
+  .dgm .acc { fill: #2f54eb; }
+  .dgm .lnb { stroke: #2f54eb; stroke-width: 1.6; fill: none; }
+  .dgm .lnw { stroke: #d9480f; stroke-width: 1.6; fill: none; }
+  .split.top { align-items: start; }
+  .card .go.inline { white-space: nowrap; }
+
+  /* ---------- content-heavy slides: tighten on short screens instead of scrolling (as in Parts 2–3) ---------- */
+  @media (max-height: 900px) and (min-width: 861px){
+    .slide.dense { gap: 12px; padding-block: 30px 46px; }
+    .slide.dense h2 { font-size: clamp(1.6rem, 2.9vw, 2.15rem); }
+    .slide.dense .lead { margin-top: 6px !important; font-size: 1rem; }
+    .slide.dense .grid { gap: 10px; }
+    .slide.dense .split { gap: 22px; }
+    .slide.dense .card { padding: 11px 14px; }
+    .slide.dense .card p, .slide.dense ul.ticks li { font-size: .86rem; }
+    .slide.dense ul.ticks { gap: 6px; }
+    .slide.dense .note { padding: 7px 12px; font-size: .84rem; }
+    .slide.dense .panel-light { padding: 10px; }
+    .slide.dense table.dense th, .slide.dense table.dense td { padding: 5px 10px; }
+  }
 </style>
 </head>
 <body>
@@ -419,16 +363,17 @@
   <!-- 1 — TITLE -->
   <section class="slide" id="s1" style="justify-content:center;">
     <div>
-      <p class="eyebrow">A field guide · Part 4 of 4 · analytical databases</p>
-      <h1>The <span class="accent">analytical</span> &amp;<br><span class="accent">specialized</span> side.</h1>
-      <p class="lead" style="margin-top:18px;">The workloads that flip the OLTP defaults: scanning billions of rows, searching by meaning, and storing data indexed by time.</p>
-      <div class="tag-row" style="margin-top:22px;">
-        <span class="pill">OLAP &amp; columnar</span><span class="pill">warehouse &amp; lakehouse</span><span class="pill">vectors &amp; HNSW</span><span class="pill">time-series</span><span class="pill">graph &amp; search</span>
+      <p class="eyebrow">A field guide · Part 4 of 5 · OLAP databases</p>
+      <h1><span class="accent">OLAP</span> databases:<br>scanning billions of rows.</h1>
+      <p class="lead" style="margin-top:18px;">Workloads that flip the OLTP defaults: few columns, billions of rows, big aggregates and joins.</p>
+      <p class="muted" style="margin-top:12px; font-size:.92rem; max-width:64ch;"><strong style="color:var(--fg)">OLAP, online analytical processing</strong>: queries that scan and aggregate many rows to answer business questions, the opposite of OLTP's short transactions.</p>
+      <div class="tag-row" style="margin-top:20px;">
+        <span class="pill">OLAP &amp; columnar</span><span class="pill">skipping &amp; execution</span><span class="pill">MPP &amp; modeling</span><span class="pill">warehouse &amp; lakehouse</span><span class="pill">real-time &amp; HTAP</span>
       </div>
-      <p class="muted" style="margin-top:26px; font-size:.85rem;">Navigate with <span class="kbd">↓</span> <span class="kbd">↑</span> <span class="kbd">Space</span> or the arrows, bottom-right. Press <span class="kbd">G</span> or tap the slide counter to see every slide and jump to one.</p>
-      <p class="muted" style="margin-top:8px; font-size:.85rem;">The rest of the series: <a class="go inline" href="../database-guide/index.html">Part 1 · models, storage, architecture</a> · <a class="go inline" href="../distributed-databases/index.html">Part 2 · distributed databases</a> · <a class="go inline" href="../database-transactions/index.html">Part 3 · transactions</a></p>
+      <p class="muted" style="margin-top:24px; font-size:.85rem;">Navigate with <span class="kbd">↓</span> <span class="kbd">↑</span> <span class="kbd">Space</span> or the arrows, bottom-right. Press <span class="kbd">G</span> or tap the slide counter to see every slide and jump to one.</p>
+      <p class="muted" style="margin-top:8px; font-size:.85rem;">The rest of the series: <a class="go inline" href="../database-guide/index.html">Part 1 · models, storage, architecture</a> · <a class="go inline" href="../distributed-databases/index.html">Part 2 · distributed databases</a> · <a class="go inline" href="../database-transactions/index.html">Part 3 · transactions</a> · <a class="go inline" href="../specialized-databases/index.html">Part 5 · specialized databases</a></p>
     </div>
-    <div class="foot">ANALYTICAL DATABASES / 01</div>
+    <div class="foot">OLAP DATABASES / 01</div>
   </section>
   <!-- 2 — OLTP VS OLAP -->
   <section class="slide" id="s2">
@@ -477,8 +422,8 @@
     </div>
     <div class="grid cols-3">
       <div class="card"><h3 class="accent">1 · Compression</h3><p>One column holds one type in a narrow range, so it compresses far better than mixed rows. <strong>Dictionary</strong> (strings → small ints), <strong>RLE</strong> (value, count), <strong>delta / frame-of-reference</strong>, <strong style="white-space:nowrap">bit-packing</strong>.</p></div>
-      <div class="card"><h3 class="accent">2 · Vectorized execution</h3><p>Operators process batches (often 1k–4k values) instead of one row at a time: fewer calls per value, <strong>SIMD</strong>-friendly loops, data that stays in CPU cache. Some engines compile the pipeline to machine code instead.</p></div>
-      <div class="card"><h3 class="accent">3 · Data skipping</h3><p>Each file or block keeps <strong>min/max</strong> stats (zone maps). <code style="white-space:nowrap">WHERE ts &gt;= '2026-09-01'</code> skips whole blocks unread. A good <strong>sort / clustering key</strong> makes pruning far more effective.</p></div>
+      <div class="card"><h3 class="accent">2 · Vectorized execution</h3><p>Operators process batches of values (MonetDB/X100: about 1,000; DuckDB: 2,048) instead of one row at a time: fewer calls per value, <strong>SIMD</strong>-friendly loops, data that stays in CPU cache. Some engines compile the pipeline to machine code instead. <a class="go inline" href="#s6">Slide 06 →</a></p></div>
+      <div class="card"><h3 class="accent">3 · Data skipping</h3><p>Each file or block keeps <strong>min/max</strong> stats (zone maps). <code style="white-space:nowrap">WHERE ts &gt;= '2026-09-01'</code> skips whole blocks unread. A good <strong>sort / clustering key</strong> makes pruning far more effective. <a class="go inline" href="#s5">Slide 05 →</a></p></div>
     </div>
     <div class="grid cols-2">
       <div class="card" style="border-color:var(--warm);"><h3 style="color:var(--warm)">What you pay</h3><p><strong>Point updates are expensive</strong> (one row touches every column file), <strong>row reconstruction</strong> costs extra when you select many columns, and single-row inserts are inefficient, so writes are batched.</p></div>
@@ -486,8 +431,224 @@
     </div>
     <div class="foot">COLUMNAR / 04</div>
   </section>
-  <!-- 5 — WAREHOUSE ARCHITECTURE -->
-  <section class="slide" id="s5">
+  <!-- 5 — DATA SKIPPING -->
+  <section class="slide dense" id="s5">
+    <div>
+      <p class="eyebrow">Storage · data skipping</p>
+      <h2>The fastest read is the one you skip</h2>
+      <p class="lead" style="margin-top:10px;">Before reading any data, the engine checks metadata and rules out every block that cannot match the filter.</p>
+    </div>
+    <div class="split">
+      <div>
+        <ul class="ticks">
+          <li><strong>Partitions</strong>: split the table on a column such as the event date. A filter on that column skips whole partitions before anything is read; BigQuery calls this <em>pruning</em>.</li>
+          <li><strong>Zone maps</strong> (min/max indexes): every block stores each column's smallest and largest value, and a block whose range cannot match is never read. DuckDB keeps them per row group; Snowflake per micro-partition (50–500 MB uncompressed).</li>
+          <li><strong>Sort or cluster keys keep those ranges narrow.</strong> BigQuery sorts storage blocks by up to four clustering columns. If the data is sorted on something else, every block spans a wide range and little is skipped.</li>
+          <li><strong>Parquet</strong>: file → row groups → one column chunk per column → pages, with min/max per chunk and per page (the page index). For IDs or emails, ranges are too wide; a <strong>bloom filter</strong> answers “definitely not here” or “maybe”, never a false no.</li>
+          <li><strong>ClickHouse</strong>: a sparse primary index with one entry per granule of up to 8,192 rows, not per row; a binary search over these entries picks the granules to read.</li>
+        </ul>
+      </div>
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 420 298" role="img" aria-label="Pruning one query: the day filter skips three of five partitions, min/max ranges on user_id skip two of three row groups, and the Parquet page index skips two of three pages, so one page of one column is read" style="max-width:470px"><defs><marker id="sk1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker><marker id="sk2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#d9480f"/></marker></defs>
+<text class="b" x="210" y="16" text-anchor="middle">WHERE day &gt;= '09-01' AND user_id = 4711</text>
+<text class="lbl" x="12" y="40">1 · partitions by day · 3 of 5 skipped</text>
+<rect class="skip" x="12" y="48" width="72" height="34" rx="7"/><text class="skt" x="48" y="69" text-anchor="middle">08-29</text>
+<rect class="skip" x="92" y="48" width="72" height="34" rx="7"/><text class="skt" x="128" y="69" text-anchor="middle">08-30</text>
+<rect class="skip" x="172" y="48" width="72" height="34" rx="7"/><text class="skt" x="208" y="69" text-anchor="middle">08-31</text>
+<rect class="n-b" x="252" y="48" width="72" height="34" rx="7"/><text x="288" y="69" text-anchor="middle">09-01</text>
+<rect class="n-b" x="332" y="48" width="72" height="34" rx="7"/><text x="368" y="69" text-anchor="middle">09-02</text>
+<path class="lnb" d="M318 84 L340 112" marker-end="url(#sk1)"/>
+<text class="lbl" x="12" y="108">2 · zone maps on user_id · 2 of 3 skipped</text>
+<rect class="skip" x="12" y="116" width="124" height="42" rx="7"/><text class="skt" x="74" y="134" text-anchor="middle">row group 1</text><text class="sub" x="74" y="150" text-anchor="middle">1 – 2,000</text>
+<rect class="skip" x="148" y="116" width="124" height="42" rx="7"/><text class="skt" x="210" y="134" text-anchor="middle">row group 2</text><text class="sub" x="210" y="150" text-anchor="middle">2,010 – 3,900</text>
+<rect class="n-b" x="284" y="116" width="124" height="42" rx="7"/><text x="346" y="134" text-anchor="middle">row group 3</text><text class="sub" x="346" y="150" text-anchor="middle">3,950 – 5,100</text>
+<path class="lnb" d="M346 160 L346 184" marker-end="url(#sk1)"/>
+<text class="lbl" x="12" y="180">3 · page index · 2 of 3 pages skipped</text>
+<rect class="skip" x="12" y="188" width="124" height="42" rx="7"/><text class="skt" x="74" y="206" text-anchor="middle">page 1</text><text class="sub" x="74" y="222" text-anchor="middle">3,950 – 4,300</text>
+<rect class="skip" x="148" y="188" width="124" height="42" rx="7"/><text class="skt" x="210" y="206" text-anchor="middle">page 2</text><text class="sub" x="210" y="222" text-anchor="middle">4,310 – 4,600</text>
+<rect class="n-w" x="284" y="188" width="124" height="42" rx="7"/><text x="346" y="206" text-anchor="middle">page 3</text><text class="sub" x="346" y="222" text-anchor="middle">4,610 – 5,100</text>
+<path class="lnw" d="M346 232 L346 252" marker-end="url(#sk2)"/>
+<rect class="n-w" x="12" y="254" width="396" height="38" rx="8"/><text class="b" x="210" y="270" text-anchor="middle">read: one page of one column</text><text class="sub" x="210" y="285" text-anchor="middle">everything else was ruled out from metadata alone</text>
+</svg>
+        <p class="cap">partitions → zone maps → page index · 09-02's row groups go through the same checks</p>
+      </div>
+    </div>
+    <div class="foot">DATA SKIPPING / 05</div>
+  </section>
+  <!-- 6 — EXECUTION ON ONE NODE -->
+  <section class="slide dense" id="s6">
+    <div>
+      <p class="eyebrow">Execution · one node</p>
+      <h2>Vectorized or compiled: how the CPU runs a query</h2>
+      <p class="lead" style="margin-top:10px;">Same plan, Scan → Filter → Sum. What changes is how much work one function call does.</p>
+    </div>
+    <div class="split">
+      <div>
+        <ul class="ticks">
+          <li><strong>Volcano (iterator) model</strong>: every operator has a <code>next()</code> that returns one row. Simple and composable, but each row costs at least one virtual function call per operator, and the compiler cannot turn that into a tight loop.</li>
+          <li><strong>Vectorized</strong> (MonetDB/X100, 2005): keep the iterator, but pass a vector of about 1,000 values per call, small enough to stay in CPU cache. Loops over one column suit <strong>SIMD</strong>: one CPU instruction applied to several values at once. DuckDB (2,048 values, push-based), ClickHouse (whole blocks, plus some JIT-compiled expressions), Meta's Velox and Databricks' Photon work this way.</li>
+          <li><strong>Compiled</strong> (HyPer, 2011): generate machine code per query with LLVM and fuse the operators, so a row stays in CPU registers until a pipeline breaker such as a hash-table build. Umbra, HyPer's successor, and Spark's whole-stage code generation (JVM bytecode) do the same.</li>
+          <li><strong>Neither wins outright</strong>: in a like-for-like study, vectorized engines hid memory stalls better, while compiled code needed fewer CPU instructions. Photon chose vectorized because it was easier to build, profile and debug.</li>
+        </ul>
+      </div>
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 420 296" role="img" aria-label="The same plan three ways: Volcano passes one row per next() call; vectorized engines pass a vector of values per call and use SIMD; compiled engines fuse scan, filter and sum into one loop that keeps values in CPU registers" style="max-width:470px"><defs><marker id="ex1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker><marker id="ex2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs>
+<rect class="cl" x="6" y="4" width="132" height="288" rx="10"/><rect class="cl" x="144" y="4" width="132" height="288" rx="10"/><rect class="cl" x="282" y="4" width="132" height="288" rx="10"/>
+<text class="b" x="72" y="24" text-anchor="middle">Volcano</text><text class="sub" x="72" y="39" text-anchor="middle">one row per call</text>
+<text class="b" x="210" y="24" text-anchor="middle">Vectorized</text><text class="sub" x="210" y="39" text-anchor="middle">a vector per call</text>
+<text class="b" x="348" y="24" text-anchor="middle">Compiled</text><text class="sub" x="348" y="39" text-anchor="middle">one fused loop</text>
+<rect class="n-g" x="26" y="58" width="92" height="30" rx="7"/><text x="72" y="77" text-anchor="middle">Sum</text>
+<rect class="n-g" x="26" y="128" width="92" height="30" rx="7"/><text x="72" y="147" text-anchor="middle">Filter</text>
+<rect class="n-g" x="26" y="198" width="92" height="30" rx="7"/><text x="72" y="217" text-anchor="middle">Scan</text>
+<path class="lnd" d="M44 90 L44 126" marker-end="url(#ex2)"/><path class="lnd" d="M44 160 L44 196" marker-end="url(#ex2)"/>
+<text class="sub" x="50" y="181">next()</text>
+<path class="lnb" d="M100 196 L100 160" marker-end="url(#ex1)"/><path class="lnb" d="M100 126 L100 90" marker-end="url(#ex1)"/>
+<rect class="n-b" x="105" y="105" width="8" height="8" rx="1"/><rect class="n-b" x="105" y="175" width="8" height="8" rx="1"/>
+<rect class="n-g" x="164" y="58" width="92" height="30" rx="7"/><text x="210" y="77" text-anchor="middle">Sum</text>
+<rect class="n-g" x="164" y="128" width="92" height="30" rx="7"/><text x="210" y="147" text-anchor="middle">Filter</text>
+<rect class="n-g" x="164" y="198" width="92" height="30" rx="7"/><text x="210" y="217" text-anchor="middle">Scan</text>
+<path class="lnd" d="M182 90 L182 126" marker-end="url(#ex2)"/><path class="lnd" d="M182 160 L182 196" marker-end="url(#ex2)"/>
+<text class="sub" x="188" y="181">next()</text>
+<path class="lnb" d="M238 196 L238 160" marker-end="url(#ex1)"/><path class="lnb" d="M238 126 L238 90" marker-end="url(#ex1)"/>
+<rect class="n-b" x="243" y="99" width="5" height="20" rx="1"/><rect class="n-b" x="250" y="99" width="5" height="20" rx="1"/><rect class="n-b" x="257" y="99" width="5" height="20" rx="1"/><rect class="n-b" x="264" y="99" width="5" height="20" rx="1"/>
+<rect class="n-b" x="243" y="169" width="5" height="20" rx="1"/><rect class="n-b" x="250" y="169" width="5" height="20" rx="1"/><rect class="n-b" x="257" y="169" width="5" height="20" rx="1"/><rect class="n-b" x="264" y="169" width="5" height="20" rx="1"/>
+<rect class="n-w" x="190" y="100" width="40" height="17" rx="4"/><text class="lbl warm" x="210" y="112.5" text-anchor="middle">SIMD</text>
+<rect class="n-w" x="294" y="58" width="108" height="170" rx="8"/>
+<text class="sub" x="348" y="76" text-anchor="middle">Scan+Filter+Sum</text>
+<text x="302" y="102" style="font-size:11.5px">for each row:</text>
+<text x="314" y="120" style="font-size:11.5px">if x &gt; 10:</text>
+<text x="326" y="138" style="font-size:11.5px">sum += x</text>
+<rect class="n-b" x="302" y="156" width="92" height="22" rx="5"/><text class="sub" x="348" y="171" text-anchor="middle">CPU registers</text>
+<text class="sub" x="348" y="195" text-anchor="middle">machine code,</text><text class="sub" x="348" y="208" text-anchor="middle">generated</text><text class="sub" x="348" y="221" text-anchor="middle">per query</text>
+<text class="sub" x="72" y="256" text-anchor="middle">simple, composable</text><text class="sub" x="72" y="271" text-anchor="middle">1 call per row,</text><text class="sub" x="72" y="285" text-anchor="middle">per operator</text>
+<text class="sub" x="210" y="256" text-anchor="middle">X100 · DuckDB</text><text class="sub" x="210" y="271" text-anchor="middle">ClickHouse · Velox</text><text class="sub" x="210" y="285" text-anchor="middle">Photon</text>
+<text class="sub" x="348" y="256" text-anchor="middle">HyPer · Umbra</text><text class="sub" x="348" y="271" text-anchor="middle">Spark whole-stage</text><text class="sub" x="348" y="285" text-anchor="middle">code generation</text>
+</svg>
+        <p class="cap">push or pull is a separate choice: DuckDB is vectorized and push-based</p>
+      </div>
+    </div>
+    <p class="read">Papers: <a href="https://www.cidrdb.org/cidr2005/papers/P19.pdf">MonetDB/X100 (CIDR 2005)</a> · <a href="https://www.vldb.org/pvldb/vol4/p539-neumann.pdf">HyPer query compilation (PVLDB 2011)</a> · <a href="https://www.vldb.org/pvldb/vol11/p2209-kersten.pdf">Compiled vs vectorized (PVLDB 2018)</a> · <a href="https://people.eecs.berkeley.edu/~matei/papers/2022/sigmod_photon.pdf">Photon (SIGMOD 2022)</a> · <a href="https://www.vldb.org/pvldb/vol15/p3372-pedreira.pdf">Velox (PVLDB 2022)</a></p>
+    <div class="foot">EXECUTION / 06</div>
+  </section>
+  <!-- 7 — EXECUTION ON MANY NODES (MPP) -->
+  <section class="slide dense" id="s7">
+    <div>
+      <p class="eyebrow">Execution · many nodes (MPP)</p>
+      <h2>One query, many nodes: shuffles and joins</h2>
+      <p class="lead" style="margin-top:10px;"><strong>MPP, massively parallel processing</strong>: slice the table across nodes, run the same plan on every slice, and move as few rows as possible between them.</p>
+    </div>
+    <div class="split">
+      <div>
+        <ul class="ticks">
+          <li><strong>Scatter / gather</strong>: a coordinator splits the query into fragments, workers scan their own slices in parallel, and results flow back up. Dremel, BigQuery's engine, began as a tree of root, intermediate and leaf servers.</li>
+          <li><strong>Partial, then final aggregation</strong>: each worker pre-aggregates its rows, the partials are hash-repartitioned by group key, and a final step merges them. Only small partials cross the network; Trino's <code>EXPLAIN</code> shows exactly these steps.</li>
+          <li><strong>Broadcast or shuffle join</strong>: copy a small table to every node and leave the big one in place, or hash-repartition both sides on the join key. Spark broadcasts tables estimated under 10 MB by default; BigQuery starts with a shuffle and switches to broadcast at run time if one side turns out small.</li>
+          <li><strong>Co-located joins need no move</strong>: distribute fact and dimension on the same join key (Redshift <code>DISTSTYLE KEY</code>, or co-location in Citus, which is shared-nothing) and matching rows already sit on one node. Small dimensions are copied to every node (Redshift <code>ALL</code>, Citus reference tables).</li>
+          <li><strong>The shuffle is the bill; skew is the trap</strong>: moving rows can dominate a query's cost; BigQuery even runs its shuffles on a separate in-memory tier. One hot key sends most rows to one node and the query waits for it; Spark's adaptive execution can split skewed partitions.</li>
+        </ul>
+      </div>
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 420 298" role="img" aria-label="A coordinator scatters fragments to three workers; each scans and pre-aggregates, partials are repartitioned by hash of the key to three final aggregators, and results are gathered. Below, three join strategies: broadcast copies the small table to every node, shuffle repartitions both sides, co-located needs no movement" style="max-width:470px"><defs><marker id="mp1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="mp2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker><marker id="mp3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#d9480f"/></marker></defs>
+<rect class="n-g" x="140" y="4" width="140" height="24" rx="7"/><text x="210" y="20.5" text-anchor="middle">coordinator</text>
+<text class="lbl" x="290" y="20">scatter fragments</text>
+<path class="lnd" d="M180 28 L80 41" marker-end="url(#mp1)"/><path class="lnd" d="M210 28 L210 41" marker-end="url(#mp1)"/><path class="lnd" d="M240 28 L340 41" marker-end="url(#mp1)"/>
+<rect class="n-b" x="12" y="42" width="124" height="46" rx="8"/><text x="74" y="61" text-anchor="middle">worker 1</text><text class="sub" x="74" y="78" text-anchor="middle">scan + pre-agg</text>
+<rect class="n-b" x="148" y="42" width="124" height="46" rx="8"/><text x="210" y="61" text-anchor="middle">worker 2</text><text class="sub" x="210" y="78" text-anchor="middle">scan + pre-agg</text>
+<rect class="n-b" x="284" y="42" width="124" height="46" rx="8"/><text x="346" y="61" text-anchor="middle">worker 3</text><text class="sub" x="346" y="78" text-anchor="middle">scan + pre-agg</text>
+<g class="ln" style="stroke:#2f54eb; stroke-opacity:.55">
+<path d="M42 88 L42 129"/><path d="M74 88 L178 129"/><path d="M106 88 L314 129"/>
+<path d="M178 88 L74 129"/><path d="M210 88 L210 129"/><path d="M242 88 L346 129"/>
+<path d="M314 88 L106 129"/><path d="M346 88 L242 129"/><path d="M378 88 L378 129"/>
+</g>
+<rect x="118" y="100" width="184" height="17" rx="4" fill="#f8fafc"/><text class="lbl dark" x="210" y="112" text-anchor="middle">repartition by hash(key)</text>
+<rect class="n-w" x="12" y="130" width="124" height="28" rx="7"/><text x="74" y="148.5" text-anchor="middle">final · hash 0</text>
+<rect class="n-w" x="148" y="130" width="124" height="28" rx="7"/><text x="210" y="148.5" text-anchor="middle">final · hash 1</text>
+<rect class="n-w" x="284" y="130" width="124" height="28" rx="7"/><text x="346" y="148.5" text-anchor="middle">final · hash 2</text>
+<path class="ln" d="M74 158 L168 177" marker-end="url(#mp1)"/><path class="ln" d="M210 158 L210 177" marker-end="url(#mp1)"/><path class="ln" d="M346 158 L252 177" marker-end="url(#mp1)"/>
+<rect class="n-g" x="140" y="178" width="140" height="24" rx="7"/><text x="210" y="194.5" text-anchor="middle">gather → result</text>
+<line class="cl" x1="8" y1="214" x2="412" y2="214"/>
+<text class="b" x="71" y="232" text-anchor="middle">broadcast</text>
+<text class="b" x="210" y="232" text-anchor="middle">shuffle</text>
+<text class="b" x="349" y="232" text-anchor="middle">co-located</text>
+<path class="lnw" d="M29 252 Q50 236 71 251" marker-end="url(#mp3)"/><path class="lnw" d="M29 252 Q71 228 113 251" marker-end="url(#mp3)"/>
+<rect class="n-g" x="10" y="252" width="38" height="24" rx="5"/><text class="lbl dark" x="29" y="268" text-anchor="middle">F1+d</text>
+<rect class="n-g" x="52" y="252" width="38" height="24" rx="5"/><text class="lbl dark" x="71" y="268" text-anchor="middle">F2+d</text>
+<rect class="n-g" x="94" y="252" width="38" height="24" rx="5"/><text class="lbl dark" x="113" y="268" text-anchor="middle">F3+d</text>
+<path class="lnb" d="M168 252 Q189 238 210 252"/><path class="lnb" d="M210 252 Q231 238 252 252"/><path class="lnb" d="M168 252 Q210 226 252 252"/>
+<rect class="n-g" x="149" y="252" width="38" height="24" rx="5"/><text class="lbl dark" x="168" y="268" text-anchor="middle">F+D</text>
+<rect class="n-g" x="191" y="252" width="38" height="24" rx="5"/><text class="lbl dark" x="210" y="268" text-anchor="middle">F+D</text>
+<rect class="n-g" x="233" y="252" width="38" height="24" rx="5"/><text class="lbl dark" x="252" y="268" text-anchor="middle">F+D</text>
+<rect class="n-b" x="288" y="252" width="38" height="24" rx="5"/><text class="lbl dark" x="307" y="268" text-anchor="middle">F1·D1</text>
+<rect class="n-b" x="330" y="252" width="38" height="24" rx="5"/><text class="lbl dark" x="349" y="268" text-anchor="middle">F2·D2</text>
+<rect class="n-b" x="372" y="252" width="38" height="24" rx="5"/><text class="lbl dark" x="391" y="268" text-anchor="middle">F3·D3</text>
+<text class="sub" x="71" y="292" text-anchor="middle">copy the small table</text>
+<text class="sub" x="210" y="292" text-anchor="middle">hash both sides</text>
+<text class="sub" x="349" y="292" text-anchor="middle">same key, same node</text>
+</svg>
+        <p class="cap">partial agg → repartition → final agg → gather, as in Trino's EXPLAIN</p>
+      </div>
+    </div>
+    <p class="read">Paper: <a href="https://www.vldb.org/pvldb/vol13/p3461-melnik.pdf">Dremel: A Decade of Interactive SQL Analysis at Web Scale (PVLDB 2020)</a></p>
+    <div class="foot">MPP / 07</div>
+  </section>
+  <!-- 8 — STAR SCHEMA -->
+  <section class="slide dense" id="s8">
+    <div>
+      <p class="eyebrow">Modeling</p>
+      <h2>Star schemas: facts, dimensions and when to flatten</h2>
+      <p class="lead" style="margin-top:10px;">Analytical schemas are shaped for scans and group-bys, not for updating one row at a time.</p>
+    </div>
+    <div class="split">
+      <div>
+        <ul class="ticks">
+          <li><strong>Fact table</strong>: one row per business event (a sale, a click) with numeric measures and a foreign key to each dimension. It is long and narrow, and it is what you aggregate. <strong>Declare the grain first</strong>: decide exactly what one row means (one order line? one daily balance?).</li>
+          <li><strong>Dimension tables</strong>: wide, flat and denormalized: the text you filter and group by (product name, region, month). A fact table joined to its dimensions by keys is a <strong>star schema</strong>.</li>
+          <li><strong>Snowflake schema</strong>: dimensions normalized into chains of smaller tables. Same information, more joins; Kimball recommends flattening them.</li>
+          <li><strong>Flatten further, or nest</strong>: pre-joining facts and dimensions into one wide table removes joins at query time but moves the work to load time (ClickHouse's advice for low latency). BigQuery recommends <strong>nested and repeated fields</strong> instead: an order keeps its line items inside its row, so there is no join and no shuffle.</li>
+          <li><strong>History, only if you need it</strong>: a type 2 <em>slowly changing dimension</em> adds a new dimension row with validity dates when a customer moves, so old facts keep the old address.</li>
+        </ul>
+      </div>
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 420 298" role="img" aria-label="Star schema: a fact_sales table at one order line per row, linked by foreign keys to date, customer, store and product dimensions; the product dimension is snowflaked into a category table. Below, the same order as one nested row whose line items are stored as separate columns" style="max-width:470px"><defs><marker id="st1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker></defs>
+<path class="ln" d="M130 74 L116 40"/><path class="ln" d="M130 134 L116 146"/><path class="ln" d="M290 74 L304 40"/><path class="ln" d="M290 134 L304 146"/>
+<rect class="n-w" x="130" y="52" width="160" height="104" rx="9"/>
+<text class="b" x="210" y="72" text-anchor="middle">fact_sales</text>
+<text class="sub" x="210" y="88" text-anchor="middle">grain: one order line</text>
+<line x1="142" y1="96" x2="278" y2="96" style="stroke:#d9480f; stroke-opacity:.35"/>
+<text class="sub" x="210" y="112" text-anchor="middle">date_key · product_key</text>
+<text class="sub" x="210" y="127" text-anchor="middle">store_key · cust_key</text>
+<text class="lbl warm" x="210" y="145" text-anchor="middle">qty · amount</text>
+<rect class="n-b" x="6" y="12" width="110" height="44" rx="8"/><text x="61" y="30" text-anchor="middle">dim_date</text><text class="sub" x="61" y="46" text-anchor="middle">day, month</text>
+<rect class="n-b" x="6" y="122" width="110" height="44" rx="8"/><text x="61" y="140" text-anchor="middle">dim_customer</text><text class="sub" x="61" y="156" text-anchor="middle">name, city</text>
+<rect class="n-b" x="304" y="12" width="110" height="44" rx="8"/><text x="359" y="30" text-anchor="middle">dim_store</text><text class="sub" x="359" y="46" text-anchor="middle">region, city</text>
+<rect class="n-b" x="304" y="122" width="110" height="44" rx="8"/><text x="359" y="140" text-anchor="middle">dim_product</text><text class="sub" x="359" y="156" text-anchor="middle">name, brand</text>
+<path class="lnd" d="M359 166 L359 177" marker-end="url(#st1)"/>
+<rect class="skip" x="304" y="178" width="110" height="24" rx="7"/><text class="skt" x="359" y="194" text-anchor="middle">dim_category</text>
+<text class="lbl" x="296" y="194" text-anchor="end">snowflake: +1 join</text>
+<text class="lbl" x="12" y="194">star: 1 join per dim</text>
+<line class="cl" x1="8" y1="212" x2="412" y2="212"/>
+<text class="b" x="8" y="230">one nested row</text>
+<rect class="n-w" x="8" y="238" width="192" height="56" rx="8"/>
+<text class="sub" x="16" y="254">order 1001 · customer {…}</text>
+<text class="sub" x="16" y="269">items ARRAY&lt;STRUCT&gt;</text>
+<text class="sub" x="16" y="284">[A, qty 2] · [B, qty 1]</text>
+<text class="b" x="216" y="230">stored as columns</text>
+<text class="sub" x="216" y="257">items.sku</text>
+<rect class="n-b" x="282" y="243" width="26" height="20" rx="4"/><text class="lbl dark" x="295" y="257" text-anchor="middle">A</text>
+<rect class="n-b" x="312" y="243" width="26" height="20" rx="4"/><text class="lbl dark" x="325" y="257" text-anchor="middle">B</text>
+<text class="sub" x="216" y="281">items.qty</text>
+<rect class="n-b" x="282" y="267" width="26" height="20" rx="4"/><text class="lbl dark" x="295" y="281" text-anchor="middle">2</text>
+<rect class="n-b" x="312" y="267" width="26" height="20" rx="4"/><text class="lbl dark" x="325" y="281" text-anchor="middle">1</text>
+<text class="sub" x="346" y="257">+ rep and</text><text class="sub" x="346" y="281">def levels</text>
+</svg>
+        <p class="cap">star schema above · nested and repeated fields below (BigQuery, Parquet)</p>
+      </div>
+    </div>
+    <p class="read">Read: <a href="https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/">Kimball Group, dimensional modeling techniques</a> · <a href="https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/36632.pdf">Dremel: record shredding for nested data (VLDB 2010)</a></p>
+    <div class="foot">STAR SCHEMA / 08</div>
+  </section>
+  <!-- 9 — WAREHOUSE ARCHITECTURE -->
+  <section class="slide" id="s9">
     <div>
       <p class="eyebrow">Architecture · warehouse · disaggregated, shared storage</p>
       <h2>Warehouses keep one shared copy of data and rent compute</h2>
@@ -507,10 +668,10 @@
         <p class="cap">disaggregated, shared storage · metadata in between</p>
       </div>
     </div>
-    <div class="foot">WAREHOUSE / 05</div>
+    <div class="foot">WAREHOUSE / 09</div>
   </section>
-  <!-- 6 — LAKEHOUSE -->
-  <section class="slide" id="s6">
+  <!-- 10 — LAKEHOUSE -->
+  <section class="slide" id="s10">
     <div>
       <p class="eyebrow">Architecture · lakehouse</p>
       <h2>A lakehouse is still a warehouse</h2>
@@ -518,7 +679,7 @@
     </div>
     <div class="lh-grid" role="table" aria-label="Warehouse and lakehouse compared layer by layer">
       <div class="hd" role="columnheader">Layer</div><div class="hd" role="columnheader">Warehouse</div><div class="hd" role="columnheader">Lakehouse</div>
-      <div class="lab">compute</div><div>The vendor's engine</div><div>Any engine: Spark, Trino, Flink, DuckDB; Snowflake and BigQuery read Iceberg too</div>
+      <div class="lab">compute</div><div>The vendor's engine</div><div>Any engine: Spark, Trino, Flink, DuckDB; Snowflake and BigQuery read and write Iceberg tables too</div>
       <div class="lab">metadata · transactions</div><div>Internal catalog and transaction log</div><div><strong>Open table format</strong> (Iceberg, Delta Lake, Hudi): ACID commits, schema evolution, time travel</div>
       <div class="lab">file format</div><div>Proprietary columnar files</div><div>Open columnar files: Parquet (or ORC)</div>
       <div class="lab">storage</div><div>Object storage managed by the vendor</div><div>Your own bucket: S3, GCS, ADLS</div>
@@ -526,12 +687,129 @@
     </div>
     <div class="grid cols-2">
       <div class="card"><h3>Where it came from</h3><p>A <strong>data lake</strong> was just files in a bucket: cheap and open, but no transactions and no schema enforcement. Table formats added those on top; Databricks popularized the name.</p></div>
-      <div class="card" style="border-color:var(--warm);"><h3 style="color:var(--warm)">What you take on</h3><p>Picking and running a <strong>catalog</strong>, compacting <strong>small files</strong>, expiring old snapshots, and accepting that performance features (caching, clustering, indexes) differ per engine.</p></div>
+      <div class="card" style="border-color:var(--warm);"><h3 style="color:var(--warm)">What you take on</h3><p>Picking and running a <strong>catalog</strong>, compacting <strong>small files</strong>, expiring old snapshots, and accepting that performance features (caching, clustering, indexes) differ per engine. How the formats commit: <a class="go inline" href="#s11">Slide 11 →</a></p></div>
     </div>
-    <div class="foot">LAKEHOUSE / 06</div>
+    <div class="foot">LAKEHOUSE / 10</div>
   </section>
-  <!-- 7 — OLAP ENGINES -->
-  <section class="slide" id="s7">
+  <!-- 11 — OPEN TABLE FORMATS -->
+  <section class="slide dense" id="s11">
+    <div>
+      <p class="eyebrow">Lakehouse · open table formats</p>
+      <h2>Iceberg, Delta Lake and Hudi: ACID on object storage</h2>
+      <p class="lead" style="margin-top:10px;">A bucket of immutable files gets transactions from a tree of metadata files and one atomic step per commit.</p>
+    </div>
+    <div class="split">
+      <div>
+        <ul class="ticks">
+          <li><strong>Commit = one atomic swap</strong>: files are never changed in place. A change writes new data files and a new metadata file, then the table's pointer moves to it in one step; readers see the old snapshot or the new one, never half of each.</li>
+          <li><strong>The metadata tree</strong> (Iceberg spec v1–v3): metadata → snapshot → manifest list → manifests with per-file min/max → Parquet files. Unchanged manifests are shared between snapshots. Spec v4, still in development, replaces the manifest list with one root manifest.</li>
+          <li><strong>Optimistic concurrency</strong>: writers prepare files without locks and commit only if the table is still at the snapshot they read. On a conflict the Iceberg REST catalog answers 409 and the writer retries. Delta Lake writers race to create the next numbered log file instead; Hudi records each action on a timeline.</li>
+          <li><strong>Copy-on-write or merge-on-read</strong>: rewrite the affected files on every update (fast reads), or write changes to small log or delete files that are merged at read time until compaction (fast writes). Hudi offers both as table types.</li>
+          <li><strong>Upkeep and catalogs</strong>: time travel works until old snapshots are expired; frequent small commits leave many small files for compaction to rewrite. Iceberg REST catalogs include Apache Polaris (a top-level Apache project since February 2026), Unity Catalog and AWS Glue.</li>
+        </ul>
+      </div>
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 420 298" role="img" aria-label="Iceberg metadata tree: the catalog points to the current table metadata file, which lists snapshots; each snapshot has a manifest list, data manifests hold per-file statistics and point to Parquet data files, a delete manifest points only to delete files, and an unchanged manifest is shared by two snapshots. A commit writes files, then swaps the catalog pointer only if the table is still at the snapshot it read; a conflict returns 409 and the writer retries. Delta Lake and Hudi commit by adding the next log file or timeline instant" style="max-width:470px"><defs><marker id="tf1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="tf2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker></defs>
+<rect class="n-g" x="6" y="4" width="262" height="34" rx="8"/><text class="b" x="137" y="19" text-anchor="middle">catalog</text><text class="sub" x="137" y="33" text-anchor="middle">REST: Polaris · Unity Catalog · Glue</text>
+<path class="lnb" d="M137 38 L137 55" marker-end="url(#tf2)"/><text class="lbl" x="145" y="51">current pointer</text>
+<rect class="n-b" x="6" y="56" width="262" height="38" rx="8"/><text x="137" y="72" text-anchor="middle">table metadata 00003.json</text><text class="sub" x="137" y="87" text-anchor="middle">schema · partition spec · snapshots</text>
+<path class="ln" d="M66 94 L66 107" marker-end="url(#tf1)"/><path class="ln" d="M196 94 L196 107" marker-end="url(#tf1)"/>
+<rect class="n-g" x="16" y="108" width="100" height="24" rx="6"/><text class="lbl dark" x="66" y="124" text-anchor="middle">snapshot S1</text>
+<rect class="n-b" x="146" y="108" width="100" height="24" rx="6"/><text class="lbl dark" x="196" y="124" text-anchor="middle">snapshot S2</text>
+<path class="ln" d="M66 132 L66 147" marker-end="url(#tf1)"/><path class="ln" d="M196 132 L196 147" marker-end="url(#tf1)"/>
+<rect class="n-g" x="16" y="148" width="100" height="24" rx="6"/><text class="lbl dark" x="66" y="164" text-anchor="middle">manifest list</text>
+<rect class="n-b" x="146" y="148" width="100" height="24" rx="6"/><text class="lbl dark" x="196" y="164" text-anchor="middle">manifest list</text>
+<path class="ln" d="M50 172 L46 187" marker-end="url(#tf1)"/><path class="ln" d="M90 172 L122 187" marker-end="url(#tf1)"/><path class="ln" d="M180 172 L140 187" marker-end="url(#tf1)"/><path class="ln" d="M212 172 L216 187" marker-end="url(#tf1)"/>
+<rect class="n-w" x="6" y="188" width="80" height="34" rx="7"/><text x="46" y="203" text-anchor="middle">manifest</text><text class="sub" x="46" y="216" text-anchor="middle">file stats</text>
+<rect class="n-w" x="91" y="188" width="80" height="34" rx="7"/><text x="131" y="203" text-anchor="middle">manifest</text><text class="sub" x="131" y="216" text-anchor="middle">shared</text>
+<rect class="n-w" x="176" y="188" width="80" height="34" rx="7"/><text x="216" y="203" text-anchor="middle">manifest</text><text class="sub" x="216" y="216" text-anchor="middle">deletes</text>
+<path class="ln" d="M36 222 L25 239"/><path class="ln" d="M56 222 L65 239"/><path class="ln" d="M121 222 L111 239"/><path class="ln" d="M141 222 L151 239"/><path class="ln" d="M216 222 L216 239"/>
+<rect class="n-g" x="8" y="240" width="34" height="22" rx="4"/><text class="lbl dark" x="25" y="255" text-anchor="middle">data</text>
+<rect class="n-g" x="48" y="240" width="34" height="22" rx="4"/><text class="lbl dark" x="65" y="255" text-anchor="middle">data</text>
+<rect class="n-g" x="94" y="240" width="34" height="22" rx="4"/><text class="lbl dark" x="111" y="255" text-anchor="middle">data</text>
+<rect class="n-g" x="134" y="240" width="34" height="22" rx="4"/><text class="lbl dark" x="151" y="255" text-anchor="middle">data</text>
+<rect class="n-w" x="199" y="240" width="34" height="22" rx="4"/><text class="lbl warm" x="216" y="255" text-anchor="middle">del</text>
+<text class="sub" x="131" y="278" text-anchor="middle">Parquet data files · delete files</text>
+<text class="sub" x="131" y="292" text-anchor="middle">unchanged manifests are reused</text>
+<text class="b" x="349" y="16" text-anchor="middle">a commit</text>
+<rect class="n-g" x="284" y="26" width="130" height="40" rx="8"/><text x="349" y="43" text-anchor="middle">1 · write files</text><text class="sub" x="349" y="58" text-anchor="middle">data + manifests</text>
+<path class="ln" d="M349 66 L349 81" marker-end="url(#tf1)"/>
+<rect class="n-b" x="284" y="82" width="130" height="56" rx="8"/><text x="349" y="99" text-anchor="middle">2 · commit</text><text class="sub" x="349" y="114" text-anchor="middle">swap 00002 → 00003</text><text class="sub" x="349" y="128" text-anchor="middle">if still at S1</text>
+<path class="lnb" d="M284 100 L276 100 L276 23 L269 23" marker-end="url(#tf2)"/>
+<path class="ln" d="M349 138 L349 153" marker-end="url(#tf1)"/>
+<rect class="n-w" x="284" y="154" width="130" height="46" rx="8"/><text x="349" y="172" text-anchor="middle">conflict? 409</text><text class="sub" x="349" y="189" text-anchor="middle">re-read, retry</text>
+<rect class="n-g" x="284" y="212" width="130" height="84" rx="8"/>
+<text class="lbl dark" x="349" y="229" text-anchor="middle">same idea:</text>
+<text class="sub" x="349" y="245" text-anchor="middle">Delta: file N+1</text>
+<text class="sub" x="349" y="259" text-anchor="middle">in _delta_log/</text>
+<text class="sub" x="349" y="275" text-anchor="middle">Hudi: next instant</text>
+<text class="sub" x="349" y="289" text-anchor="middle">on its timeline</text>
+</svg>
+        <p class="cap">Iceberg's tree (spec v1–v3) · commit lane on the right</p>
+      </div>
+    </div>
+    <p class="read">Specs: <a href="https://iceberg.apache.org/spec/">Apache Iceberg table spec</a> · <a href="https://github.com/delta-io/delta/blob/master/PROTOCOL.md">Delta Lake transaction protocol</a> · <a href="https://hudi.apache.org/docs/timeline">Apache Hudi timeline</a></p>
+    <div class="foot">TABLE FORMATS / 11</div>
+  </section>
+  <!-- 12 — REAL-TIME OLAP -->
+  <section class="slide dense" id="s12">
+    <div>
+      <p class="eyebrow">Real-time OLAP</p>
+      <h2>Fresh and fast: rollups, materialized views and pre-aggregation</h2>
+      <p class="lead" style="margin-top:10px;">Dashboards that must show the last few seconds, answer in under a second, and serve many users at once.</p>
+    </div>
+    <div class="split">
+      <div>
+        <ul class="ticks">
+          <li><strong>Aggregate on the way in</strong>: ingest from Kafka continuously and compute summaries at write time, so a dashboard reads a small table instead of scanning raw events. The cost moves from query time to insert time.</li>
+          <li><strong>ClickHouse materialized views are insert triggers</strong>: each inserted block runs through the view's query and lands in a target table. An AggregatingMergeTree target stores partial states (sum so far, count so far) that background merges combine, so queries still finish with <code style="white-space:nowrap">GROUP BY</code>.</li>
+          <li><strong>Druid rollup</strong> (on by default): rows with the same dimensions in the same time bucket become one row with summed metrics. Row counts can drop by orders of magnitude, but single events are gone. Its Kafka ingestion tracks offsets for exactly-once loading.</li>
+          <li><strong>Pinot star-tree index</strong>: pre-aggregated rows over chosen dimensions, where a star node aggregates one dimension away. Fast for the group-bys it was configured for, no help for ad hoc ones.</li>
+          <li><strong>Weak points: joins and updates</strong>: Druid advises joining before load, and a ClickHouse view with a JOIN fires only on inserts to its left-most table. Updates work within limits: ClickHouse's lightweight UPDATE is meant for up to about 10% of a table; Pinot upserts by primary key at ingest.</li>
+        </ul>
+      </div>
+      <div class="panel-light">
+<svg class="dgm" viewBox="0 0 420 298" role="img" aria-label="Events flow from Kafka partitions into an ingest step that writes raw events and also feeds a materialized view; the view writes partial aggregates to a small table, merged in the background, which the dashboard reads in under a second. Below: Druid rollup collapses three events in the same minute into one row; a Pinot star-tree has star nodes that aggregate a dimension away. A scale runs from raw data (any question, costly to scan) to pre-aggregated data (fast, fixed questions)" style="max-width:470px"><defs><marker id="rt1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="rt2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker><marker id="rt3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#d9480f"/></marker></defs>
+<rect class="cl" x="6" y="14" width="76" height="80" rx="9"/><text class="b" x="44" y="31" text-anchor="middle">Kafka</text>
+<rect class="n-g" x="14" y="40" width="60" height="13" rx="3"/><rect class="n-g" x="14" y="57" width="60" height="13" rx="3"/><rect class="n-g" x="14" y="74" width="60" height="13" rx="3"/>
+<path class="ln" d="M82 54 L99 54" marker-end="url(#rt1)"/>
+<rect class="n-b" x="100" y="32" width="86" height="46" rx="8"/><text x="143" y="51" text-anchor="middle">ingest</text><text class="sub" x="143" y="67" text-anchor="middle">per block</text>
+<path class="ln" d="M186 44 L201 24" marker-end="url(#rt1)"/><path class="ln" d="M186 66 L201 83" marker-end="url(#rt1)"/>
+<rect class="n-g" x="202" y="6" width="112" height="32" rx="8"/><text x="258" y="26.5" text-anchor="middle">raw events</text>
+<rect class="n-w" x="202" y="62" width="112" height="46" rx="8"/><text x="258" y="81" text-anchor="middle">mat. view</text><text class="sub" x="258" y="97" text-anchor="middle">runs per insert</text>
+<path class="lnw" d="M314 85 L329 85" marker-end="url(#rt3)"/>
+<rect class="n-b" x="330" y="62" width="84" height="46" rx="8"/><text x="372" y="81" text-anchor="middle">agg table</text><text class="sub" x="372" y="97" text-anchor="middle">partials</text>
+<rect class="n-g" x="330" y="6" width="84" height="32" rx="8"/><text x="372" y="26.5" text-anchor="middle">dashboard</text>
+<path class="lnb" d="M372 61 L372 39" marker-end="url(#rt2)"/><text class="lbl" x="366" y="54" text-anchor="end">sub-second</text>
+<path class="lnd" d="M352 108 Q372 128 392 108" marker-end="url(#rt1)"/><text class="lbl" x="372" y="134" text-anchor="middle">merge</text>
+<line class="cl" x1="8" y1="142" x2="412" y2="142"/>
+<text class="b" x="8" y="158">Druid rollup</text>
+<text class="sub" x="8" y="178">10:01:05 US 1</text>
+<text class="sub" x="8" y="192">10:01:22 US 1</text>
+<text class="sub" x="8" y="206">10:01:48 US 1</text>
+<path class="lnw" d="M94 192 L113 192" marker-end="url(#rt3)"/>
+<rect class="n-w" x="114" y="176" width="88" height="32" rx="7"/><text class="lbl dark" x="158" y="190" text-anchor="middle">10:01 US 3</text><text class="sub" x="158" y="203" text-anchor="middle">per minute</text>
+<text class="sub" x="8" y="226">single events are gone</text>
+<text class="b" x="220" y="158">Pinot star-tree</text>
+<circle class="n-g" cx="350" cy="174" r="5"/>
+<path class="ln" d="M346 178 L305 188"/><path class="ln" d="M350 179 L350 188"/><path class="ln" d="M354 178 L395 188"/>
+<rect class="n-b" x="290" y="188" width="30" height="17" rx="4"/><text class="lbl dark" x="305" y="200.5" text-anchor="middle">US</text>
+<rect class="n-b" x="335" y="188" width="30" height="17" rx="4"/><text class="lbl dark" x="350" y="200.5" text-anchor="middle">EU</text>
+<rect class="n-w" x="380" y="188" width="30" height="17" rx="4"/><text class="lbl warm" x="395" y="201" text-anchor="middle">*</text>
+<text class="sub" x="220" y="226">* = dimension aggregated away</text>
+<line class="cl" x1="8" y1="238" x2="412" y2="238"/>
+<path class="lnd" d="M14 256 L406 256" marker-start="url(#rt1)" marker-end="url(#rt1)"/>
+<text class="lbl dark" x="8" y="276">raw: any question,</text><text class="sub" x="8" y="290">costly to scan</text>
+<text class="lbl dark" x="412" y="276" text-anchor="end">pre-aggregated: fast,</text><text class="sub" x="412" y="290" text-anchor="end">fixed questions</text>
+</svg>
+        <p class="cap">ClickHouse-style flow above · Druid and Pinot tricks below</p>
+      </div>
+    </div>
+    <p class="read">Docs: <a href="https://clickhouse.com/docs/materialized-view/incremental-materialized-view">ClickHouse incremental materialized views</a> · <a href="https://druid.apache.org/docs/latest/ingestion/rollup">Druid rollup</a> · <a href="https://docs.pinot.apache.org/basics/indexing/star-tree-index">Pinot star-tree index</a></p>
+    <div class="foot">REAL-TIME OLAP / 12</div>
+  </section>
+  <!-- 13 — OLAP ENGINES -->
+  <section class="slide dense" id="s13">
     <div>
       <p class="eyebrow">OLAP systems</p>
       <h2>Seven engines, seven trade-offs</h2>
@@ -542,227 +820,117 @@
         <tr><td>Snowflake</td><td>Managed SaaS</td><td>Immutable columnar micro-partitions on object storage</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Enterprise warehousing, BI, elastic concurrency</td></tr>
         <tr><td>BigQuery</td><td>Serverless</td><td>Capacitor columnar format on Google's distributed file system</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Ad hoc scans over huge datasets, no cluster to run</td></tr>
         <tr><td>Redshift</td><td>Managed cluster or serverless</td><td>Columnar, sort and distribution keys</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>AWS-centric warehousing</td></tr>
-        <tr><td>Databricks SQL</td><td>Managed, on your cloud account</td><td>Delta Lake (Parquet + transaction log) in your bucket</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Lakehouse: BI, data engineering and ML on one copy of open files</td></tr>
-        <tr><td>ClickHouse</td><td>Self-managed or cloud</td><td>MergeTree parts, sparse primary index</td><td>Shared-nothing;<br>Cloud: disaggregated, <span class="nw">shared storage</span></td><td>Real-time analytics, very high ingest, sub-second aggregates</td></tr>
+        <tr><td>Databricks SQL</td><td>Managed: serverless (Databricks' account) or pro / classic (your cloud account)</td><td>Delta Lake (Parquet + transaction log) in your bucket or the workspace's default storage</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Lakehouse: BI, data engineering and ML on one copy of open files</td></tr>
+        <tr><td>ClickHouse</td><td>Self-managed or cloud</td><td>MergeTree parts, sparse primary&nbsp;index</td><td>Shared-nothing;<br>Cloud: disaggregated, <span class="nw">shared storage</span></td><td>Real-time analytics, very high ingest, sub-second aggregates</td></tr>
         <tr><td>Druid / Pinot</td><td>Self-managed or cloud</td><td>Time-partitioned segments, pre-aggregation, rich indexes</td><td>Hybrid: servers preload segments</td><td>User-facing analytics at high QPS, low latency</td></tr>
-        <tr><td>DuckDB</td><td>Embedded, in-process</td><td>Columnar file; reads Parquet / Iceberg directly</td><td>Embedded: not a cluster</td><td>Local analytics, notebooks, small data apps</td></tr>
+        <tr><td>DuckDB</td><td>Embedded, in-process</td><td>Columnar file; reads Parquet and Iceberg, writes Iceberg through a REST catalog</td><td>Embedded: not&nbsp;a&nbsp;cluster</td><td>Local analytics, notebooks, small data apps</td></tr>
       </tbody>
     </table></div>
-    <p class="muted" style="font-size:.82rem;">Labels from <a class="go inline" href="../database-guide/index.html#s10">Part 1's cluster architectures</a>. Redshift: RG, RA3, Serverless (DC2: shared-nothing). Druid / Pinot load segments from deep storage.</p>
-    <div class="foot">OLAP ENGINES / 07</div>
+    <p class="muted" style="font-size:.82rem;">Labels from <a class="go inline" href="../database-guide/index.html#s10">Part 1's cluster architectures</a>. Redshift: RG, RA3 and Serverless keep data in managed storage (local SSD + S3); the older DC2 nodes, which were shared-nothing, are no longer available. Druid / Pinot are hybrid: servers must preload their assigned segments from deep storage before they can answer. HTAP engines: <a class="go inline" href="#s14">Slide 14 →</a></p>
+    <div class="foot">OLAP ENGINES / 13</div>
   </section>
-  <!-- 8 — VECTOR INTRO -->
-  <section class="slide" id="s8">
+  <!-- 14 — HTAP -->
+  <section class="slide dense" id="s14">
     <div>
-      <p class="eyebrow">Vector databases · 1 of 5</p>
-      <h2>Searching by meaning, not by value</h2>
+      <p class="eyebrow">HTAP</p>
+      <h2>One database for both workloads?</h2>
+      <p class="lead" style="margin-top:10px;"><strong>HTAP, hybrid transactional/analytical processing</strong>: run analytics on the operational database itself, without slowing its transactions.</p>
     </div>
     <div class="split">
       <div>
         <ul class="ticks">
-          <li><strong>Embeddings</strong>: a model turns text, images or audio into a vector of a few hundred to a few thousand floats (commonly 384–3072). Similar meaning → nearby vectors.</li>
-          <li><strong>The query is “nearest neighbours”</strong>: embed the question, return the k closest stored vectors. No exact match, no <code>WHERE</code>; results are ranked by distance.</li>
-          <li><strong>Distance metric</strong>: cosine (angle), dot product (equals cosine on normalized vectors) or Euclidean L2. Use the one your embedding model was trained for.</li>
-          <li><strong>Why B-Trees don't help</strong>: they order data along one key; “closest in 768 dimensions” has no sort order. Space-partitioning trees (k-d trees) degrade toward brute force as dimensions grow.</li>
-          <li><strong>Brute force is O(N·d)</strong>: 10M vectors × 768 dims ≈ 7.7 billion multiply-adds per query. Hence <mark>approximate</mark> nearest-neighbour (ANN) indexes.</li>
-        </ul>
-        <div class="tag-row" style="margin-top:12px;"><span class="pill on">semantic search</span><span class="pill on">RAG for LLMs</span><span class="pill on">recommendations</span><span class="pill on">near-duplicate detection</span><span class="pill on">image search</span></div>
-      </div>
-      <div class="panel-light">
-<svg class="dgm" viewBox="0 0 420 300" role="img" aria-label="Toy two-dimensional embedding space: similar concepts cluster together; a query finds its nearest neighbours" style="max-width:460px"><defs><marker id="v1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="v1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker></defs><rect x="2" y="2" width="416" height="296" rx="10" fill="none" stroke="#dfe3ea"/><text class="lbl" x="410" y="290" text-anchor="end">dimension 1 →</text><text class="lbl" x="12" y="18">↑ dimension 2</text><circle cx="88" cy="96" r="44" fill="#ffece0" fill-opacity=".55" stroke="#d9480f" stroke-dasharray="4 4"/><circle cx="70" cy="82" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="79" y="86" text-anchor="start">kitten</text><circle cx="112" cy="64" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="121" y="68" text-anchor="start">cat</text><circle cx="96" cy="132" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="105" y="136" text-anchor="start">puppy</text><circle cx="150" cy="120" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="159" y="124" text-anchor="start">dog</text><circle cx="292" cy="214" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="301" y="218" text-anchor="start">car</text><circle cx="344" cy="236" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="353" y="240" text-anchor="start">truck</text><circle cx="300" cy="262" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="309" y="266" text-anchor="start">bus</text><circle cx="300" cy="66" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="309" y="70" text-anchor="start">invoice</text><circle cx="352" cy="98" r="5" fill="#2f54eb"/><text class="lbl dark halo" x="361" y="102" text-anchor="start">receipt</text><circle cx="88" cy="96" r="6.5" fill="#d9480f"/><text class="lbl warm halo" x="88" y="158" text-anchor="middle">query: “small cat photo”</text><text class="lbl warm halo" x="150" y="34" text-anchor="middle">k = 3 nearest</text><text class="lbl halo" x="330" y="40" text-anchor="middle">documents</text><text class="lbl halo" x="320" y="190" text-anchor="middle">vehicles</text><text class="lbl halo" x="110" y="182" text-anchor="middle">animals</text></svg>
-        <p class="cap">2-D for intuition · real embeddings have hundreds of dimensions</p>
-      </div>
-    </div>
-    <div class="foot">VECTORS · INTRO / 08</div>
-  </section>
-  <!-- 9 — ANN INDEX FAMILIES -->
-  <section class="slide" id="s9">
-    <div>
-      <p class="eyebrow">Vector databases · 2 of 5</p>
-      <h2>ANN indexes trade recall for speed</h2>
-      <p class="lead" style="margin-top:10px;">Every index below has a knob that trades recall (did we find the true nearest neighbours?) against latency and memory.</p>
-    </div>
-    <div class="matrix-wrap"><table class="dense">
-      <thead><tr><th>Index</th><th>Idea</th><th>Knobs</th><th>Trade-off</th></tr></thead>
-      <tbody>
-        <tr><td>Flat</td><td>Compare the query with every vector</td><td>—</td><td>Exact (100% recall), but O(N) per query. Fine up to roughly hundreds of thousands of vectors.</td></tr>
-        <tr><td>IVF</td><td>k-means clusters the vectors into cells; search only the cells nearest the query</td><td><code>nlist</code>, <code>nprobe</code></td><td>Fast to build; misses neighbours that sit in a cell you didn't probe.</td></tr>
-        <tr><td>HNSW</td><td>Multi-layer proximity graph; greedy hops from coarse to fine</td><td><code>M</code>, <code>efConstruction</code>, <code>efSearch</code></td><td>Best recall/latency for in-memory search; memory-heavy and slower to build. <span class="accent">Next two slides.</span></td></tr>
-        <tr><td>PQ</td><td>Product quantization: split each vector into sub-vectors and store a codebook id per piece</td><td>sub-vectors, bits per code</td><td>Much smaller index, approximate distances; often combined with IVF (IVF-PQ).</td></tr>
-        <tr><td>DiskANN</td><td>A proximity graph (Vamana) laid out for SSD; only compressed vectors stay in RAM</td><td><code>R</code> (degree), <code>L</code> (search list)</td><td>Very large collections on one machine, at SSD latency.</td></tr>
-      </tbody>
-    </table></div>
-    <p class="note"><b>Measure, don't assume:</b> compute recall@k against brute force on a sample of your own queries before picking settings.</p>
-    <div class="foot">VECTORS · INDEXES / 09</div>
-  </section>
-  <!-- 10 — HNSW CONCEPT -->
-  <section class="slide" id="s10">
-    <div>
-      <p class="eyebrow">Vector databases · 3 of 5</p>
-      <h2>HNSW: a skip list made of graphs</h2>
-      <p class="lead" style="margin-top:10px;">Hierarchical Navigable Small World: the default index in pgvector, Qdrant, Weaviate and Milvus.</p>
-    </div>
-    <div class="split">
-      <div>
-        <ul class="ticks">
-          <li><strong>Small-world graph</strong>: each vector links to its nearest neighbours, so hopping toward the query reaches the right region in a few steps.</li>
-          <li><strong>Layers</strong>: every vector is on L0; each also appears higher up with exponentially falling probability, like a skip list. Upper layers are sparse express lanes.</li>
-          <li><strong>Search</strong>: hop greedily from the top entry point until no neighbour is closer, then drop a layer. On L0, keep the <code>efSearch</code> best candidates; return the top k.</li>
-          <li><strong>Insert</strong>: draw the vector's top layer at random, find neighbours with the same search (<code>efConstruction</code>), link to <code>M</code> per layer, prune over-full neighbours.</li>
-          <li><strong>Costs</strong>: graph and vectors usually live in RAM; deletes leave tombstones; heavy filters can disconnect the graph.</li>
+          <li><strong>Two requirements</strong>: <em>isolation</em> (analytics must not slow transactions) and <em>freshness</em> (analytics must see recent writes). Most designs keep rows for OLTP and add a second, columnar copy for scans.</li>
+          <li><strong>Separate replica: TiDB + TiFlash</strong> (<a class="go inline" href="../database-guide/index.html#s19">Part 1</a>; disaggregated, storage nodes): a columnar copy joins each Raft group as a <em>learner</em>. It receives the log asynchronously and never votes, so it never slows the write quorum, yet analytical reads still see consistent, recent data.</li>
+          <li><strong>Same server, two formats</strong>: SQL Server (since 2016) adds an updatable columnstore index to an OLTP table; Oracle Database In-Memory keeps rows in the buffer cache and columns in an in-memory column store; AlloyDB's columnar engine keeps chosen columns in memory, on the primary or on read pool instances.</li>
+          <li><strong>Attached accelerator: MySQL HeatWave</strong>: an in-memory columnar cluster beside MySQL; eligible queries are offloaded automatically and changes flow to it in the background. SingleStore is the exception: one format per table, columnstore by default, in-memory rowstore for the hottest tables.</li>
+          <li><strong>What you pay</strong>: every write also maintains the column copy, the copy needs memory or nodes, and it covers one source database. Analytics across many systems still needs a warehouse.</li>
         </ul>
       </div>
       <div class="panel-light">
-<svg class="dgm" viewBox="0 0 420 322" role="img" aria-label="HNSW: three layers of proximity graphs; search starts at the top entry point, hops greedily, and drops a layer at each local minimum" style="max-width:470px"><defs><marker id="h1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="h1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker></defs><rect class="hn-band" x="6" y="14" width="408" height="66" rx="10"/><rect class="hn-band" x="6" y="112" width="408" height="72" rx="10"/><rect class="hn-band" x="6" y="220" width="408" height="96" rx="10"/><text class="lbl" x="16" y="30">L2 · few nodes, long links</text><text class="lbl" x="16" y="128">L1</text><text class="lbl" x="16" y="236">L0 · every vector, short links</text><line class="hn-v" x1="88" y1="142" x2="88" y2="280"/><line class="hn-v" x1="180" y1="160" x2="180" y2="284"/><line class="hn-v" x1="272" y1="140" x2="272" y2="282"/><line class="hn-v" x1="318" y1="160" x2="318" y2="250"/><line class="hn-v" x1="398" y1="148" x2="398" y2="258"/><line class="hn-v" x1="88" y1="44" x2="88" y2="142"/><line class="hn-v" x1="272" y1="52" x2="272" y2="140"/><line class="hn-e" x1="88" y1="44" x2="272" y2="52"/><line class="hn-e" x1="88" y1="142" x2="180" y2="160"/><line class="hn-e" x1="180" y1="160" x2="272" y2="140"/><line class="hn-e" x1="272" y1="140" x2="318" y2="160"/><line class="hn-e" x1="318" y1="160" x2="398" y2="148"/><line class="hn-e" x1="88" y1="142" x2="272" y2="140"/><line class="hn-e" x1="40" y1="252" x2="88" y2="280"/><line class="hn-e" x1="88" y1="280" x2="134" y2="246"/><line class="hn-e" x1="134" y1="246" x2="180" y2="284"/><line class="hn-e" x1="180" y1="284" x2="226" y2="252"/><line class="hn-e" x1="226" y1="252" x2="272" y2="282"/><line class="hn-e" x1="272" y1="282" x2="318" y2="250"/><line class="hn-e" x1="318" y1="250" x2="360" y2="286"/><line class="hn-e" x1="360" y1="286" x2="398" y2="258"/><line class="hn-e" x1="40" y1="252" x2="134" y2="246"/><line class="hn-e" x1="134" y1="246" x2="226" y2="252"/><line class="hn-e" x1="272" y1="282" x2="360" y2="286"/><line class="hn-e" x1="318" y1="250" x2="398" y2="258"/><path class="hn-p" d="M88 44 L272 52" marker-end="url(#h1a)"/><path class="hn-p" d="M272 59 L272 133" marker-end="url(#h1a)"/><path class="hn-p" d="M272 140 L318 160" marker-end="url(#h1a)"/><path class="hn-p" d="M318 167 L318 243" marker-end="url(#h1a)"/><path class="hn-p" d="M318 250 L360 286" marker-end="url(#h1a)"/><circle cx="88" cy="44" r="6" class="hn-on"/><circle cx="272" cy="52" r="6" class="hn-on"/><circle cx="88" cy="142" r="5.5" class="hn-n"/><circle cx="180" cy="160" r="5.5" class="hn-n"/><circle cx="272" cy="140" r="5.5" class="hn-on"/><circle cx="318" cy="160" r="5.5" class="hn-on"/><circle cx="398" cy="148" r="5.5" class="hn-n"/><circle cx="40" cy="252" r="5" class="hn-n"/><circle cx="88" cy="280" r="5" class="hn-n"/><circle cx="134" cy="246" r="5" class="hn-n"/><circle cx="180" cy="284" r="5" class="hn-n"/><circle cx="226" cy="252" r="5" class="hn-n"/><circle cx="272" cy="282" r="5" class="hn-n"/><circle cx="318" cy="250" r="5" class="hn-on"/><circle cx="360" cy="286" r="5" class="hn-on"/><circle cx="398" cy="258" r="5" class="hn-n"/><circle cx="338" cy="303" r="5.5" fill="#d9480f"/><text class="lbl warm halo" x="328" y="307" text-anchor="end">query</text><text class="lbl dark halo" x="88" y="70" text-anchor="middle">entry point</text><text class="lbl dark halo" x="369" y="296" text-anchor="start">nearest</text></svg>
-        <p class="cap">greedy hop · drop a layer · repeat · beam search on L0</p>
+<svg class="dgm" viewBox="0 0 420 298" role="img" aria-label="Three HTAP designs. Separate replica: a TiDB Raft group of TiKV row-store replicas sends its log asynchronously to a TiFlash columnar learner outside the quorum, which serves analytic reads. Same server: an optimizer sends lookups to the row store and scans to a column copy that the engine keeps in sync. Accelerator: MySQL sends changes in the background to a HeatWave cluster of in-memory columnar nodes. Trade-offs: freshness, isolation and cost" style="max-width:470px"><defs><marker id="ht1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="ht2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#d9480f"/></marker></defs>
+<line class="cl" x1="141" y1="6" x2="141" y2="228"/><line class="cl" x1="279" y1="6" x2="279" y2="228"/>
+<text class="b" x="72" y="16" text-anchor="middle">separate replica</text><text class="sub" x="72" y="30" text-anchor="middle">TiDB + TiFlash</text>
+<text class="b" x="210" y="16" text-anchor="middle">same server</text><text class="sub" x="210" y="30" text-anchor="middle">rows + columns</text>
+<text class="b" x="348" y="16" text-anchor="middle">accelerator</text><text class="sub" x="348" y="30" text-anchor="middle">MySQL HeatWave</text>
+<text class="lbl" x="72" y="50" text-anchor="middle">transactions</text>
+<rect class="cl" x="10" y="56" width="124" height="90" rx="9"/>
+<rect class="n-b" x="18" y="64" width="108" height="22" rx="5"/><text class="lbl dark" x="72" y="79" text-anchor="middle">TiKV leader</text>
+<rect class="n-g" x="18" y="94" width="50" height="22" rx="5"/><text class="lbl dark" x="43" y="109" text-anchor="middle">TiKV</text>
+<rect class="n-g" x="76" y="94" width="50" height="22" rx="5"/><text class="lbl dark" x="101" y="109" text-anchor="middle">TiKV</text>
+<text class="sub" x="72" y="137" text-anchor="middle">Raft quorum</text>
+<path class="lnw" d="M72 146 L72 175" style="stroke-dasharray:4 3" marker-end="url(#ht2)"/><text class="lbl" x="66" y="165" text-anchor="end">async log</text>
+<rect class="n-w" x="10" y="176" width="124" height="34" rx="6"/><text class="lbl dark" x="72" y="190" text-anchor="middle">TiFlash learner</text><text class="sub" x="72" y="204" text-anchor="middle">columns, no vote</text>
+<text class="lbl" x="72" y="224" text-anchor="middle">analytic reads</text>
+<rect class="n-g" x="160" y="40" width="100" height="22" rx="6"/><text class="lbl dark" x="210" y="55" text-anchor="middle">optimizer</text>
+<path class="ln" d="M210 62 L210 77" marker-end="url(#ht1)"/>
+<path class="ln" d="M260 51 L266 51 L266 131" marker-end="url(#ht1)"/>
+<rect class="n-b" x="160" y="78" width="100" height="34" rx="7"/><text x="210" y="93" text-anchor="middle">row store</text><text class="sub" x="210" y="106" text-anchor="middle">point lookups</text>
+<path class="lnd" d="M210 112 L210 131" marker-end="url(#ht1)"/><text class="lbl" x="204" y="126" text-anchor="end">auto sync</text>
+<rect class="n-w" x="150" y="132" width="120" height="34" rx="7"/><text x="210" y="147" text-anchor="middle">column copy</text><text class="sub" x="210" y="160" text-anchor="middle">scans, aggregates</text>
+<text class="sub" x="210" y="190" text-anchor="middle">one server: shares</text><text class="sub" x="210" y="204" text-anchor="middle">CPU and memory</text>
+<rect class="n-b" x="290" y="40" width="116" height="34" rx="7"/><text x="348" y="55" text-anchor="middle">MySQL</text><text class="sub" x="348" y="68" text-anchor="middle">InnoDB rows</text>
+<path class="lnw" d="M348 74 L348 99" style="stroke-dasharray:4 3" marker-end="url(#ht2)"/><text class="lbl" x="354" y="91">changes</text>
+<rect class="cl" x="290" y="100" width="116" height="66" rx="9"/><text class="b" x="348" y="117" text-anchor="middle">HeatWave</text>
+<rect class="n-w" x="300" y="126" width="28" height="30" rx="5"/><rect class="n-w" x="334" y="126" width="28" height="30" rx="5"/><rect class="n-w" x="368" y="126" width="28" height="30" rx="5"/>
+<text class="sub" x="348" y="190" text-anchor="middle">in-memory columns</text><text class="sub" x="348" y="204" text-anchor="middle">queries offloaded</text>
+<rect class="n-g" x="8" y="240" width="128" height="54" rx="8"/><text class="b" x="72" y="257" text-anchor="middle">freshness</text><text class="sub" x="72" y="272" text-anchor="middle">async replica lag</text><text class="sub" x="72" y="286" text-anchor="middle">vs in-engine copy</text>
+<rect class="n-g" x="146" y="240" width="128" height="54" rx="8"/><text class="b" x="210" y="257" text-anchor="middle">isolation</text><text class="sub" x="210" y="272" text-anchor="middle">separate nodes vs</text><text class="sub" x="210" y="286" text-anchor="middle">shared CPU, memory</text>
+<rect class="n-g" x="284" y="240" width="128" height="54" rx="8"/><text class="b" x="348" y="257" text-anchor="middle">cost</text><text class="sub" x="348" y="272" text-anchor="middle">more memory, nodes</text><text class="sub" x="348" y="286" text-anchor="middle">write overhead</text>
+</svg>
+        <p class="cap">three ways to keep a column copy beside the rows</p>
       </div>
     </div>
-    <div class="knobs"><span><code>M</code> links per node → recall ↑ memory ↑</span><span><code>efConstruction</code> build beam → graph quality ↑ build time ↑</span><span><code>efSearch</code> query beam (≥ k) → recall ↑ latency ↑</span></div>
-    <div class="foot">HNSW / 10</div>
+    <p class="read">Paper: <a href="https://www.vldb.org/pvldb/vol13/p3072-huang.pdf">TiDB: A Raft-based HTAP Database (PVLDB 2020)</a></p>
+    <div class="foot">HTAP / 14</div>
   </section>
-  <!-- 11 — HNSW LIVE -->
-  <section class="slide" id="s11">
-    <div>
-      <p class="eyebrow">Vector databases · 4 of 5 · interactive</p>
-      <h2>Watch an HNSW search</h2>
-      <p class="lead" style="margin-top:10px;">A live HNSW graph of 150 points. <strong>Click a panel</strong> to query it.</p>
-    </div>
-    <div class="lsm-controls">
-      <button class="primary" id="hn-new">New random query</button>
-      <button id="hn-replay">↺ Replay</button>
-      <label class="hn-ef"><span>efSearch</span><input type="range" id="hn-ef" min="3" max="40" value="4" aria-label="efSearch"><b id="hn-efv">4</b></label>
-    </div>
-    <div class="hn-panels" id="hn">
-      <div class="hn-panel"><h4><span>Layer 2</span><span id="hn-c2"></span></h4><svg class="hn-svg" id="hn-l2" viewBox="0 0 100 100" role="img" aria-label="HNSW layer 2"></svg></div>
-      <div class="hn-panel"><h4><span>Layer 1</span><span id="hn-c1"></span></h4><svg class="hn-svg" id="hn-l1" viewBox="0 0 100 100" role="img" aria-label="HNSW layer 1"></svg></div>
-      <div class="hn-panel"><h4><span>Layer 0</span><span id="hn-c0"></span></h4><svg class="hn-svg" id="hn-l0" viewBox="0 0 100 100" role="img" aria-label="HNSW layer 0"></svg></div>
-    </div>
-    <div class="hn-legend"><span><i class="lg-hop"></i>hops</span><span><i class="lg-vis"></i>distance computed</span><span><i class="lg-res"></i>returned top-3</span><span><i class="lg-tru"></i>true top-3 (brute force)</span><span><i class="lg-q"></i>query</span></div>
-    <div class="lsm-log" id="hn-log"></div>
-    <div class="foot">HNSW · LIVE / 11</div>
-  </section>
-  <!-- 12 — VECTOR LANDSCAPE -->
-  <section class="slide" id="s12">
-    <div>
-      <p class="eyebrow">Vector databases · 5 of 5</p>
-      <h2>Extension or dedicated engine?</h2>
-    </div>
-    <div class="matrix-wrap"><table class="dense">
-      <thead><tr><th>System</th><th>Form</th><th>Indexes</th><th>Notable trait</th></tr></thead>
-      <tbody>
-        <tr><td>pgvector</td><td>PostgreSQL extension</td><td>HNSW, IVFFlat</td><td>Vectors next to relational data: joins, transactions, existing backups and tooling</td></tr>
-        <tr><td>Pinecone</td><td>Managed service</td><td>Proprietary</td><td>Fully managed. Serverless indexes are disaggregated, shared storage: executors cache data from object storage</td></tr>
-        <tr><td>Milvus</td><td>Distributed, open source</td><td>HNSW, IVF, PQ variants, DiskANN, more</td><td>Disaggregated, shared storage: query nodes cache segments from object storage (fetched on demand with tiered storage). Built for very large collections</td></tr>
-        <tr><td>Qdrant</td><td>Open source (Rust), managed option</td><td>HNSW + quantization</td><td>Strong payload filtering alongside vector search</td></tr>
-        <tr><td>Weaviate</td><td>Open source, managed option</td><td>HNSW</td><td>Hybrid keyword + vector search built in</td></tr>
-      </tbody>
-    </table></div>
-    <div class="grid cols-2">
-      <div class="card" style="border-color:var(--warm);"><h3 style="color:var(--warm)">The hard part is filtering</h3><p><code>WHERE tenant = 7</code> plus nearest-neighbour. <strong>Post-filtering</strong> can return fewer than k results; <strong>pre-filtering</strong> can break HNSW's graph connectivity. Engines differ a lot here, so test with your real filters.</p></div>
-      <div class="card"><h3 class="accent">Rule of thumb</h3><p>Already on Postgres with up to a few million vectors: start with pgvector. Very large collections, heavy filtering or strict latency at high QPS: evaluate a dedicated engine.</p></div>
-    </div>
-    <div class="foot">VECTORS · LANDSCAPE / 12</div>
-  </section>
-  <!-- 13 — TIME-SERIES -->
-  <section class="slide" id="s13">
-    <div>
-      <p class="eyebrow">Time-series · storage tricks</p>
-      <h2>Append-mostly data indexed by time</h2>
-    </div>
-    <div class="grid cols-2">
-      <div class="card"><h3>Workload traits</h3><p>Writes are almost all appends at “now”; reads are recent windows and rollups; old data is rarely edited and usually expires. Model: <code>(metric, labels, timestamp, value)</code>.</p><p style="margin-top:8px;"><strong>Cardinality is the real enemy.</strong> Every unique label combination is a separate series; a label like <code>user_id</code> can multiply series until memory and index size blow up.</p></div>
-      <div class="card"><h3>Standard techniques</h3><p><strong>Time partitioning</strong> into chunks, so expiry is “drop a chunk”. <strong>Downsampling / rollups</strong> for old data (1s → 1m → 1h). <strong>Retention policies</strong> as first-class config. <strong>Specialized compression</strong>, below.</p></div>
-    </div>
-    <div class="model-box" style="white-space:pre; font-size:.78rem;"><span class="c">// delta-of-delta timestamps (the idea behind Facebook's Gorilla paper)</span>
-timestamps     : 1000  1060  1120  1180  1241
-deltas         :        60    60    60    61
-<span class="k">delta-of-delta :              0     0     1</span>   <span class="c">← regular scrapes become mostly zeros → a few bits each</span>
-
-<span class="c">// float values: XOR with the previous value; similar values share leading/trailing zero bits</span>
-v[n] <span class="k">XOR</span> v[n-1]  →  store only the meaningful middle bits</div>
-    <p class="muted" style="font-size:.85rem;">Regular intervals and slowly changing values are what make these encodings effective; noisy, irregular data compresses much worse.</p>
-    <div class="foot">TIME-SERIES / 13</div>
-  </section>
-  <!-- 14 — TSDB LANDSCAPE -->
-  <section class="slide" id="s14">
-    <div>
-      <p class="eyebrow">Time-series · landscape</p>
-      <h2>Five engines, three styles</h2>
-    </div>
-    <div class="matrix-wrap"><table class="dense">
-      <thead><tr><th>System</th><th>Style</th><th>Query language</th><th>Notes</th></tr></thead>
-      <tbody>
-        <tr><td>Prometheus</td><td>Metrics TSDB, pull-based scraping</td><td>PromQL</td><td>The standard for infrastructure metrics. Single server: local storage is not clustered or replicated; long-term and clustered setups use remote write or companion systems.</td></tr>
-        <tr><td>VictoriaMetrics</td><td>Metrics TSDB, Prometheus-compatible</td><td>MetricsQL (PromQL superset)</td><td>Often used as long-term Prometheus storage. The cluster version is disaggregated, shared-nothing storage: vmselect runs queries, and each vmstorage node owns its share of the series.</td></tr>
-        <tr><td>InfluxDB</td><td>Columnar engine</td><td>SQL (v3), InfluxQL, Flux (v2)</td><td>Version 3 is built on Apache Arrow, DataFusion and Parquet; check which major version you run.</td></tr>
-        <tr><td>TimescaleDB</td><td>PostgreSQL extension</td><td>SQL</td><td>Hypertables auto-partitioned into time chunks, with columnar compression and the full Postgres ecosystem.</td></tr>
-        <tr><td>QuestDB</td><td>Columnar engine</td><td>SQL + time extensions</td><td>Aimed at very high ingest rates and fast time-window queries.</td></tr>
-      </tbody>
-    </table></div>
-    <p class="muted" style="font-size:.85rem;">ClickHouse and Druid handle time-series well too: the line between “time-series DB” and “real-time OLAP” is blurry by design.</p>
-    <div class="foot">TIME-SERIES · LANDSCAPE / 14</div>
-  </section>
-  <!-- 15 — GRAPH AND SEARCH -->
+  <!-- 15 — CHEAT SHEET -->
   <section class="slide" id="s15">
-    <div>
-      <p class="eyebrow">Also specialized</p>
-      <h2>Graph and search engines</h2>
-    </div>
-    <div class="grid cols-2">
-      <div class="card"><h3 class="accent">Graph · Neo4j, JanusGraph, Amazon Neptune</h3><p><strong>Core idea</strong>: relationships are stored as direct pointers between nodes (index-free adjacency in native graph stores), so a traversal costs roughly what it visits, not the size of the table.</p><p style="margin-top:8px;"><strong>Wins</strong>: multi-hop queries (fraud rings, recommendations, dependency graphs) that become many self-joins in SQL. <strong>Watch out</strong>: supernodes, and sharding a graph without cutting too many edges.</p></div>
-      <div class="card"><h3 class="accent">Search · Elasticsearch, OpenSearch, Solr</h3><p><strong>Core idea</strong>: an <strong>inverted index</strong> maps each term to the documents containing it; ranking uses relevance scoring such as BM25. Segments are immutable and merged in the background, an LSM-like pattern.</p><p style="margin-top:8px;"><strong>Wins</strong>: full-text relevance, faceting, fuzzy matching, log search. <strong>Watch out</strong>: near-real-time visibility, and it is a poor system of record.</p></div>
-    </div>
-    <p class="muted" style="font-size:.9rem; text-align:center;">Pattern: each family reorganizes data around the access path it serves, and pays for it in general-purpose behaviour.</p>
-    <div class="foot">GRAPH & SEARCH / 15</div>
-  </section>
-  <!-- 16 — DECISION MATRIX -->
-  <section class="slide" id="s16">
     <div>
       <p class="eyebrow">One-page cheat sheet</p>
       <h2>From workload to first candidate</h2>
     </div>
     <div class="seg" id="flt" role="group" aria-label="Filter">
-      <button data-f="all" aria-pressed="true">All</button><button data-f="olap" aria-pressed="false">Analytics</button><button data-f="vec" aria-pressed="false">Vector</button><button data-f="ts" aria-pressed="false">Time-series</button><button data-f="oth" aria-pressed="false">Graph / search</button>
+      <button data-f="all" aria-pressed="true">All</button><button data-f="wh" aria-pressed="false">Warehouse</button><button data-f="mpp" aria-pressed="false">MPP</button><button data-f="lake" aria-pressed="false">Lakehouse</button><button data-f="rt" aria-pressed="false">Real-time</button><button data-f="htap" aria-pressed="false">HTAP</button><button data-f="emb" aria-pressed="false">Embedded</button>
     </div>
     <div class="matrix-wrap"><table class="dense" id="mx">
       <thead><tr><th>Workload</th><th>First candidates</th><th>Why</th><th>Watch out for</th></tr></thead>
       <tbody>
-        <tr data-c="olap"><td>Ad hoc analytics on TBs</td><td>BigQuery, Snowflake, Redshift</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Cost per byte or per compute-second</td></tr>
-        <tr data-c="olap"><td>One copy, many engines</td><td>Iceberg or Delta Lake + Spark, Trino</td><td>Open table format, ACID, time travel</td><td>Catalog choice, small files</td></tr>
-        <tr data-c="olap"><td>Real-time dashboards</td><td>ClickHouse, Druid, Pinot</td><td>Fast ingest, sub-second aggregates</td><td>Weaker joins and updates</td></tr>
-        <tr data-c="olap"><td>Embedded analytics</td><td>DuckDB</td><td>In-process, reads Parquet directly</td><td>Embedded: one process, one machine</td></tr>
-        <tr data-c="vec"><td>RAG, moderate scale</td><td>pgvector (HNSW)</td><td>Vectors beside relational data</td><td>Index build time, RAM</td></tr>
-        <tr data-c="vec"><td>Vector search at scale</td><td>Milvus, Qdrant, Pinecone, Weaviate</td><td>Distributed ANN, filtering</td><td>Filtered recall, embedding sync</td></tr>
-        <tr data-c="ts"><td>Infrastructure metrics</td><td>Prometheus (+ VictoriaMetrics)</td><td>Labels, PromQL, exporters</td><td>Label cardinality</td></tr>
-        <tr data-c="ts"><td>IoT / sensors with SQL</td><td>TimescaleDB, QuestDB, InfluxDB 3</td><td>Time chunks, compression, SQL</td><td>Late, out-of-order data</td></tr>
-        <tr data-c="oth"><td>Multi-hop relationships</td><td>Neo4j, Neptune</td><td>Traversal-first storage</td><td>Supernodes, sharding</td></tr>
-        <tr data-c="oth"><td>Full-text search</td><td>Elasticsearch, OpenSearch</td><td>Inverted index, BM25, facets</td><td>Not a system of record</td></tr>
+        <tr data-c="wh"><td>Ad hoc analytics on TBs</td><td>BigQuery, Snowflake, Redshift</td><td>Disaggregated, <span class="nw">shared storage</span>: one copy, elastic compute</td><td>Cost per byte scanned or per compute-second</td></tr>
+        <tr data-c="mpp"><td>Big fact–dimension joins</td><td>Redshift (<code>DISTKEY</code>), Citus (co-located and reference tables)</td><td>Matching rows already sit on one node: no shuffle</td><td>Pick the key of the biggest join; skewed keys</td></tr>
+        <tr data-c="lake"><td>One copy, many engines</td><td>Iceberg or Delta Lake + a REST catalog (Polaris, Unity Catalog, Glue) + Spark, Trino, DuckDB</td><td>Open table format: ACID, time travel, your bucket</td><td>Catalog choice, small files, uneven v3 support</td></tr>
+        <tr data-c="rt"><td>Real-time dashboards</td><td>ClickHouse, Druid, Pinot</td><td>Ingest from Kafka, pre-aggregate on write, sub-second reads</td><td>Joins, updates, questions you did not pre&#8209;aggregate&nbsp;for</td></tr>
+        <tr data-c="htap"><td>Analytics on live OLTP data</td><td>TiDB + TiFlash, SQL Server columnstore, AlloyDB columnar engine, MySQL HeatWave, Oracle In&#8209;Memory</td><td>A column copy beside the rows, kept current</td><td>Write overhead, memory, one source only</td></tr>
+        <tr data-c="emb"><td>Embedded analytics</td><td>DuckDB</td><td>In-process, vectorized, reads Parquet and Iceberg directly</td><td>One process, one machine</td></tr>
       </tbody>
     </table></div>
-    <div class="foot">CHEAT SHEET / 16</div>
+    <p class="muted" style="font-size:.84rem;">More on each: <a class="go inline" href="#s9">warehouses</a> · <a class="go inline" href="#s7">MPP joins</a> · <a class="go inline" href="#s11">table formats</a> · <a class="go inline" href="#s12">real-time OLAP</a> · <a class="go inline" href="#s14">HTAP</a> · <a class="go inline" href="#s13">engines</a></p>
+    <div class="foot">CHEAT SHEET / 15</div>
   </section>
-  <!-- 17 — SUMMARY -->
-  <section class="slide" id="s17" style="justify-content:center;">
+  <!-- 16 — SUMMARY -->
+  <section class="slide" id="s16" style="justify-content:center;">
     <div>
       <p class="eyebrow">Summary · end of Part 4</p>
       <h1>What to <span class="accent">remember</span>.</h1>
-      <div class="grid cols-4" style="margin-top:28px;">
-        <div class="card"><h3>Layout follows access</h3><p>Scans over few columns favour columnar storage, compression, vectorization and data skipping.</p></div>
-        <div class="card"><h3>Lakehouse = warehouse</h3><p>Same architecture: disaggregated, shared storage with columnar files and metadata. Only the format and ownership are open.</p></div>
-        <div class="card"><h3>Vectors need ANN</h3><p>HNSW is a skip list of graphs; <code>efSearch</code> trades recall for latency.</p></div>
-        <div class="card"><h3>Specialize deliberately</h3><p>Start from the dominant query, then check what the specialized engine makes you give up.</p></div>
+      <div class="grid cols-3" style="margin-top:24px;">
+        <div class="card"><h3>Columns, then skip</h3><p>Store each column on its own and compress it; partitions, sort keys and min/max statistics then decide how much is read at all.</p></div>
+        <div class="card"><h3>Batches or compiled loops</h3><p>Both beat one row at a time through the CPU; neither wins everywhere.</p></div>
+        <div class="card"><h3>Avoid the shuffle</h3><p>Pre-aggregate locally, broadcast small tables, co-locate big joins on the same key.</p></div>
+        <div class="card"><h3>Model for scans</h3><p>Facts at a declared grain, flat dimensions; nest repeated detail instead of joining it.</p></div>
+        <div class="card"><h3>Table formats are metadata</h3><p>A lakehouse is a warehouse on open files: a metadata tree over immutable files, committed by one atomic swap in a catalog or one new log file.</p></div>
+        <div class="card"><h3>Fresh answers cost writes</h3><p>Real-time engines pre-aggregate on ingest; HTAP systems maintain a second, columnar copy.</p></div>
       </div>
-      <p class="lead" style="margin-top:28px;">Thank you. Questions?</p>
-      <p style="margin-top:14px;"><a class="go" href="../database-guide/index.html">← Part 1: data models, storage &amp; architecture</a> &nbsp;·&nbsp; <a class="go" href="../distributed-databases/index.html">← Part 2: distributed databases</a> &nbsp;·&nbsp; <a class="go" href="../database-transactions/index.html">← Part 3: transactions</a></p>
+      <p class="lead" style="margin-top:24px;">Thank you. Questions?</p>
+      <p style="margin-top:12px;"><a class="go" href="../specialized-databases/index.html" style="font-size:.95rem; font-weight:600;">Next: Part 5 · specialized databases: vectors, time-series, graphs and search →</a></p>
+      <p style="margin-top:10px;"><a class="go" href="../database-guide/index.html">← Part 1: data models, storage &amp; architecture</a> &nbsp;·&nbsp; <a class="go" href="../distributed-databases/index.html">← Part 2: distributed databases</a> &nbsp;·&nbsp; <a class="go" href="../database-transactions/index.html">← Part 3: transactions</a></p>
     </div>
-    <div class="foot">END · PART 4 / 17</div>
+    <div class="foot">END · PART 4 / 16</div>
   </section>
 
 </main>
 
 <div id="hud">
   <button class="hud-btn" id="prev" aria-label="Previous slide" title="Previous (↑)">↑</button>
-  <button type="button" id="counter" title="All slides (G)">1 / 17</button>
+  <button type="button" id="counter" title="All slides (G)">1 / 16</button>
   <button class="hud-btn" id="next" aria-label="Next slide" title="Next (↓ / Space)">↓</button>
 </div>
 
@@ -902,219 +1070,6 @@ v[n] <span class="k">XOR</span> v[n-1]  →  store only the meaningful middle bi
     b.addEventListener("click", function(){ q = b.getAttribute("data-q"); render(); });
   });
   render();
-})();
-
-/* ===================== HNSW live demo ===================== */
-(function(){
-  "use strict";
-  var root = document.getElementById("hn");
-  if (!root) return;
-  var SVGNS = "http://www.w3.org/2000/svg";
-  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  // deterministic RNG so the graph is the same for every viewer
-  function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-  var R = mulberry32(20261002);
-
-  var N = 150, M = 5, M0 = 2 * M, EFC = 24, MAXL = 2, K = 3, mL = 1 / Math.log(M);
-  var P = [], lev = [], links = [[], [], []];
-  var i, l;
-  for (i = 0; i < N; i++){
-    P.push({ x: 0.05 + 0.9 * R(), y: 0.05 + 0.9 * R() });
-    lev.push(Math.min(MAXL, Math.floor(-Math.log(1 - R()) * mL)));
-  }
-  function d2(a, b){ var dx = a.x - b.x, dy = a.y - b.y; return dx * dx + dy * dy; }
-  function byDist(a, b){ return a[0] - b[0]; }
-
-  // standard HNSW layer search (beam of size ef); stats records every distance computation
-  function searchLayer(q, eps, ef, layer, stats){
-    var vis = {}, cand = [], W = [];
-    eps.forEach(function(e){
-      vis[e] = 1; var de = d2(q, P[e]);
-      cand.push([de, e]); W.push([de, e]);
-      if (stats){ stats.comps++; stats.order.push({ id: e, parent: -1 }); }
-    });
-    cand.sort(byDist); W.sort(byDist);
-    while (cand.length){
-      var c = cand.shift();
-      if (c[0] > W[W.length - 1][0]) break;
-      (links[layer][c[1]] || []).forEach(function(e){
-        if (vis[e]) return; vis[e] = 1;
-        var de = d2(q, P[e]);
-        if (stats){ stats.comps++; stats.order.push({ id: e, parent: c[1] }); }
-        if (W.length < ef || de < W[W.length - 1][0]){
-          cand.push([de, e]); W.push([de, e]); cand.sort(byDist); W.sort(byDist);
-          if (W.length > ef) W.pop();
-        }
-      });
-    }
-    return W.map(function(w){ return w[1]; });
-  }
-
-  // build the index by inserting points one at a time
-  var ep = -1, top = -1;
-  for (i = 0; i < N; i++){
-    for (l = 0; l <= lev[i]; l++) links[l][i] = [];
-    if (ep < 0){ ep = i; top = lev[i]; continue; }
-    var cur = [ep];
-    for (l = top; l > lev[i]; l--) cur = searchLayer(P[i], cur, 1, l).slice(0, 1);
-    for (l = Math.min(top, lev[i]); l >= 0; l--){
-      var W = searchLayer(P[i], cur, EFC, l);
-      var nb = W.slice(0, M), mx = l === 0 ? M0 : M;
-      links[l][i] = nb.slice();
-      for (var j = 0; j < nb.length; j++){
-        var n = nb[j], L = links[l][n];
-        L.push(i);
-        if (L.length > mx){
-          L.sort(function(a, b){ return d2(P[n], P[a]) - d2(P[n], P[b]); });
-          L.length = mx;
-        }
-      }
-      cur = W;
-    }
-    if (lev[i] > top){ ep = i; top = lev[i]; }
-  }
-
-  // run one query and record every step for the animation
-  function trace(q, ef){
-    var ops = [], comps = 1, cur = ep, hops = [0, 0, 0];
-    for (var layer = top; layer > 0; layer--){
-      var moved = true;
-      while (moved){
-        moved = false;
-        var best = cur, bd = d2(q, P[cur]);
-        links[layer][cur].forEach(function(n){ comps++; var dn = d2(q, P[n]); if (dn < bd){ bd = dn; best = n; } });
-        if (best !== cur){ ops.push({ t: "hop", l: layer, a: cur, b: best }); hops[layer]++; cur = best; moved = true; }
-      }
-      ops.push({ t: "drop", l: layer - 1, n: cur });
-    }
-    var st = { comps: 0, order: [] };
-    var W = searchLayer(q, [cur], Math.max(ef, K), 0, st);
-    comps += st.comps - 1;                       // the entry node's distance was already counted
-    var par = {};
-    st.order.forEach(function(o){ ops.push({ t: "visit", id: o.id }); if (!(o.id in par)) par[o.id] = o.parent; });
-    var found = W.slice(0, K);
-    var path = [], x = found[0], guard = 0;
-    while (par[x] !== undefined && par[x] !== -1 && guard++ < N){ path.push([par[x], x]); x = par[x]; }
-    path.reverse();
-    var truth = P.map(function(p, k){ return [d2(q, p), k]; }).sort(byDist).slice(0, K).map(function(a){ return a[1]; });
-    var rec = found.filter(function(f){ return truth.indexOf(f) >= 0; }).length;
-    return { ops: ops, found: found, truth: truth, rec: rec, comps: comps, hops: hops, path: path };
-  }
-
-  // ---------- drawing
-  var svgs = [document.getElementById("hn-l0"), document.getElementById("hn-l1"), document.getElementById("hn-l2")];
-  var dyn = [];
-  function el(tag, attrs, parent){
-    var e = document.createElementNS(SVGNS, tag);
-    for (var k in attrs) e.setAttribute(k, attrs[k]);
-    if (parent) parent.appendChild(e);
-    return e;
-  }
-  function X(k){ return (P[k].x * 100).toFixed(2); }
-  function Y(k){ return (P[k].y * 100).toFixed(2); }
-  svgs.forEach(function(svg, layer){
-    var defs = el("defs", {}, svg);
-    var mk = el("marker", { id: "hnm" + layer, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "4", markerHeight: "4", orient: "auto-start-reverse" }, defs);
-    el("path", { d: "M0 0 L10 5 L0 10 z", "class": "mk" }, mk);
-    var seen = {};
-    for (var a = 0; a < N; a++){
-      if (!links[layer][a]) continue;
-      links[layer][a].forEach(function(b){
-        var key = a < b ? a + "-" + b : b + "-" + a;
-        if (seen[key]) return; seen[key] = 1;
-        el("line", { x1: X(a), y1: Y(a), x2: X(b), y2: Y(b), "class": "e" }, svg);
-      });
-    }
-    for (var k = 0; k < N; k++){
-      if (lev[k] >= layer) el("circle", { cx: X(k), cy: Y(k), r: layer === 0 ? 0.9 : 1.5, "class": "n" }, svg);
-      else el("circle", { cx: X(k), cy: Y(k), r: 0.45, "class": "gh" }, svg);
-    }
-    dyn[layer] = el("g", {}, svg);
-    var count = 0; for (k = 0; k < N; k++) if (lev[k] >= layer) count++;
-    var c = document.getElementById("hn-c" + layer);
-    if (c) c.textContent = count + " nodes";
-  });
-
-  var q = null, ef = 4, res = null, upto = 0, timer = null;
-  var efIn = document.getElementById("hn-ef"), efV = document.getElementById("hn-efv"), log = document.getElementById("hn-log");
-
-  function render(){
-    dyn.forEach(function(g){ while (g.firstChild) g.removeChild(g.firstChild); });
-    if (!q || !res) return;
-    // entry point on the top layer
-    el("circle", { cx: X(ep), cy: Y(ep), r: 2.8, "class": "ent" }, dyn[top]);
-    el("text", { x: (P[ep].x * 100 + 3.2).toFixed(2), y: (P[ep].y * 100 - 2.5).toFixed(2), "class": "t" }, dyn[top]).textContent = "entry";
-    var layerNow = top;
-    for (var s = 0; s < upto && s < res.ops.length; s++){
-      var o = res.ops[s];
-      if (o.t === "hop"){
-        el("line", { x1: X(o.a), y1: Y(o.a), x2: X(o.b), y2: Y(o.b), "class": "hop", "marker-end": "url(#hnm" + o.l + ")" }, dyn[o.l]);
-        el("circle", { cx: X(o.b), cy: Y(o.b), r: 1.5, "class": "vis" }, dyn[o.l]);
-        layerNow = o.l;
-      } else if (o.t === "drop"){
-        el("circle", { cx: X(o.n), cy: Y(o.n), r: 2.8, "class": "ent" }, dyn[o.l]);
-        layerNow = o.l;
-      } else {
-        el("circle", { cx: X(o.id), cy: Y(o.id), r: 1.1, "class": "vis" }, dyn[0]);
-        layerNow = 0;
-      }
-    }
-    var done = upto >= res.ops.length;
-    if (done){
-      res.path.forEach(function(pr){ el("line", { x1: X(pr[0]), y1: Y(pr[0]), x2: X(pr[1]), y2: Y(pr[1]), "class": "hop", "marker-end": "url(#hnm0)" }, dyn[0]); });
-      res.truth.forEach(function(k){ el("circle", { cx: X(k), cy: Y(k), r: 3.6, "class": "tru" }, dyn[0]); });
-      res.found.forEach(function(k){ el("circle", { cx: X(k), cy: Y(k), r: 2.6, "class": "res" }, dyn[0]); });
-    }
-    // query marker on every layer
-    dyn.forEach(function(g){
-      var qx = q.x * 100, qy = q.y * 100;
-      el("line", { x1: qx - 2.2, y1: qy, x2: qx + 2.2, y2: qy, "class": "q" }, g);
-      el("line", { x1: qx, y1: qy - 2.2, x2: qx, y2: qy + 2.2, "class": "q" }, g);
-    });
-    if (!done){
-      log.innerHTML = "Searching… <b>layer " + layerNow + "</b>" + (layerNow > 0 ? ": greedy hops toward the query" : ": beam search, keeping the " + Math.max(ef, K) + " best candidates");
-    } else {
-      var miss = res.rec < K;
-      log.innerHTML =
-        "<b>Upper layers:</b> " + res.hops[2] + " hop(s) on L2, " + res.hops[1] + " on L1, then drop to L0. " +
-        "<b>Layer 0:</b> beam search with efSearch = " + ef + ".<br>" +
-        "<b>" + res.comps + "</b> distance computations vs <b>" + N + "</b> for brute force · <b>recall@3 = " + res.rec + "/3</b>" +
-        (miss ? " — a true neighbour was missed; raise efSearch." : ".");
-    }
-  }
-  function play(animate){
-    if (timer){ clearTimeout(timer); timer = null; }
-    res = trace(q, ef);
-    if (!animate || reduce){ upto = res.ops.length; render(); return; }
-    upto = 0; render();
-    (function step(){
-      upto++; render();
-      if (upto < res.ops.length){
-        timer = setTimeout(step, res.ops[upto - 1].t === "visit" ? 45 : 420);
-      }
-    })();
-  }
-  function randomQuery(){ q = { x: 0.08 + 0.84 * Math.random(), y: 0.08 + 0.84 * Math.random() }; play(true); }
-
-  svgs.forEach(function(svg){
-    svg.addEventListener("click", function(ev){
-      var r = svg.getBoundingClientRect();
-      var x = (ev.clientX - r.left) / r.width, y = (ev.clientY - r.top) / r.height;
-      q = { x: Math.max(0.02, Math.min(0.98, x)), y: Math.max(0.02, Math.min(0.98, y)) };
-      play(true);
-    });
-  });
-  document.getElementById("hn-new").addEventListener("click", randomQuery);
-  document.getElementById("hn-replay").addEventListener("click", function(){ if (q) play(true); });
-  efIn.addEventListener("input", function(){ ef = +efIn.value; efV.textContent = ef; if (q) play(false); });
-
-  // start with a fixed query so the first view is the same for everyone
-  q = { x: 0.71, y: 0.33 };
-  play(false);
-
-  // test hook (harmless): lets automated checks inspect the built graph
-  root.__hnsw = { N: N, top: top, levels: lev, trace: trace, links: links };
 })();
 
 /* ===================== decision-matrix filter ===================== */

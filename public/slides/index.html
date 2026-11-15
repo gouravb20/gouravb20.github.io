@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1c">
-  <meta name="description" content="Slide decks and visual guides for system design, starting with a four-part field guide to databases.">
+  <meta name="description" content="Slide decks and visual guides for system design, starting with a five-part field guide to databases.">
   <title>Slides · System Design Notes</title>
   <script src="../shared/looks.js"></script>
   <script src="../shared/sitenav.js"></script>
@@ -160,19 +160,19 @@
       <h1>Visual guides, one deck at a time</h1>
       <p class="lede">Slide decks that walk through a topic visually, with diagrams and animations. Use the arrow keys or swipe to move between slides.</p>
       <div class="totals">
-        <div class="total"><b>4</b><span>decks</span></div>
-        <div class="total"><b data-count="slides" data-src=".">82</b><span>slides</span></div>
+        <div class="total"><b>5</b><span>decks</span></div>
+        <div class="total"><b data-count="slides" data-src=".">96</b><span>slides</span></div>
       </div>
     </section>
 
-    <h2>A Field Guide to Databases &middot; four parts</h2>
+    <h2>A Field Guide to Databases &middot; five parts</h2>
     <a class="card wide" href="database-guide/index.html" style="--accent:#f59e0b">
       <div class="body">
         <div class="card-head">
           <div class="mono">P1</div>
           <div><h3>Part 1 &middot; Data Models, Storage &amp; Architecture</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="database-guide">22</span> slides</div></div>
         </div>
-        <p>How databases are classified: start from the workload, then three independent axes (data model and query, storage structure, deployment and architecture), the three cluster architectures (shared-nothing; disaggregated, shared-nothing storage; disaggregated, shared storage), seven recurring archetypes, and an animated LSM-Tree.</p>
+        <p>How databases are classified: start from the workload, then three independent axes (data model and query, storage structure, deployment and architecture), the three cluster architectures (shared-nothing; disaggregated, storage nodes; disaggregated, shared storage), seven recurring archetypes, and an animated LSM-Tree.</p>
         <div class="chips"><span class="chip">OLTP vs OLAP</span><span class="chip">Three axes</span><span class="chip">B-Tree vs LSM</span><span class="chip">Seven archetypes</span></div>
         <span class="open">Open slides &rarr;</span>
       </div>
@@ -233,19 +233,40 @@
       <div class="body">
         <div class="card-head">
           <div class="mono">P4</div>
-          <div><h3>Part 4 &middot; Analytical Databases: Columnar, Lakehouses &amp; Vectors</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="database-anatomy-part2">17</span> slides</div></div>
+          <div><h3>Part 4 &middot; OLAP Databases: Columnar Storage, Warehouses &amp; Lakehouses</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="database-anatomy-part2">16</span> slides</div></div>
         </div>
-        <p>The workloads that flip the OLTP defaults: columnar storage and OLAP, warehouses and lakehouses on object storage, vector search with an interactive HNSW demo, time-series, graph and search engines.</p>
-        <div class="chips"><span class="chip">Columnar &amp; OLAP</span><span class="chip">Lakehouse</span><span class="chip">HNSW</span><span class="chip">Time-series</span></div>
+        <p>The workloads that flip the OLTP defaults: columnar storage (with an interactive row-vs-column lab), data skipping, vectorized and MPP execution, star schemas, warehouses, lakehouses and open table formats, real-time OLAP and HTAP.</p>
+        <div class="chips"><span class="chip">Columnar &amp; OLAP</span><span class="chip">Vectorized &amp; MPP</span><span class="chip">Lakehouse</span><span class="chip">HTAP</span></div>
         <span class="open">Open slides &rarr;</span>
       </div>
       <div class="side">
         <strong style="color:var(--text)">Covers</strong>
         <ol>
-          <li>Row vs column layouts and compression</li>
-          <li>Warehouses, lakehouses and table formats</li>
+          <li>Row vs column layouts, compression and data skipping</li>
+          <li>Shuffles, joins and aggregation across many nodes</li>
+          <li>Iceberg, Delta Lake and Hudi on object storage</li>
+          <li>A cheat sheet from workload to first engine</li>
+        </ol>
+      </div>
+    </a>
+
+    <a class="card wide" href="specialized-databases/index.html" style="--accent:#14b8a6">
+      <div class="body">
+        <div class="card-head">
+          <div class="mono">P5</div>
+          <div><h3>Part 5 &middot; Specialized Databases: Vector, Time-Series, Graph &amp; Search</h3><div class="by">Slide deck &middot; <span data-count="slides" data-src="specialized-databases">15</span> slides</div></div>
+        </div>
+        <p>When the shape of the query picks the engine: vector search with an interactive HNSW demo, time-series storage, graph models and traversals, and search engines built on inverted indexes, BM25 and hybrid search.</p>
+        <div class="chips"><span class="chip">Vectors &amp; HNSW</span><span class="chip">Time-series</span><span class="chip">Graphs</span><span class="chip">Search &amp; BM25</span></div>
+        <span class="open">Open slides &rarr;</span>
+      </div>
+      <div class="side">
+        <strong style="color:var(--text)">Covers</strong>
+        <ol>
           <li>ANN indexes: pgvector vs dedicated engines</li>
-          <li>A decision matrix from workload to engine</li>
+          <li>Time-series storage tricks and engines</li>
+          <li>Property graphs, RDF and GQL</li>
+          <li>Inverted indexes, BM25 and hybrid search</li>
         </ol>
       </div>
     </a>

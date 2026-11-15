@@ -46,12 +46,13 @@ Paths in the table are relative to `public/books/`. The [Books page](public/book
 
 ## Slides
 
-*A Field Guide to Databases*, in four parts:
+*A Field Guide to Databases*, in five parts:
 
-- [`slides/database-guide`](public/slides/database-guide/index.html): *Part 1 · Data Models, Storage & Architecture*, a 22-slide deck on how databases are classified: the workload, three axes (data model and query, storage structure, deployment and architecture), the three cluster architectures (shared-nothing; disaggregated, shared-nothing storage; disaggregated, shared storage), an animated LSM-Tree and seven recurring archetypes.
+- [`slides/database-guide`](public/slides/database-guide/index.html): *Part 1 · Data Models, Storage & Architecture*, a 22-slide deck on how databases are classified: the workload, three axes (data model and query, storage structure, deployment and architecture), the three cluster architectures (shared-nothing; disaggregated, storage nodes; disaggregated, shared storage), an animated LSM-Tree and seven recurring archetypes.
 - [`slides/distributed-databases`](public/slides/distributed-databases/index.html): *Part 2 · Distributed Databases: Replication, Partitioning & Consensus*, a 23-slide deck on single-leader, multi-leader and leaderless replication (with an interactive quorum lab), partitioning, request routing and partition metadata, consensus, distributed transactions, and clocks and consistency.
 - [`slides/database-transactions`](public/slides/database-transactions/index.html): *Part 3 · Transactions: ACID, Isolation & Concurrency Control*, a 20-slide deck on ACID, durability settings, isolation anomalies (with an interactive lab), isolation levels, MVCC, locking, serializable snapshot isolation and transactions in NoSQL databases.
-- [`slides/database-anatomy-part2`](public/slides/database-anatomy-part2/index.html): *Part 4 · Analytical Databases: Columnar, Lakehouses & Vectors*, a 17-slide deck on columnar storage and OLAP, warehouses and lakehouses, vector search with an interactive HNSW demo, and time-series, graph and search engines.
+- [`slides/database-anatomy-part2`](public/slides/database-anatomy-part2/index.html): *Part 4 · OLAP Databases: Columnar Storage, Warehouses & Lakehouses*, a 16-slide deck on columnar storage (with an interactive row-vs-column lab), data skipping, vectorized and MPP execution, star schemas, warehouses, lakehouses and open table formats, real-time OLAP and HTAP.
+- [`slides/specialized-databases`](public/slides/specialized-databases/index.html): *Part 5 · Specialized Databases: Vector, Time-Series, Graph & Search*, a 15-slide deck on vector search with an interactive HNSW demo, time-series, graph and search engines.
 
 ## Features of the notes sites
 
@@ -119,6 +120,7 @@ public/                        served as-is under /learn/
     distributed-databases/     slide deck, Part 2
     database-transactions/     slide deck, Part 3
     database-anatomy-part2/    slide deck, Part 4
+    specialized-databases/     slide deck, Part 5
 src/
   content.config.ts            loads every Astro-rendered app's data*.js and demos*.js, validates them with Zod
   lib/notes-source.mjs         finds notes apps and runs their scripts; shared with scripts/check-site.mjs
