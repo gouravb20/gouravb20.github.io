@@ -1,4 +1,4 @@
-<!doctype html><html lang="en" data-theme="dark"><head><meta charset=utf8><meta name="description" content="Part 1 of A Field Guide to Databases: a 22-slide visual guide to how databases are classified: the workload, then three axes in three layers (data model &amp; query, storage structure, deployment &amp; architecture), the three cluster architectures (shared-nothing; disaggregated, storage nodes; disaggregated, shared storage), and seven recurring archetypes."><link rel="canonical" href="https://gouravb20.github.io/learn/slides/database-guide/"><meta property="og:type" content="article"><meta property="og:site_name" content="System Design Notes"><meta property="og:title" content="Part 1 · Data Models, Storage &amp; Architecture"><meta property="og:description" content="Part 1 of A Field Guide to Databases: a 22-slide visual guide to how databases are classified: the workload, then three axes in three layers (data model &amp; query, storage structure, deployment &amp; architecture), the three cluster architectures (shared-nothing; disaggregated, storage nodes; disaggregated, shared storage), and seven recurring archetypes."><meta property="og:url" content="https://gouravb20.github.io/learn/slides/database-guide/"><meta name="twitter:card" content="summary"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><link rel="icon" href="../../favicon.svg" type="image/svg+xml"></head><body>
+<!doctype html><html lang="en" data-theme="dark"><head><meta charset=utf8><meta name="description" content="Part 1 of A Field Guide to Databases: a 22-slide visual guide to how databases are classified: the workload, then three axes in three layers (data model &amp; query, storage structure, deployment &amp; architecture), the three cluster architectures (shared-nothing, compute over storage nodes, compute over a storage service), and seven recurring archetypes."><link rel="canonical" href="https://gouravb20.github.io/learn/slides/database-guide/"><meta property="og:type" content="article"><meta property="og:site_name" content="System Design Notes"><meta property="og:title" content="Part 1 · Data Models, Storage &amp; Architecture"><meta property="og:description" content="Part 1 of A Field Guide to Databases: a 22-slide visual guide to how databases are classified: the workload, then three axes in three layers (data model &amp; query, storage structure, deployment &amp; architecture), the three cluster architectures (shared-nothing, compute over storage nodes, compute over a storage service), and seven recurring archetypes."><meta property="og:url" content="https://gouravb20.github.io/learn/slides/database-guide/"><meta name="twitter:card" content="summary"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><link rel="icon" href="../../favicon.svg" type="image/svg+xml"></head><body>
 <title>Part 1 · Data Models, Storage &amp; Architecture</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -499,7 +499,7 @@
       </div>
       <div class="map-layer one">
         <div class="lname">System<span>where it runs, what's shared</span></div>
-        <div class="card axis"><h3><span class="num">03</span>Deployment &amp; architecture</h3><p>Embedded, single server or cluster: <span class="nw">shared-nothing</span>; disaggregated, <span class="nw">storage nodes</span>; or disaggregated, shared storage.</p><a class="go" href="#s9">Slides 09–10 →</a></div>
+        <div class="card axis"><h3><span class="num">03</span>Deployment &amp; architecture</h3><p>Embedded, single server or cluster. A cluster is <span class="nw">shared-nothing</span>, compute over storage nodes, or compute over a storage service.</p><a class="go" href="#s9">Slides 09–10 →</a></div>
       </div>
       <div class="series">
         <div class="lname">The rest of the series<span>each part is its own deck</span></div>
@@ -527,11 +527,11 @@
       </div>
       <div class="card tight">
         <h3>Structure ⟂ architecture</h3>
-        <p><strong>RocksDB</strong> runs embedded, and as TiKV's engine under TiDB's disaggregated SQL tier. <strong>Aurora</strong> keeps <mark>B-tree</mark> pages on shared storage.</p>
+        <p><strong>RocksDB</strong> runs embedded, and as TiKV's engine under TiDB's separate SQL tier. <strong>Aurora</strong> keeps <mark>B-tree</mark> pages on shared storage.</p>
       </div>
       <div class="card tight">
         <h3>Model ⟂ architecture</h3>
-        <p>Disaggregated, shared storage: <strong>Bigtable</strong> (NoSQL) and <strong>Aurora</strong> (SQL). Shared-nothing: <strong>Cassandra</strong> (NoSQL) and <strong>CockroachDB</strong> (SQL).</p>
+        <p>Compute over a storage service: <strong>Bigtable</strong> (NoSQL) and <strong>Aurora</strong> (SQL). Shared-nothing: <strong>Cassandra</strong> (NoSQL) and <strong>CockroachDB</strong> (SQL).</p>
       </div>
       <div class="card tight">
         <h3>Same engine, every deployment</h3>
@@ -745,7 +745,7 @@
     <div>
       <p class="eyebrow">Axis 03 · system · cluster architecture</p>
       <h2>In a cluster, what do compute and storage share?</h2>
-      <p class="ask"><span>1 · Does the query tier own a partition of the data? Then C1. 2 · If not, does moving work copy persistent data between the database's own storage nodes (C2), or only change ownership, since a storage service holds the bytes (C3)?</span></p>
+      <p class="ask"><span>Find the server that serves a key range. C1: it stores the range and runs the queries. C2: it stores the range; SQL runs on a separate tier. C3: it stores nothing; the range lives in a storage service.</span></p>
     </div>
     <div class="grid cols-3 arch">
       <div class="card tight">
@@ -779,8 +779,8 @@
         <span class="ex">Aurora&nbsp;· Bigtable&nbsp;· HBase&nbsp;· Neon&nbsp;· AlloyDB&nbsp;· <span class="nw">Azure SQL Hyperscale</span></span>
       </div>
     </div>
-    <p class="note"><b>“Shared” means one logical storage system, not one machine:</b> Google's Colossus partitions and replicates data across many machines (shared-nothing underneath). C2 and C3 differ in the contract between compute and storage. On Colossus, <strong>Bigtable</strong> is C3 and <strong>Spanner</strong> is a hybrid: C3 inside a zone, shared-nothing across zones (each read-write or read-only replica keeps a full copy).</p>
-    <p class="read">A classification of architectural patterns, not a standard taxonomy: seen from afar, TiKV is a storage service too.<br>Landmarks: <span class="nw">Stonebraker, “The Case for Shared Nothing” (1986)</span> · <span class="nw">Aurora (SIGMOD 2017)</span> · <span class="nw">TiDB (VLDB 2020)</span></p>
+    <p class="note"><b>“Shared” means one logical storage system, not one machine:</b> Google's Colossus partitions and replicates data across many machines (shared-nothing underneath). In C2 the database places every replica itself; in C3 the storage service does. On Colossus, <strong>Bigtable</strong> is C3 and <strong>Spanner</strong> is a hybrid: C3 inside a zone, shared-nothing across zones (each read-write or read-only replica keeps a full copy).</p>
+    <p class="read">Patterns, not a standard taxonomy. TiKV can serve other apps too; here TiDB runs it as its own storage nodes.<br>Landmarks: <span class="nw">Stonebraker, “The Case for Shared Nothing” (1986)</span> · <span class="nw">Aurora (SIGMOD 2017)</span> · <span class="nw">TiDB (VLDB 2020)</span></p>
     <div class="foot">CLUSTER ARCHITECTURE / 10</div>
   </section>
 
@@ -796,9 +796,9 @@
       <a class="card part tight" href="#s13"><span class="num">A2</span><h3>Classic relational</h3><span class="sigline">SQL · <span class="nw">B-tree</span> · one server + replicas</span><p>Postgres, MySQL, SQL&nbsp;Server, Oracle</p><span class="go">Slide 13 →</span></a>
       <a class="card part tight" href="#s14"><span class="num">A3</span><h3>Key–value store</h3><span class="sigline">key → value · hash tables or <span class="nw">log-structured</span> · single server or <span class="nw">shared-nothing</span></span><p>Redis, Valkey, Memcached, Aerospike</p><span class="go">Slide 14 →</span></a>
       <a class="card part tight" href="#s15"><span class="num">A4</span><h3>Document store</h3><span class="sigline">JSON documents · <span class="nw">B-tree</span> (MongoDB, DynamoDB) · <span class="nw">shared-nothing</span> (Firestore: hybrid, on Spanner)</span><p>MongoDB, Couchbase, DynamoDB, Firestore</p><span class="go">Slide 15 →</span></a>
-      <a class="card part tight" href="#s16"><span class="num">A5</span><h3>Wide-column store</h3><span class="sigline">sorted rows per partition · LSM · <span class="nw">shared-nothing</span> or disaggregated, shared storage</span><p>Cassandra, ScyllaDB, Bigtable, HBase</p><span class="go">Slide 16 →</span></a>
-      <a class="card part tight" href="#s17"><span class="num">A6</span><h3>Shared-storage SQL</h3><span class="sigline">SQL · <span class="nw">B-tree</span> pages · disaggregated, shared storage</span><p>Aurora, Neon, AlloyDB</p><span class="go">Slide 17 →</span></a>
-      <a class="card part tight" href="#s18"><span class="num">A7</span><h3>Distributed SQL</h3><span class="sigline">SQL · LSM · <span class="nw">shared-nothing</span> or disaggregated, <span class="nw">storage nodes</span> (Spanner: hybrid)</span><p>Spanner, CockroachDB, TiDB, YugabyteDB</p><span class="go">Slides 18–19 →</span></a>
+      <a class="card part tight" href="#s16"><span class="num">A5</span><h3>Wide-column store</h3><span class="sigline">sorted rows per partition · LSM · <span class="nw">shared-nothing</span> or compute over a storage service</span><p>Cassandra, ScyllaDB, Bigtable, HBase</p><span class="go">Slide 16 →</span></a>
+      <a class="card part tight" href="#s17"><span class="num">A6</span><h3>Shared-storage SQL</h3><span class="sigline">SQL · <span class="nw">B-tree</span> pages · compute over a storage service</span><p>Aurora, Neon, AlloyDB</p><span class="go">Slide 17 →</span></a>
+      <a class="card part tight" href="#s18"><span class="num">A7</span><h3>Distributed SQL</h3><span class="sigline">SQL · LSM · <span class="nw">shared-nothing</span> or compute over storage nodes (Spanner: hybrid)</span><p>Spanner, CockroachDB, TiDB, YugabyteDB</p><span class="go">Slides 18–19 →</span></a>
       <a class="card part tight" href="../distributed-databases/index.html#s20" style="border-color:var(--accent); background:var(--accent-soft);"><span class="num">ANOTHER CUT</span><h3 class="accent">By how they distribute</h3><p>These are grouped by what the app sees and how a node stores data. Part 2 regroups the distributed ones by replication and routing.</p><span class="go">Part 2, slide 20 →</span></a>
     </div>
     <div class="foot">ARCHETYPES / 11</div>
@@ -896,7 +896,7 @@
     <dl class="sig">
       <div><dt><i>01</i>Model</dt><dd>JSON-like documents, flexible schema. MongoDB and Firestore query any indexed field; DynamoDB goes by partition + sort key, plus secondary indexes</dd></div>
       <div><dt><i>02</i>Structure</dt><dd>B-tree: MongoDB's WiredTiger, and DynamoDB's storage nodes (a B-tree plus a write-ahead log). Firestore sits on Spanner</dd></div>
-      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing: each MongoDB shard and DynamoDB storage node serves the data it holds; mongos and DynamoDB's request routers only route. Couchbase splits by service: key–value calls go to the Data node that owns the vBucket; SQL++ runs in the Query service, which fetches from Data nodes (disaggregated, storage nodes). Firestore runs on Spanner (per Google's ICDE 2023 paper), so it inherits Spanner's hybrid</dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing: each MongoDB shard and DynamoDB storage node serves the data it holds; mongos and DynamoDB's request routers only route. Couchbase splits by service: key–value calls go to the Data node that owns the vBucket; SQL++ runs in the Query service, which fetches from Data nodes (compute over storage nodes). Firestore runs on Spanner (per Google's ICDE 2023 paper), so it inherits Spanner's hybrid</dd></div>
     </dl>
     <div class="grid cols-2">
       <div class="card why"><h3>Why these answers travel together</h3><p>If one request's data lives in one document, the document is the natural unit for everything: written atomically, stored on one partition, loaded in one read. DynamoDB takes it furthest: related items share a partition key and come back in one query. Joins and <a class="go inline" href="../database-transactions/index.html#s16">multi-document transactions</a> exist, but cost more, so you shape the data around the reads.</p></div>
@@ -921,11 +921,11 @@
     <dl class="sig">
       <div><dt><i>01</i>Model</dt><dd>Partition key → rows sorted by a clustering key; columns can differ per row; no joins</dd></div>
       <div><dt><i>02</i>Structure</dt><dd>LSM in all four: memtable, SSTables, compaction (the Bigtable paper named them)</dd></div>
-      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing, no leader: Cassandra (a hash ring) and ScyllaDB (hash-split tablets) nodes serve the ranges they store. Disaggregated, shared storage: Bigtable and HBase serve each key range from one server, but the range's files sit on Colossus or HDFS, so a range moves without copying data</dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing, no leader: Cassandra (a hash ring) and ScyllaDB (hash-split tablets) nodes serve the ranges they store. Compute over a storage service: Bigtable and HBase serve each key range from one server, but the range's files sit on Colossus or HDFS, so a range moves without copying data</dd></div>
     </dl>
     <div class="grid cols-2">
       <div class="card why"><h3>Why these answers travel together</h3><p>Two lineages. <strong>Bigtable</strong> (2006) gave the data model and the LSM engine. <strong>Dynamo</strong> (2007) gave the hash ring and <a class="go inline" href="../distributed-databases/index.html#s8">leaderless replication</a>. Cassandra combines both. Heavy writes suit an LSM, and a request by partition key touches one node; a query without it must scan the cluster.</p></div>
-      <div class="card exc"><h3>The exception that proves the axes</h3><p><strong>Wide-column ≠ columnar</strong>: Cassandra keeps a row's cells together, Bigtable and HBase keep them together per column family; none stores one column across rows. Columnar storage is <a class="go inline" href="../database-anatomy-part2/index.html#s3">Part 4</a>. And one model runs on two architectures: Cassandra is shared-nothing, while Bigtable and HBase run on disaggregated, shared storage (Colossus, HDFS).</p></div>
+      <div class="card exc"><h3>The exception that proves the axes</h3><p><strong>Wide-column ≠ columnar</strong>: Cassandra keeps a row's cells together, Bigtable and HBase keep them together per column family; none stores one column across rows. Columnar storage is <a class="go inline" href="../database-anatomy-part2/index.html#s3">Part 4</a>. And one model runs on two architectures: Cassandra is shared-nothing, while Bigtable and HBase run as compute over a storage service (Colossus, HDFS).</p></div>
     </div>
     <div class="foot">A5 · WIDE-COLUMN / 16</div>
   </section>
@@ -946,11 +946,11 @@
     <dl class="sig">
       <div><dt><i>01</i>Model</dt><dd>Relational; wire-compatible with Postgres, MySQL or SQL Server</dd></div>
       <div><dt><i>02</i>Structure</dt><dd>B-tree pages, rebuilt by storage from the log</dd></div>
-      <div><dt><i>03</i>Architecture</dt><dd>Disaggregated, shared storage, one writer per volume: Aurora's writer and up to 15 readers mount one volume, which storage keeps as 6 copies across 3 zones</dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Compute over a storage service, one writer per volume: Aurora's writer and up to 15 readers mount one volume, which storage keeps as 6 copies across 3 zones</dd></div>
     </dl>
     <div class="grid cols-2">
       <div class="card why"><h3>Why these answers travel together</h3><p>The writer sends only log records, and storage builds the pages (Aurora's “the log is the database”). Network traffic stays small, and readers share the same volume, so a new replica or a failover copies no data. But there is still <strong>one writer</strong>: writes scale up, not out.</p></div>
-      <div class="card exc"><h3>The exception that proves the axes</h3><p>That one-writer ceiling is why AWS added partitioning on top: <strong>Aurora Limitless</strong> shards across writers, and <strong>Aurora DSQL</strong> is a distributed SQL design (<a class="go inline" href="#s18">A7</a>). Disaggregated, shared storage isn't SQL-only either: <strong>Bigtable</strong> servers keep their files on Colossus.</p></div>
+      <div class="card exc"><h3>The exception that proves the axes</h3><p>That one-writer ceiling is why AWS added partitioning on top: <strong>Aurora Limitless</strong> shards across writers, and <strong>Aurora DSQL</strong> is a distributed SQL design (<a class="go inline" href="#s18">A7</a>). Compute over a storage service isn't SQL-only either: <strong>Bigtable</strong> servers keep their files on Colossus.</p></div>
     </div>
     <div class="foot">A6 · SHARED-STORAGE SQL / 17</div>
   </section>
@@ -972,7 +972,7 @@
     <dl class="sig">
       <div><dt><i>01</i>Model</dt><dd>Relational; Postgres- or MySQL-compatible SQL</dd></div>
       <div><dt><i>02</i>Structure</dt><dd>LSM: Pebble, RocksDB; Spanner's Ressi format is LSM-style</dd></div>
-      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing: every node of a single-tenant CockroachDB cluster, and every YugabyteDB node, runs SQL and stores Raft-replicated ranges. Disaggregated, storage nodes: stateless TiDB servers over TiKV (classic TiDB); Aurora DSQL is similar, plus a shared commit journal. Spanner is a hybrid <span class="nw">(<a class="go inline" href="#s10">slide 10</a>)</span></dd></div>
+      <div><dt><i>03</i>Architecture</dt><dd>Shared-nothing: every node of a single-tenant CockroachDB cluster, and every YugabyteDB node, runs SQL and stores Raft-replicated ranges. Compute over storage nodes: stateless TiDB servers over TiKV (classic TiDB); Aurora DSQL is similar, plus a shared commit journal. Spanner is a hybrid <span class="nw">(<a class="go inline" href="#s10">slide 10</a>)</span></dd></div>
     </dl>
     <div class="grid cols-2">
       <div class="card why"><h3>Why these answers travel together</h3><p>Transactions across ranges need <a class="go inline" href="../distributed-databases/index.html#s14">consensus per range</a> (one agreed history each) and a <a class="go inline" href="../distributed-databases/index.html#s18">shared clock</a> (TrueTime, hybrid clocks, a timestamp oracle) so ranges agree on commit order. Ranges are slices of one sorted key space, so an ordered key–value engine below makes them cheap to split and move.</p></div>
@@ -986,7 +986,7 @@
     <div>
       <p class="eyebrow">Archetype A7 · case study</p>
       <h2>Case study: TiDB</h2>
-      <p class="lead" style="margin-top:10px;">One system where the axes are separate parts you can point at: SQL, storage engine, placement and an analytics copy. It is the canonical <a class="go inline" href="#s10">disaggregated, storage nodes</a> design (classic TiDB): stateless TiDB servers over TiKV nodes that each hold replicas of their Regions.</p>
+      <p class="lead" style="margin-top:10px;">One system where the axes are separate parts you can point at: SQL, storage engine, placement and an analytics copy. It is the canonical design with <a class="go inline" href="#s10">compute over storage nodes</a> (classic TiDB): stateless TiDB servers over TiKV nodes that each hold replicas of their Regions.</p>
     </div>
     <div class="split">
       <div>
@@ -997,7 +997,7 @@
           <li><strong>TiFlash</strong>: a columnar replica for analytics → <strong>HTAP</strong> in one system (the bridge to <a class="go inline" href="../database-anatomy-part2/index.html#s14">Part 4</a>).</li>
         </ul>
         <div class="tag-row" style="margin-top:12px;">
-          <span class="pill on">SQL</span><span class="pill warm">LSM</span><span class="pill on">distributed</span><span class="pill on">disaggregated, storage nodes</span>
+          <span class="pill on">SQL</span><span class="pill warm">LSM</span><span class="pill on">distributed</span><span class="pill on">compute over storage nodes</span>
         </div>
       </div>
       <div class="panel-light">
@@ -1023,7 +1023,7 @@
           <li><strong>Write-heavy ingest ⇒ LSM</strong>: sequential appends beat random page writes.</li>
           <li><strong>Data on the database's own storage nodes (C1 and C2) ⇒ partition by key</strong>: a query without the key asks every storage node.</li>
           <li><strong>Ranges that split and move ⇒ an ordered key–value engine underneath</strong>: a range is a slice of one sorted key space, so splitting it is cheap.</li>
-          <li><strong>Disaggregated, shared storage (C3) ⇒ writers must coordinate</strong>: most designs give each piece of data one owner (Aurora: one writer for the whole volume, so writes scale up, not out; Bigtable: one server per tablet). Oracle RAC lets every instance write and keeps their caches in sync with Cache Fusion.</li>
+          <li><strong>Compute over a storage service (C3) ⇒ writers must coordinate</strong>: most designs give each piece of data one owner (Aurora: one writer for the whole volume, so writes scale up, not out; Bigtable: one server per tablet). Oracle RAC lets every instance write and keeps their caches in sync with Cache Fusion.</li>
           <li><strong>Disaggregated compute ⇒ query nodes scale apart from storage</strong>, but data they don't cache crosses the network.</li>
         </ul>
       </div>
@@ -1034,8 +1034,8 @@
           <li><strong>SQL ≠ single node</strong>: Spanner and CockroachDB spread SQL across many nodes.</li>
           <li><strong>NoSQL ≠ LSM</strong>: MongoDB and DynamoDB use B-trees.</li>
           <li><strong>Wide-column ≠ columnar</strong>: it's a row layout.</li>
-          <li><strong>Disaggregated, shared storage ≠ new engine</strong>: Aurora still uses B-tree pages.</li>
-          <li><strong>NoSQL ≠ shared-nothing</strong>: Bigtable runs on <span class="nw">disaggregated, shared storage</span>.</li>
+          <li><strong>Compute over a storage service ≠ new engine</strong>: Aurora still uses B-tree pages.</li>
+          <li><strong>NoSQL ≠ shared-nothing</strong>: Bigtable runs as compute over a storage service.</li>
         </ul>
       </div>
     </div>
@@ -1065,11 +1065,11 @@
           <tr><td class="name">DynamoDB<span class="an">A4</span></td><td>Document, key-first</td><td>DynamoDB API / PartiQL</td><td class="m-eng-btree">B-tree + WAL</td><td>shared-nothing, serverless</td></tr>
           <tr><td class="name">Firestore<span class="an">A4</span></td><td>Document</td><td>Firestore SDK queries</td><td class="m-eng-lsm">on Spanner</td><td>serverless; hybrid (on Spanner)</td></tr>
           <tr><td class="name">Cassandra · Scylla<span class="an">A5</span></td><td>Wide-column</td><td>CQL</td><td class="m-eng-lsm">LSM</td><td>shared-nothing</td></tr>
-          <tr><td class="name">Bigtable / HBase<span class="an">A5</span></td><td>Wide-column</td><td>Bigtable API / HBase API</td><td class="m-eng-lsm">LSM</td><td>disaggregated, shared storage (Colossus / HDFS)</td></tr>
-          <tr><td class="name">Aurora<span class="an">A6</span></td><td>Relational</td><td>SQL</td><td class="m-eng-btree">B-tree pages</td><td>disaggregated, shared storage, one writer</td></tr>
-          <tr><td class="name">Spanner<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM-style</td><td>hybrid: disaggregated, shared storage per zone, shared-nothing across zones</td></tr>
-          <tr><td class="name">CockroachDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (Pebble)</td><td>shared-nothing (Raft per range); multi-tenant cloud: disaggregated, storage nodes</td></tr>
-          <tr><td class="name">TiDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (RocksDB)</td><td>disaggregated, storage nodes (TiKV); TiDB X: disaggregated, shared storage</td></tr>
+          <tr><td class="name">Bigtable / HBase<span class="an">A5</span></td><td>Wide-column</td><td>Bigtable API / HBase API</td><td class="m-eng-lsm">LSM</td><td>compute over a storage service (Colossus / HDFS)</td></tr>
+          <tr><td class="name">Aurora<span class="an">A6</span></td><td>Relational</td><td>SQL</td><td class="m-eng-btree">B-tree pages</td><td>compute over a storage service, one writer</td></tr>
+          <tr><td class="name">Spanner<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM-style</td><td>hybrid: compute over a storage service per zone, shared-nothing across zones</td></tr>
+          <tr><td class="name">CockroachDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (Pebble)</td><td>shared-nothing (Raft per range); multi-tenant cloud: compute over storage nodes</td></tr>
+          <tr><td class="name">TiDB<span class="an">A7</span></td><td>Relational</td><td>SQL</td><td class="m-eng-lsm">LSM (RocksDB)</td><td>compute over storage nodes (TiKV); TiDB X: compute over a storage service</td></tr>
         </tbody>
       </table>
     </div>

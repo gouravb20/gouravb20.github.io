@@ -650,7 +650,7 @@
   <!-- 9 — WAREHOUSE ARCHITECTURE -->
   <section class="slide" id="s9">
     <div>
-      <p class="eyebrow">Architecture · warehouse · disaggregated, shared storage</p>
+      <p class="eyebrow">Architecture · warehouse · compute over a storage service</p>
       <h2>Warehouses keep one shared copy of data and rent compute</h2>
     </div>
     <div class="split">
@@ -661,11 +661,11 @@
           <li><strong>A metadata layer</strong> tracks which files make up each table, per-file stats for pruning, and the transaction log that gives snapshots and time travel.</li>
           <li><strong>The cost</strong>: cold reads cross the network, so engines lean on local SSD caches, result caches and aggressive pruning. A cache is a disposable copy, not a partition: losing a node loses no data.</li>
         </ul>
-        <p class="muted" style="margin-top:12px; font-size:.88rem;">This is Part 1's <a class="go inline" href="../database-guide/index.html#s10">disaggregated, shared storage (C3)</a> pushed to its limit.</p>
+        <p class="muted" style="margin-top:12px; font-size:.88rem;">This is Part 1's <a class="go inline" href="../database-guide/index.html#s10">compute over a storage service (C3)</a> pushed to its limit.</p>
       </div>
       <div class="panel-light">
 <svg class="dgm" viewBox="0 0 420 300" role="img" aria-label="Warehouse: several compute clusters share one metadata layer and one copy of columnar files in object storage" style="max-width:460px"><defs><marker id="w1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8b94a3"/></marker><marker id="w1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f54eb"/></marker></defs><rect class="cl" x="8" y="6" width="404" height="92" rx="12"/><text class="lbl" x="22" y="26">compute: owns no data, only caches · per workload</text><rect class="n-b" x="22" y="40" width="116" height="44" rx="8"/><text x="80.0" y="59.0" text-anchor="middle">cluster A</text><text class="sub" x="80.0" y="74.0" text-anchor="middle">BI dashboards</text><rect class="n-b" x="152" y="40" width="116" height="44" rx="8"/><text x="210.0" y="59.0" text-anchor="middle">cluster B</text><text class="sub" x="210.0" y="74.0" text-anchor="middle">ELT jobs</text><rect class="n-b" x="282" y="40" width="116" height="44" rx="8"/><text x="340.0" y="59.0" text-anchor="middle">cluster C</text><text class="sub" x="340.0" y="74.0" text-anchor="middle">ad hoc</text><path class="ln" d="M80 84 L120 124" marker-end="url(#w1)"/><path class="ln" d="M210 84 L210 124" marker-end="url(#w1)"/><path class="ln" d="M340 84 L300 124" marker-end="url(#w1)"/><rect class="n-g" x="22" y="124" width="376" height="48" rx="8"/><text x="210.0" y="145.0" text-anchor="middle">metadata · catalog · transactions</text><text class="sub" x="210.0" y="160.0" text-anchor="middle">per-file min/max stats → prune before reading</text><path class="ln" d="M120 172 L120 210" marker-end="url(#w1)"/><path class="ln" d="M210 172 L210 210" marker-end="url(#w1)"/><path class="ln" d="M300 172 L300 210" marker-end="url(#w1)"/><rect class="cl" x="8" y="200" width="404" height="92" rx="12"/><text class="lbl" x="22" y="220">shared storage: one copy, every cluster reads it</text><rect class="n-w" x="22" y="232" width="84" height="46" rx="8"/><text x="64.0" y="252.0" text-anchor="middle">file 1</text><text class="sub" x="64.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="118" y="232" width="84" height="46" rx="8"/><text x="160.0" y="252.0" text-anchor="middle">file 2</text><text class="sub" x="160.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="214" y="232" width="84" height="46" rx="8"/><text x="256.0" y="252.0" text-anchor="middle">file 3</text><text class="sub" x="256.0" y="267.0" text-anchor="middle">columnar</text><rect class="n-w" x="310" y="232" width="84" height="46" rx="8"/><text x="352.0" y="252.0" text-anchor="middle">file 4</text><text class="sub" x="352.0" y="267.0" text-anchor="middle">columnar</text></svg>
-        <p class="cap">disaggregated, shared storage · metadata in between</p>
+        <p class="cap">compute over a storage service · metadata in between</p>
       </div>
     </div>
     <div class="foot">WAREHOUSE / 09</div>
@@ -683,7 +683,7 @@
       <div class="lab">metadata · transactions</div><div>Internal catalog and transaction log</div><div><strong>Open table format</strong> (Iceberg, Delta Lake, Hudi): ACID commits, schema evolution, time travel</div>
       <div class="lab">file format</div><div>Proprietary columnar files</div><div>Open columnar files: Parquet (or ORC)</div>
       <div class="lab">storage</div><div>Object storage managed by the vendor</div><div>Your own bucket: S3, GCS, ADLS</div>
-      <div class="lab same">same idea</div><div class="same" style="grid-column: span 2;">immutable columnar files · disaggregated, shared storage · metadata pruning · snapshots</div>
+      <div class="lab same">same idea</div><div class="same" style="grid-column: span 2;">immutable columnar files · compute over a storage service · metadata pruning · snapshots</div>
     </div>
     <div class="grid cols-2">
       <div class="card"><h3>Where it came from</h3><p>A <strong>data lake</strong> was just files in a bucket: cheap and open, but no transactions and no schema enforcement. Table formats added those on top; Databricks popularized the name.</p></div>
@@ -817,11 +817,11 @@
     <div class="matrix-wrap"><table class="dense">
       <thead><tr><th>System</th><th>Deployment</th><th>Storage</th><th>Architecture</th><th>Sweet spot</th></tr></thead>
       <tbody>
-        <tr><td>Snowflake</td><td>Managed SaaS</td><td>Immutable columnar micro-partitions on object storage</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Enterprise warehousing, BI, elastic concurrency</td></tr>
-        <tr><td>BigQuery</td><td>Serverless</td><td>Capacitor columnar format on Google's distributed file system</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Ad hoc scans over huge datasets, no cluster to run</td></tr>
-        <tr><td>Redshift</td><td>Managed cluster or serverless</td><td>Columnar, sort and distribution keys</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>AWS-centric warehousing</td></tr>
-        <tr><td>Databricks SQL</td><td>Managed: serverless (Databricks' account) or pro / classic (your cloud account)</td><td>Delta Lake (Parquet + transaction log) in your bucket or the workspace's default storage</td><td>Disaggregated, <span class="nw">shared storage</span></td><td>Lakehouse: BI, data engineering and ML on one copy of open files</td></tr>
-        <tr><td>ClickHouse</td><td>Self-managed or cloud</td><td>MergeTree parts, sparse primary&nbsp;index</td><td>Shared-nothing;<br>Cloud: disaggregated, <span class="nw">shared storage</span></td><td>Real-time analytics, very high ingest, sub-second aggregates</td></tr>
+        <tr><td>Snowflake</td><td>Managed SaaS</td><td>Immutable columnar micro-partitions on object storage</td><td>Compute over a storage service</td><td>Enterprise warehousing, BI, elastic concurrency</td></tr>
+        <tr><td>BigQuery</td><td>Serverless</td><td>Capacitor columnar format on Google's distributed file system</td><td>Compute over a storage service</td><td>Ad hoc scans over huge datasets, no cluster to run</td></tr>
+        <tr><td>Redshift</td><td>Managed cluster or serverless</td><td>Columnar, sort and distribution keys</td><td>Compute over a storage service</td><td>AWS-centric warehousing</td></tr>
+        <tr><td>Databricks SQL</td><td>Managed: serverless (Databricks' account) or pro / classic (your cloud account)</td><td>Delta Lake (Parquet + transaction log) in your bucket or the workspace's default storage</td><td>Compute over a storage service</td><td>Lakehouse: BI, data engineering and ML on one copy of open files</td></tr>
+        <tr><td>ClickHouse</td><td>Self-managed or cloud</td><td>MergeTree parts, sparse primary&nbsp;index</td><td>Shared-nothing;<br>Cloud: compute over a storage service</td><td>Real-time analytics, very high ingest, sub-second aggregates</td></tr>
         <tr><td>Druid / Pinot</td><td>Self-managed or cloud</td><td>Time-partitioned segments, pre-aggregation, rich indexes</td><td>Hybrid: servers preload segments</td><td>User-facing analytics at high QPS, low latency</td></tr>
         <tr><td>DuckDB</td><td>Embedded, in-process</td><td>Columnar file; reads Parquet and Iceberg, writes Iceberg through a REST catalog</td><td>Embedded: not&nbsp;a&nbsp;cluster</td><td>Local analytics, notebooks, small data apps</td></tr>
       </tbody>
@@ -840,7 +840,7 @@
       <div>
         <ul class="ticks">
           <li><strong>Two requirements</strong>: <em>isolation</em> (analytics must not slow transactions) and <em>freshness</em> (analytics must see recent writes). Most designs keep rows for OLTP and add a second, columnar copy for scans.</li>
-          <li><strong>Separate replica: TiDB + TiFlash</strong> (<a class="go inline" href="../database-guide/index.html#s19">Part 1</a>; disaggregated, storage nodes): a columnar copy joins each Raft group as a <em>learner</em>. It receives the log asynchronously and never votes, so it never slows the write quorum, yet analytical reads still see consistent, recent data.</li>
+          <li><strong>Separate replica: TiDB + TiFlash</strong> (<a class="go inline" href="../database-guide/index.html#s19">Part 1</a>; compute over storage nodes): a columnar copy joins each Raft group as a <em>learner</em>. It receives the log asynchronously and never votes, so it never slows the write quorum, yet analytical reads still see consistent, recent data.</li>
           <li><strong>Same server, two formats</strong>: SQL Server (since 2016) adds an updatable columnstore index to an OLTP table; Oracle Database In-Memory keeps rows in the buffer cache and columns in an in-memory column store; AlloyDB's columnar engine keeps chosen columns in memory, on the primary or on read pool instances.</li>
           <li><strong>Attached accelerator: MySQL HeatWave</strong>: an in-memory columnar cluster beside MySQL; eligible queries are offloaded automatically and changes flow to it in the background. SingleStore is the exception: one format per table, columnstore by default, in-memory rowstore for the hottest tables.</li>
           <li><strong>What you pay</strong>: every write also maintains the column copy, the copy needs memory or nodes, and it covers one source database. Analytics across many systems still needs a warehouse.</li>
@@ -895,7 +895,7 @@
     <div class="matrix-wrap"><table class="dense" id="mx">
       <thead><tr><th>Workload</th><th>First candidates</th><th>Why</th><th>Watch out for</th></tr></thead>
       <tbody>
-        <tr data-c="wh"><td>Ad hoc analytics on TBs</td><td>BigQuery, Snowflake, Redshift</td><td>Disaggregated, <span class="nw">shared storage</span>: one copy, elastic compute</td><td>Cost per byte scanned or per compute-second</td></tr>
+        <tr data-c="wh"><td>Ad hoc analytics on TBs</td><td>BigQuery, Snowflake, Redshift</td><td>Compute over a storage service: one copy, elastic compute</td><td>Cost per byte scanned or per compute-second</td></tr>
         <tr data-c="mpp"><td>Big fact–dimension joins</td><td>Redshift (<code>DISTKEY</code>), Citus (co-located and reference tables)</td><td>Matching rows already sit on one node: no shuffle</td><td>Pick the key of the biggest join; skewed keys</td></tr>
         <tr data-c="lake"><td>One copy, many engines</td><td>Iceberg or Delta Lake + a REST catalog (Polaris, Unity Catalog, Glue) + Spark, Trino, DuckDB</td><td>Open table format: ACID, time travel, your bucket</td><td>Catalog choice, small files, uneven v3 support</td></tr>
         <tr data-c="rt"><td>Real-time dashboards</td><td>ClickHouse, Druid, Pinot</td><td>Ingest from Kafka, pre-aggregate on write, sub-second reads</td><td>Joins, updates, questions you did not pre&#8209;aggregate&nbsp;for</td></tr>
