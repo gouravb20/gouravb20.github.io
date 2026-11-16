@@ -703,7 +703,7 @@
       <div class="card">
         <h3>Fixed slots</h3>
         <p>Hash into a fixed, large number of partitions, then assign partitions to nodes. Adding a node moves whole partitions; keys never re-hash.</p>
-        <p class="who"><b>Redis Cluster</b> 16,384 slots · <b>Aerospike</b> 4,096 partitions · Couchbase 1,024 vBuckets</p>
+        <p class="who"><b>Redis Cluster</b> 16,384 slots · <b>Aerospike</b> 4,096 partitions · Couchbase 128 / 1,024 vBuckets</p>
       </div>
     </div>
     <div class="grid cols-4">
@@ -828,7 +828,7 @@
         <thead><tr><th>Database</th><th>Data replication</th><th>Metadata &amp; membership</th><th>Failure detection</th></tr></thead>
         <tbody>
           <tr><td class="name">Spanner</td><td>Multi-Paxos group per split</td><td>internal placement service</td><td>Paxos leader leases</td></tr>
-          <tr><td class="name">CockroachDB</td><td>Raft per range, plus a leaseholder</td><td>meta ranges under Raft; gossip for cluster info</td><td>node-liveness heartbeats</td></tr>
+          <tr><td class="name">CockroachDB</td><td>Raft per range, plus a leaseholder</td><td>meta ranges under Raft; gossip for cluster info</td><td>store-liveness heartbeats</td></tr>
           <tr><td class="name">TiDB / TiKV</td><td>Raft per region (multi-Raft)</td><td>PD on embedded etcd (Raft), also the timestamp oracle</td><td>store heartbeats to PD</td></tr>
           <tr><td class="name">YugabyteDB</td><td>Raft per tablet</td><td>YB-Master Raft group</td><td>heartbeats to YB-Master</td></tr>
           <tr><td class="name">MongoDB</td><td>replica-set protocol (Raft-derived) per shard</td><td>config servers: a replica set, same protocol</td><td>replica-set heartbeats</td></tr>

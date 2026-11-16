@@ -351,6 +351,13 @@
     .slide.dense .panel-light { padding: 10px; }
     .slide.dense table.dense th, .slide.dense table.dense td { padding: 5px 10px; }
   }
+  /* very short screens (≤760 px tall, e.g. 1280×720): the text column is the tall one, so widen it and narrow the diagram */
+  @media (max-height: 760px) and (min-width: 861px){
+    .slide.dense { padding-block: 24px 40px; }
+    .slide.dense .lead { max-width: 80ch; }
+    .slide.dense .split { grid-template-columns: 1.25fr 1fr; gap: 18px; }
+    .slide.dense ul.ticks li { font-size: .84rem; }
+  }
 </style>
 </head>
 <body>
